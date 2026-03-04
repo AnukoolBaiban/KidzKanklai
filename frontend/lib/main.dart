@@ -3,13 +3,14 @@ import 'package:flutter_application_1/api_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_application_1/screens/all_quest.dart';
 
 import 'screens/login.dart';
 import 'screens/register.dart';
 import 'screens/forgotpw.dart';
 import 'screens/resetpw.dart';
 import 'screens/lobby.dart';
-import 'screens/quest_screen.dart';
+import 'screens/all_quest.dart';
 import 'screens/countdown_screen.dart';
 import 'screens/profile.dart';
 import 'screens/notification.dart';
@@ -92,7 +93,7 @@ class KidzKanklaiApp extends StatelessWidget {
         '/lobby': (context) => LobbyScreen(),
         '/fashion': (context) => const FashionPage(), // Add Fashion Route
         '/setting': (context) => const SettingScreen(),
-        '/quest': (context) => const QuestScreen(),
+        '/allquest': (context) => const AllQuestScreen(),
         '/createnormalquest': (context) => CreateNormalQuestScreen(
           onSubmit: (data) {
             // บันทึกข้อมูลภารกิจ
