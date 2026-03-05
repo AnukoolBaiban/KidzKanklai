@@ -9,6 +9,9 @@ import 'package:flutter_application_1/api_service.dart' as api;
 
 
 import 'package:flutter_application_1/config/app_config.dart'; // [ADDED] สำหรับดึง baseUrl
+import 'package:rive/rive.dart' hide LinearGradient, Image; // [ADDED] Rive
+import 'package:flutter_application_1/api_service.dart' as api; // [ADDED] ApiService
+import 'package:flutter_application_1/config/rive_cache.dart'; // [ADDED] RiveCache
 
 
 class ProfileScreen extends StatefulWidget {
@@ -39,10 +42,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _strStat = "10";
   String _creStat = "10";
 
+  // --- Rive State ---
+  SMINumber? _poseInput;
+  SMINumber? _hairInput;
+  SMINumber? _faceInput;
+  SMINumber? _skinInput;
+  SMINumber? _clothInput;
+  StateMachineController? _controller;
+  api.User? _user; // Store full user profile
+  bool _isRiveLoaded = false;
+
   @override
   void initState() {
     super.initState();
     _fetchUserProfile();
+    _fetchFullProfileForRive(); // Call this to get Rive data
   }
 
   // [UPDATED] ปรับ Logic ให้รับ Level จาก DB แล้วคำนวณแค่เศษ EXP สำหรับหลอด
@@ -85,7 +99,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _fetchUserProfile() async {
     try {
-      final user = _supabase.auth.currentUser;
+      final user = _supabase.auth.currentUser; // Supabase User
       if (user == null) return;
 
       setState(() {
@@ -130,6 +144,84 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       debugPrint('Error fetching profile: $e');
     }
+  }
+
+  // ✅ [ADDED] Fetch Full Profile for Rive
+  Future<void> _fetchFullProfileForRive() async {
+    // We use ID 0 because getProfile uses the token to identify the user
+    final user = await api.ApiService.getProfile(0);
+    if (user != null) {
+      if (mounted) {
+        setState(() {
+          _user = user;
+          _syncRiveToEquipped();
+        });
+      }
+    }
+  }
+
+  // ✅ [ADDED] Rive Logic
+  void _onRiveInit(Artboard artboard) {
+    var controller = StateMachineController.fromArtboard(artboard, 'State Machine 1');
+    if (controller == null && artboard.stateMachines.isNotEmpty) {
+       controller = StateMachineController.fromArtboard(artboard, artboard.stateMachines.first.name);
+    }
+
+    if (controller != null) {
+      artboard.addController(controller);
+      _controller = controller;
+
+      // Bind Inputs
+       for (var input in controller.inputs) {
+        if (input.name == 'Pose') _poseInput = input as SMINumber;
+        if (input.name == 'HairID') _hairInput = input as SMINumber;
+        if (input.name == 'FaceID') _faceInput = input as SMINumber;
+        if (input.name == 'SkinID') _skinInput = input as SMINumber;
+        if (input.name == 'ClothID' || input.name == 'BodyID') _clothInput = input as SMINumber;
+      }
+      
+      // Initial Sync
+      _syncRiveToEquipped();
+
+      // Force Pose to 2 (Peace Sign)
+      if (_poseInput != null) {
+         _poseInput!.value = 2.0; 
+      }
+    }
+    if (mounted) setState(() => _isRiveLoaded = true);
+  }
+
+  double _parseId(String s) {
+      if (s.isEmpty) return 0;
+      if (s.contains('_')) {
+         try { return double.parse(s.split('_').last); } catch (_) {}
+      }
+      if (s.contains(' ')) {
+         try { return double.parse(s.split(' ').last); } catch (_) {}
+      }
+      try { return double.parse(s); } catch(_) { return 0; }
+  }
+
+  void _syncRiveToEquipped() {
+     if (_controller == null || _user == null) return;
+     
+     try {
+        if (_hairInput != null) _hairInput!.value = _parseId(_user!.equippedHair);
+        if (_faceInput != null) _faceInput!.value = _parseId(_user!.equippedFace);
+        if (_skinInput != null) _skinInput!.value = _parseId(_user!.equippedSkin);
+        
+        if (_clothInput != null) {
+            double val = _parseId(_user!.equippedCloth);
+            if (val == 0 && _user!.equippedBody.isNotEmpty) val = _parseId(_user!.equippedBody);
+            _clothInput!.value = val;
+        }
+        
+        // Ensure Pose is set again just in case
+        if (_poseInput != null) _poseInput!.value = 2.0;
+
+     } catch (e) {
+       print("Error syncing Rive Profile: $e");
+     }
   }
 
   // ✅ [เพิ่มฟังก์ชันนี้] เพื่อยิงไปหา Go Backend
@@ -271,34 +363,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Positioned(
             left: 0,
             right: 0,
-            bottom: 20,
-            child: CustomBottomNavigationBar(
-              selectedIndex: _selectedIndex,
-              onItemTapped: (index) {
-                setState(() {
-                  _selectedIndex = index;
-                });
+            bottom: 0, // ให้ติดขอบล่างของ SafeArea
+            child: SafeArea( // ✅ เพิ่ม SafeArea ครอบเอาไว้
+              top: false, // ป้องกันแค่ด้านล่าง ด้านบนไม่ต้อง
+              child: CustomBottomNavigationBar(
+                selectedIndex: _selectedIndex,
+                onItemTapped: (index) {
+                  setState(() {
+                    _selectedIndex = index;
+                  });
 
-                switch (index) {
-                  case 0:
-                    Navigator.pushNamed(context, '/fashion');
-                    break;
-                  case 1:
-                    Navigator.pushNamed(context, '/lobby');
-                    break;
-                  case 2:
-                    Navigator.pushNamed(context, '/map');
-                    break;
-                  case 3:
-                    Navigator.pushNamed(context, '/club');
-                    break;
-                }
-              },
-              avatarUrl: null,
-              playerLevel: widget.user?.level ?? 1,
-              onAvatarTapped: () {
-                Navigator.pushNamed(context, '/profile');
-              },
+                  switch (index) {
+                    case 0:
+                      Navigator.pushNamed(context, '/fashion');
+                      break;
+                    case 1:
+                      Navigator.pushNamed(context, '/lobby');
+                      break;
+                    case 2:
+                      Navigator.pushNamed(context, '/map');
+                      break;
+                    case 3:
+                      Navigator.pushNamed(context, '/club');
+                      break;
+                  }
+                },
+                onAvatarTapped: () {
+                  Navigator.pushNamed(context, '/profile');
+                },
+              ),
             ),
           ),
 
@@ -633,10 +726,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Image.asset(
-                'assets/images/profile/profile-character.png',
+              // [UPDATED] Show Rive Character
+              SizedBox(
                 height: 160,
-                fit: BoxFit.contain,
+                width: 160,
+                child: _user == null 
+                  ? const Center(child: CircularProgressIndicator()) 
+                  : (RiveCache().file != null 
+                      ? RiveAnimation.direct(
+                          RiveCache().file!,
+                          fit: BoxFit.contain,
+                          onInit: _onRiveInit,
+                        )
+                      : RiveAnimation.asset(
+                          'assets/animation/Model2.0.riv', 
+                          fit: BoxFit.contain,
+                          onInit: _onRiveInit,
+                        )),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -685,15 +791,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Image.asset(iconPath, fit: BoxFit.contain),
           ),
           const SizedBox(width: 12),
-          Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-              color: Colors.black,
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: Colors.black,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 8),
           Text(
              value,
              style: const TextStyle(
@@ -777,15 +886,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
               fit: BoxFit.contain,
             ),
             const SizedBox(width: 10),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const Spacer(),
             Image.asset(
               'assets/images/design/design1.png',
               width: 50,

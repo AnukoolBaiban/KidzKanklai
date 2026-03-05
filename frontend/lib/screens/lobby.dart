@@ -17,6 +17,29 @@ class LobbyScreen extends StatefulWidget {
 
 class _LobbyScreenState extends State<LobbyScreen> {
   int _selectedIndex = 1; // Default to Lobby (Room)
+  User? _user; // Local user state
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _user = widget.user; // Initialize with passed user
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    // Always fetch latest data to ensure updates from Fashion/Tasks are reflected
+    // even if widget.user is passed (it might be stale)
+    final profile = await ApiService.getProfile(0);
+    if (mounted) {
+      setState(() {
+        if (profile != null) {
+          _user = profile;
+        }
+        _isLoading = false;
+      });
+    }
+  }
 
   // Right Menu Items
   List<MenuItem> get _menuItems => [
@@ -31,14 +54,14 @@ class _LobbyScreenState extends State<LobbyScreen> {
       imagePath: "assets/images/icon/iconQuest.png",
       label: 'ภารกิจ',
       onTap: () {
-        Navigator.pushNamed(context, '/createnormalquest');
+        Navigator.pushNamed(context,'/questdetail');
       },
     ),
     MenuItem(
       imagePath: "assets/images/item/Gasha.png",
       label: 'กล่องสุ่ม',
       onTap: () {
-        Navigator.pushNamed(context, '/me');
+        Navigator.pushNamed(context, '/gasha');
       },
     ),
   ];
@@ -58,7 +81,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
             children: [
               // Top Bar - ใช้ CustomTopBar
               CustomTopBar(
-                user: widget.user,
+                user: _user, // Use local state
                 onNotificationTapped: () {
                   Navigator.pushNamed(context, '/notification');
                 },
@@ -68,7 +91,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
               ),
 
               // Main Content
-              // Main Content
               Expanded(
                 // Added Expanded to fill remaining space
                 child: Stack(
@@ -77,11 +99,13 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     // Character Widget - อยู่ชั้นล่างสุด
                     Positioned(
                       bottom: -50, // Adjust position as needed
-                      child: CharacterWidget(
-                        height: 600,
-                        width: 500,
-                        user: widget.user, // Pass User
-                      ),
+                      child: _isLoading || _user == null
+                          ? const SizedBox() // Or CircularProgressIndicator() if you want to see it loading
+                          : CharacterWidget(
+                              height: 600,
+                              width: 500,
+                              user: _user, // Pass Updated User to Character
+                            ),
                     ),
 
                     // Right Side Menu Component
@@ -117,8 +141,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
                         break;
                     }
                   },
-                  avatarUrl: null,
-                  playerLevel: widget.user?.level ?? 1,
                   onAvatarTapped: () {
                     Navigator.pushNamed(context, '/profile');
                   },

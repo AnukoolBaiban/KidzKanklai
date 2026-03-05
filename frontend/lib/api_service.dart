@@ -37,30 +37,47 @@ class User {
     required this.equippedSkin,
     required this.equippedHair,
     required this.equippedFace,
+    this.equippedCloth = '',
+    this.equippedShoes = '',
+    this.equippedBody = '',
     required this.statIntellect,
     required this.statStrength,
     required this.statCreativity,
   });
+  
+  final String equippedCloth;
+  final String equippedShoes;
+  final String equippedBody;
+
+  static int _parseInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      id: json['id'] ?? 0,
+      id: _parseInt(json['id']),
       username: json['username'] ?? '',
       email: json['email'] ?? '',
-      level: json['level'] ?? 1,
-      exp: json['exp'] ?? 0,
-      coins: json['coins'] ?? 0,
-      tickets: json['tickets'] ?? 0,
-      vouchers: json['vouchers'] ?? 0,
+      level: _parseInt(json['level']),
+      exp: _parseInt(json['exp']),
+      coins: _parseInt(json['coins']),
+      tickets: _parseInt(json['tickets']),
+      vouchers: _parseInt(json['vouchers']),
       bio: json['bio'] ?? '',
-      soundBGM: json['sound_bgm'] ?? 70,
-      soundSFX: json['sound_sfx'] ?? 70,
+      soundBGM: _parseInt(json['sound_bgm']),
+      soundSFX: _parseInt(json['sound_sfx']),
       equippedSkin: json['equipped_skin'] ?? '',
       equippedHair: json['equipped_hair'] ?? '',
       equippedFace: json['equipped_face'] ?? '',
-      statIntellect: json['stat_intellect'] ?? 0,
-      statStrength: json['stat_strength'] ?? 0,
-      statCreativity: json['stat_creativity'] ?? 0,
+      equippedCloth: json['equipped_cloth'] ?? '',
+      equippedShoes: json['equipped_shoes'] ?? '',
+      equippedBody: json['equipped_body'] ?? '',
+      statIntellect: _parseInt(json['stat_intellect']),
+      statStrength: _parseInt(json['stat_strength']),
+      statCreativity: _parseInt(json['stat_creativity']),
     );
   }
 }
@@ -83,13 +100,46 @@ class InventoryItem {
   });
 
   factory InventoryItem.fromJson(Map<String, dynamic> json) {
+    String name = json['name'] ?? '';
+    int parseRiveId(String n) {
+      if (n.isEmpty) return 0;
+      
+      // Try splitting by _ first (Format: Name_ID)
+      if (n.contains('_')) {
+        try {
+          var parts = n.split('_');
+           // Ensure the last part is actually a number
+          return int.parse(parts.last);
+        } catch (e) {
+          // Fallback or ignore
+        }
+      }
+      
+      // Try splitting by space (Format: Name ID)
+      if (n.contains(' ')) {
+        try {
+           var parts = n.split(' ');
+           return int.parse(parts.last);
+        } catch (e) {}
+      }
+      
+      // Try identifying if the whole string is a number? Unlikely but possible for IDs
+      try {
+        return int.parse(n);
+      } catch (e) {}
+
+      // Log warning for dev (print is okay here for debug)
+      print("Warning: Could not parse RiveID from item name: '$n'. Defaulting to 0.");
+      return 0; 
+    }
+
     return InventoryItem(
-      type: json['type'] ?? '',
-      id: json['id'] ?? '',
-      name: json['name'] ?? '',
+      type: json['category'] ?? '',
+      id: json['id'].toString(),
+      name: name,
       category: json['category'] ?? '',
-      imagePath: json['image_path'] ?? '',
-      riveId: json['rive_id'] ?? 0,
+      imagePath: json['image'] ?? '',
+      riveId: parseRiveId(name),
     );
   }
 }
@@ -99,48 +149,24 @@ class InventoryItem {
 class ApiService {
   // Use 10.0.2.2 for Android Emulator, localhost for iOS/Web
   static const String baseUrl = "http://10.0.2.2:8080";
+  static String? authToken; // Token for Authentication
+
+  static Map<String, String> get _headers => {
+        "Content-Type": "application/json",
+        if (authToken != null) "Authorization": "Bearer $authToken",
+  };
 
   // Auth
   static Future<User?> login(String email, String password) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/login'),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"email": email, "password": password}),
-      );
-
-      if (response.statusCode == 200) {
-        // Login returns basic info, might want to fetch full profile after
-        return User.fromJson(jsonDecode(response.body));
-      }
-    } catch (e) {
-      print("Login Error: $e");
-    }
+    // Note: Login is handled by Supabase Client directly in LoginScreen.
+    // This method is for custom backend login if needed.
     return null;
-  }
-
-  static Future<bool> register(String username, String email, String password) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/register'),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "username": username,
-          "email": email,
-          "password": password
-        }),
-      );
-      return response.statusCode == 201;
-    } catch (e) {
-      print("Register Error: $e");
-      return false;
-    }
   }
 
   // Profile
   static Future<User?> getProfile(int userId) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/me/$userId'));
+      final response = await http.get(Uri.parse('$baseUrl/me'), headers: _headers);
       if (response.statusCode == 200) {
         return User.fromJson(jsonDecode(response.body));
       }
@@ -151,12 +177,12 @@ class ApiService {
   }
 
   // Inventory
-  static Future<List<InventoryItem>> getInventory(int userId) async {
+  static Future<List<InventoryItem>> getInventory() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/inventory/$userId'));
+      final response = await http.get(Uri.parse('$baseUrl/inventory'), headers: _headers);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final list = data['items'] as List;
+        final list = (data['inventory'] as List?) ?? []; // Handle null inventory
         return list.map((e) => InventoryItem.fromJson(e)).toList();
       }
     } catch (e) {
@@ -165,18 +191,34 @@ class ApiService {
     return [];
   }
 
+   // Equipped
+  static Future<List<InventoryItem>> getEquipped() async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/equipped'), headers: _headers);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final list = (data['equipped'] as List?) ?? []; // Handle null equipped
+        return list.map((e) => InventoryItem.fromJson(e)).toList();
+      }
+    } catch (e) {
+      print("Get Equipped Error: $e");
+    }
+    return [];
+  }
+
   // Equip
-  static Future<bool> equipItem(int userId, String type, String itemId) async {
+  static Future<bool> equipItem(String itemId) async {
      try {
       final response = await http.post(
         Uri.parse('$baseUrl/equip'),
-        headers: {"Content-Type": "application/json"},
+        headers: _headers,
         body: jsonEncode({
-          "user_id": userId,
-          "type": type,
-          "item_id": itemId
+          "item_id": int.parse(itemId) 
         }),
       );
+      if (response.statusCode != 200) {
+        print("Equip Failed (${response.statusCode}): ${response.body}");
+      }
       return response.statusCode == 200;
     } catch (e) {
       print("Equip Error: $e");

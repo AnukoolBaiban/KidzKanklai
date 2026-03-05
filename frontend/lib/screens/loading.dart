@@ -24,7 +24,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
 
   Future<void> _loadResources() async {
     // 1. Load Rive File
-    await RiveCache().loadAsset('assets/animation/Model1110.riv');
+    await RiveCache().loadAsset('assets/animation/Model2.0.riv');
     
     // 2. Add other preload logic here if needed (e.g. user data)
     

@@ -153,34 +153,35 @@ class _AchievementScreenState extends State<AchievementScreen> {
           Positioned(
             left: 0,
             right: 0,
-            bottom: 20,
-            child: CustomBottomNavigationBar(
-              selectedIndex: _selectedIndex,
-              onItemTapped: (index) {
-                setState(() {
-                  _selectedIndex = index;
-                });
+            bottom: 0, // ให้ติดขอบล่างของ SafeArea
+            child: SafeArea( // ✅ เพิ่ม SafeArea ครอบเอาไว้
+              top: false, // ป้องกันแค่ด้านล่าง ด้านบนไม่ต้อง
+              child: CustomBottomNavigationBar(
+                selectedIndex: _selectedIndex,
+                onItemTapped: (index) {
+                  setState(() {
+                    _selectedIndex = index;
+                  });
 
-                switch (index) {
-                  case 0:
-                    Navigator.pushNamed(context, '/fashion');
-                    break;
-                  case 1:
-                    Navigator.pushNamed(context, '/lobby');
-                    break;
-                  case 2:
-                    Navigator.pushNamed(context, '/map');
-                    break;
-                  case 3:
-                    Navigator.pushNamed(context, '/club');
-                    break;
-                }
-              },
-              avatarUrl: null,
-              playerLevel: widget.user?.level ?? 1,
-              onAvatarTapped: () {
-                Navigator.pushNamed(context, '/profile');
-              },
+                  switch (index) {
+                    case 0:
+                      Navigator.pushNamed(context, '/fashion');
+                      break;
+                    case 1:
+                      Navigator.pushNamed(context, '/lobby');
+                      break;
+                    case 2:
+                      Navigator.pushNamed(context, '/map');
+                      break;
+                    case 3:
+                      Navigator.pushNamed(context, '/club');
+                      break;
+                  }
+                },
+                onAvatarTapped: () {
+                  Navigator.pushNamed(context, '/profile');
+                },
+              ),
             ),
           ),
         ],
@@ -221,54 +222,76 @@ class _AchievementScreenState extends State<AchievementScreen> {
     return widgets;
   }
 
-  Widget _buildTopBar() {
-    return SafeArea(
+    Widget _buildTopBar() {
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
+            height: screenHeight * 0.098, // responsive
+            color: Colors.black.withOpacity(0.4),
+            alignment: Alignment.bottomCenter,
             child: CustomTopBar(
               user: widget.user,
               onNotificationTapped: () {
                 Navigator.pushNamed(context, '/notification');
               },
               onSettingsTapped: () {
-                Navigator.pushNamed(context, '/settings');
+                Navigator.pushNamed(context, '/setting');
               },
             ),
           ),
 
-          // Back Button
-          Padding(
-            padding: const EdgeInsets.only(left: 20, top: 10),
-            child: GestureDetector(
-              onTapDown: (_) => setState(() => _isPressed = true),
-              onTapUp: (_) {},
-              onTapCancel: () => setState(() => _isPressed = false),
-              onTap: () async {
-                await Future.delayed(const Duration(milliseconds: 200));
-                if (!mounted) return;
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LobbyScreen()),
-                ).then((_) {
-                  setState(() => _isPressed = false);
-                });
-              },
-              child: Image.asset(
-                _isPressed
-                    ? 'assets/images/button/bt-hover-Back.png'
-                    : 'assets/images/button/bt-Back.png',
-                width: 50,
-                height: 50,
-              ),
-            ),
-          ),
+          // เรียก Back Button
+          _buildBackButton(),
         ],
       ),
     );
   }
+
+  Widget _buildBackButton() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    // ขนาดปุ่มตามขนาดจอ
+    final buttonSize = screenWidth * 0.12; // 12% ของความกว้างจอ
+    final topPadding = screenHeight * 0.010;
+
+    return Padding(
+      padding: EdgeInsets.only(left: screenWidth * 0.05, top: topPadding),
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapCancel: () => setState(() => _isPressed = false),
+        onTap: () async {
+          await Future.delayed(const Duration(milliseconds: 150));
+          if (!mounted) return;
+
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => LobbyScreen(user: widget.user),
+            ),
+          ).then((_) {
+            setState(() => _isPressed = false);
+          });
+        },
+        child: Image.asset(
+          _isPressed
+              ? 'assets/images/button/bt-hover-Back.png'
+              : 'assets/images/button/bt-Back.png',
+          width: buttonSize,
+          height: buttonSize,
+        ),
+      ),
+    );
+  }
+
 
   Widget _buildAchievementItem(Achievement achievement, int index) {
     final isExpanded = _expandedAchievementIndex == index;

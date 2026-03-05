@@ -64,6 +64,7 @@ flutter:
   assets:
     - assets/images/
     - assets/animation/
+    - assets/audio/
     - assets/images/achievement/
     - assets/images/background/
     - assets/images/button/
@@ -71,6 +72,9 @@ flutter:
     - assets/images/icon/
     - assets/images/item/
     - assets/images/profile/
+    - assets/images/Fashion/HairStyle/
+    - assets/images/Fashion/Cloth/
+    - assets/images/Fashion/AgeIcon/
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

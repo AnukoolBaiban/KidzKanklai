@@ -5,6 +5,7 @@ import 'package:flutter_application_1/screens/register.dart';
 import 'package:flutter_application_1/screens/forgotpw.dart';
 import 'package:flutter_application_1/screens/profile.dart';
 import 'package:flutter_application_1/screens/lobby.dart';
+import 'package:flutter_application_1/api_service.dart'; // Import ApiService
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -30,6 +31,10 @@ class _LoginScreenState extends State<LoginScreen> {
     _authStream.listen((data) {
       final session = data.session;
       if (session != null && mounted) {
+        // ✅ Save Token to ApiService
+        ApiService.authToken = session.accessToken;
+        print("Token Saved: ${session.accessToken.substring(0, 10)}...");
+        
         Navigator.pushReplacementNamed(context, '/lobby');
       }
     });
@@ -64,6 +69,11 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('เข้าสู่ระบบสำเร็จ')),
         );
+        
+        // Save Token (Explicitly)
+        if (res.session != null) {
+           ApiService.authToken = res.session!.accessToken;
+        }
 
         Navigator.pushReplacementNamed(context, '/lobby');
       }

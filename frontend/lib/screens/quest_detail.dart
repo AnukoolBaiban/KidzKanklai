@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import '../widgets/custom_top_bar.dart';
 import '../api_service.dart';
+import '../screens/lobby.dart';
+import '../widgets/confirm_giveup_popup.dart';
+import '../widgets/reward_popup.dart';
 
 class QuestDetailScreen extends StatefulWidget {
-  final QuestItem quest;
   final User? user;
 
-  const QuestDetailScreen({
-    Key? key,
-    required this.quest,
-    this.user,
-  }) : super(key: key);
+  const QuestDetailScreen({Key? key, this.user}) : super(key: key);
 
   @override
   State<QuestDetailScreen> createState() => _QuestDetailScreenState();
@@ -19,262 +17,326 @@ class QuestDetailScreen extends StatefulWidget {
 class _QuestDetailScreenState extends State<QuestDetailScreen> {
   bool _isPressed = false;
 
+  // Mock Data
+  final String mockTitle = "สรุปคณิตบทที่ 1";
+  final String mockDescription =
+      "อ่านวันละ 2 บท และทำการบ้านบทที่ 1 หน้า 75";
+  final String mockStartDate = "25/06/68";
+  final String mockEndDate = "27/06/68";
+  final String? mockImagePath = "assets/images/achievement/achievement1.png";
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/BG1.png'),
-            fit: BoxFit.cover,
-            onError: (exception, stackTrace) {},
-          ),
-          color: Color(0xFFE3F2FD),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Top Bar
-              CustomTopBar(
-                user: widget.user,
-                onNotificationTapped: () {
-                  Navigator.pushNamed(context, '/notification');
-                },
-                onSettingsTapped: () {
-                  Navigator.pushNamed(context, '/settings');
-                },
-              ),
+    final size = MediaQuery.of(context).size;
+    final topPadding = MediaQuery.of(context).padding.top;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final topBarHeight = 75.0 + topPadding;
 
-              // Back Button
-              Padding(
-                padding: const EdgeInsets.only(left: 20, top: 10),
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      onTapDown: (_) => setState(() => _isPressed = true),
-                      onTapUp: (_) => setState(() => _isPressed = false),
-                      onTapCancel: () => setState(() => _isPressed = false),
-                      onTap: () {
-                        Navigator.pop(context);
-                      },
-                      child: Image.asset(
-                        _isPressed
-                            ? 'assets/bt-hover-Back.png'
-                            : 'assets/bt-Back.png',
-                        width: 50,
-                        height: 50,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 4,
-                                  offset: Offset(0, 2),
+    return Scaffold(
+      body: Stack(
+        children: [
+          // Background
+          _buildBackground(),
+
+          // Top Bar
+          _buildTopBar(topPadding, topBarHeight),
+
+          // Main Content
+          Padding(
+            padding: EdgeInsets.only(
+              top: topBarHeight + 10,
+              left: size.width * 0.05,
+              right: size.width * 0.05,
+              bottom: bottomPadding + 100, // เว้นที่ให้ปุ่ม
+            ),
+            child: Column(
+              children: [
+                // Back Button
+                Row(children: [_buildBackButton()]),
+
+                SizedBox(height: 10),
+
+                // Content Card
+                Expanded(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Color(0xFFAAD7EA), width: 3),
+                    ),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        // Scrollable Content
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
+                          child: SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Quest Title and Dates
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      mockTitle,
+                                      style: TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF447199),
+                                      ),
+                                    ),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          'สร้าง $mockStartDate',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                        Text(
+                                          'วันที่สิ้นสุด $mockEndDate',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 5),
+
+                                Container(height: 2, color: Color(0xFFB3E5FC)),
+
+                                SizedBox(height: 20),
+
+                                // รูปภาพ Section
+                                if (mockImagePath != null) ...[
+                                  Container(
+                                    width: double.infinity,
+                                    padding: EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(5),
+                                      border: Border.all(
+                                        color: Color(0xFF9DD0E7),
+                                        width: 2,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.1),
+                                          blurRadius: 8,
+                                          offset: Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        // Title อยู่ในกล่อง
+                                        Text(
+                                          'รูปภาพ',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF002A50),
+                                          ),
+                                        ),
+
+                                        SizedBox(height: 12),
+
+                                        // Responsive Image
+                                        LayoutBuilder(
+                                          builder: (context, constraints) {
+                                            return Center(
+                                              child: Container(
+                                                width:
+                                                    constraints.maxWidth *
+                                                    0.6, // responsive
+                                                constraints: BoxConstraints(
+                                                  maxWidth: 300,
+                                                  maxHeight: 300,
+                                                ),
+                                                child: AspectRatio(
+                                                  aspectRatio:
+                                                      1, // ทำให้รูปเป็นสี่เหลี่ยม
+                                                  child: ClipRRect(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          12,
+                                                        ),
+                                                    child: Image.asset(
+                                                      mockImagePath!,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder:
+                                                          (
+                                                            context,
+                                                            error,
+                                                            stackTrace,
+                                                          ) {
+                                                            return Container(
+                                                              color: Color(
+                                                                0xFFE8F4F8,
+                                                              ),
+                                                              child: Center(
+                                                                child: Icon(
+                                                                  Icons
+                                                                      .broken_image,
+                                                                  size: 60,
+                                                                  color: Colors
+                                                                      .grey,
+                                                                ),
+                                                              ),
+                                                            );
+                                                          },
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  SizedBox(height: 20),
+                                ],
+
+                                // Description
+                                Text(
+                                  mockDescription,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Color(0xFF313131),
+                                    height: 1.5,
+                                  ),
                                 ),
                               ],
                             ),
-                            child: Icon(
-                              Icons.arrow_back,
-                              color: Color(0xFF2374B5),
-                            ),
-                          );
-                        },
-                      ),
+                          ),
+                        ),
+
+                        // Header "รายละเอียด"
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: _buildHeaderTitle(),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-
-              // Main Content
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      // White Container
-                      Container(
-                        margin: EdgeInsets.only(top: 30),
-                        padding: EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Color(0xFF2374B5),
-                            width: 3,
-                          ),
-                        ),
-                        child: SingleChildScrollView(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SizedBox(height: 40),
-
-                              // Quest Name Section
-                              _buildSectionTitle('สรุปคณิตบทที่ 1'),
-
-                              SizedBox(height: 16),
-
-                              // Dates
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'เริ่ม 25/06/06',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                  ),
-                                  Text(
-                                    'สิ้นสุด 27/06/06',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                              SizedBox(height: 24),
-
-                              // รูปภาพ Section
-                              Text(
-                                'รูปภาพ',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                              ),
-
-                              SizedBox(height: 12),
-
-                              // Image Preview
-                              Center(
-                                child: Container(
-                                  width: 180,
-                                  height: 220,
-                                  decoration: BoxDecoration(
-                                    color: Color(0xFFE8F4F8),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: Color(0xFFB3E5FC),
-                                      width: 2,
-                                    ),
-                                  ),
-                                  child: widget.quest.imagePath != null
-                                      ? ClipRRect(
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                          child: Image.asset(
-                                            widget.quest.imagePath!,
-                                            fit: BoxFit.cover,
-                                            errorBuilder:
-                                                (context, error, stackTrace) {
-                                              return _buildPlaceholderImage();
-                                            },
-                                          ),
-                                        )
-                                      : _buildPlaceholderImage(),
-                                ),
-                              ),
-
-                              SizedBox(height: 24),
-
-                              // รายละเอียด Section
-                              Text(
-                                'อ่านวิธีได้: 2 ขน และทำการบันทึปบทที่ 1 หน้า 75',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.black87,
-                                  height: 1.5,
-                                ),
-                              ),
-
-                              SizedBox(height: 32),
-
-                              // Buttons
-                              Row(
-                                children: [
-                                  // ปุ่มยืนยัน (แดง)
-                                  Expanded(
-                                    child: _buildButton(
-                                      text: 'ยอมเเพ้',
-                                      color: Color(0xFFE74A4A),
-                                      onPressed: () {
-                                        _showGiveUpDialog();
-                                      },
-                                    ),
-                                  ),
-
-                                  SizedBox(width: 12),
-
-                                  // ปุ่มทำสำเร็จ (น้ำเงิน)
-                                  Expanded(
-                                    child: _buildButton(
-                                      text: 'ทำสำเร็จ',
-                                      color: Color(0xFF4A8FE7),
-                                      onPressed: () {
-                                        _showCompleteDialog();
-                                      },
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      // Header Title
-                      _buildHeaderTitle(),
-                    ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
+
+          // Bottom Buttons
+          _buildBottomButtons(bottomPadding),
+        ],
+      ),
+    );
+  }
+
+  // ==================== Components ====================
+
+  Widget _buildBackground() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        color: const Color(0xFFE2F5FD),
+        alignment: Alignment.center,
+        child: Image.asset(
+          "assets/images/background/bg-head.png",
+          fit: BoxFit.contain,
+          width: MediaQuery.of(context).size.width * 0.8,
+          errorBuilder: (context, error, stackTrace) {
+            return Container();
+          },
         ),
       ),
     );
   }
 
-  Widget _buildHeaderTitle() {
+  Widget _buildTopBar(double topPadding, double height) {
     return Positioned(
       top: 0,
       left: 0,
       right: 0,
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF005395), Color(0xFF2374B5)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+      child: Container(
+        height: height,
+        padding: EdgeInsets.only(top: topPadding),
+        color: Colors.black.withOpacity(0.4),
+        alignment: Alignment.bottomCenter,
+        child: CustomTopBar(
+          user: widget.user,
+          onNotificationTapped: () =>
+              Navigator.pushNamed(context, '/notification'),
+          onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBackButton() {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapCancel: () => setState(() => _isPressed = false),
+      onTap: () async {
+        await Future.delayed(const Duration(milliseconds: 150));
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => LobbyScreen(user: widget.user)),
+          ).then((_) => setState(() => _isPressed = false));
+        }
+      },
+      child: Image.asset(
+        _isPressed
+            ? 'assets/images/button/bt-hover-Back.png'
+            : 'assets/images/button/bt-Back.png',
+        width: 50,
+        height: 50,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
             ),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white, width: 3),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 8,
-                offset: Offset(0, 4),
-              ),
-            ],
+            child: Icon(Icons.arrow_back, color: Color(0xFF2374B5)),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildHeaderTitle() {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: FractionalTranslation(
+        translation: const Offset(0, -0.5),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2374B5),
+            borderRadius: BorderRadius.circular(5),
           ),
-          child: Text(
+          child: const Text(
             "รายละเอียด",
             style: TextStyle(
-              fontSize: 24,
+              fontSize: 32,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
@@ -284,35 +346,32 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: Color(0xFF2374B5),
-      ),
-    );
-  }
-
-  Widget _buildPlaceholderImage() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildBottomButtons(double bottomPadding) {
+    return Positioned(
+      bottom: bottomPadding + 20,
+      left: MediaQuery.of(context).size.width * 0.1,
+      right: MediaQuery.of(context).size.width * 0.1,
+      child: Row(
         children: [
-          Icon(
-            Icons.image_outlined,
-            size: 80,
-            color: Color(0xFFB3E5FC),
+          // ปุ่มยอมแพ้ (สีแดงธรรมดา)
+          Expanded(
+            child: _buildButton(
+              text: 'ยอมแพ้',
+              color: Color(0xFFE74A4A),
+              useGradient: false,
+              onPressed: _openGiveUpPopup,
+            ),
           ),
-          SizedBox(height: 8),
-          Text(
-            'เทสต็อป\nภารกิจเเบบปกติ',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFF64B5F6),
-              fontWeight: FontWeight.w500,
+
+          SizedBox(width: 15),
+
+          // ปุ่มทำสำเร็จ (ไล่สี)
+          Expanded(
+            child: _buildButton(
+              text: 'ทำสำเร็จ',
+              color: Color(0xFF4A8FE7),
+              useGradient: true,
+              onPressed: _openRewardPopup,
             ),
           ),
         ],
@@ -324,18 +383,22 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
     required String text,
     required Color color,
     required VoidCallback onPressed,
+    bool useGradient = false,
   }) {
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color, color.withOpacity(0.8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: useGradient ? null : color,
+        gradient: useGradient
+            ? LinearGradient(
+                colors: [Color(0xFF556AEB), Color(0xFF59ABEC)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              )
+            : null,
         borderRadius: BorderRadius.circular(25),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.4),
+            color: color.withOpacity(0.35),
             blurRadius: 8,
             offset: Offset(0, 4),
           ),
@@ -362,68 +425,39 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
       ),
     );
   }
+  // ==================== Dialogs ====================
 
-  void _showGiveUpDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('ยืนยันยอมแพ้'),
-        content: Text('คุณแน่ใจหรือไม่ว่าต้องการยอมแพ้ภารกิจนี้?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('ยกเลิก'),
+  void _openGiveUpPopup() {
+    ConfirmGiveUpPopup.show(
+      context,
+      onConfirm: () {
+        Navigator.pop(context); // ปิด popup
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('ยอมแพ้ภารกิจแล้ว'),
+            backgroundColor: Colors.red,
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // ปิด dialog
-              Navigator.pop(context); // กลับหน้าเดิม
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('ยอมแพ้ภารกิจแล้ว'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            },
-            child: Text('ยืนยัน', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  void _showCompleteDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('ยืนยันทำสำเร็จ'),
-        content: Text('คุณแน่ใจหรือไม่ว่าทำภารกิจนี้สำเร็จแล้ว?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('ยกเลิก'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // ปิด dialog
-              Navigator.pop(context); // กลับหน้าเดิม
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('ทำภารกิจสำเร็จ! +100 EXP'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            },
-            child: Text('ยืนยัน', style: TextStyle(color: Colors.green)),
-          ),
-        ],
-      ),
+  void _openRewardPopup() {
+    RewardPopup.show(
+      context,
+      rewardType: 'EXP',
+      amount: 100,
+      onClose: () {
+        Navigator.pop(context);
+      },
     );
   }
 }
 
-// Quest Model
-class QuestItem {
+// ==================== Model ====================
+
+class Quest {
   final String id;
   final String name;
   final String description;
@@ -432,7 +466,7 @@ class QuestItem {
   final DateTime dueDate;
   final bool isCompleted;
 
-  QuestItem({
+  Quest({
     required this.id,
     required this.name,
     required this.description,

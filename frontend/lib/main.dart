@@ -3,14 +3,14 @@ import 'package:flutter_application_1/api_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_application_1/screens/all_quest.dart';
 
 import 'screens/login.dart';
 import 'screens/register.dart';
 import 'screens/forgotpw.dart';
 import 'screens/resetpw.dart';
 import 'screens/lobby.dart';
-import 'screens/fashion_screen.dart';
-import 'screens/quest_screen.dart';
+import 'screens/all_quest.dart';
 import 'screens/countdown_screen.dart';
 import 'screens/profile.dart';
 import 'screens/notification.dart';
@@ -21,15 +21,18 @@ import 'screens/club_screen.dart';
 import 'screens/setting.dart';
 import 'screens/startgame.dart';
 import 'screens/loading.dart';
-import 'screens/test.dart';
 import 'screens/me.dart';
+import 'screens/fashion.dart';
 import 'screens/create_normal_quest.dart';
+import 'screens/quest_detail.dart';
 import 'config/rive_cache.dart';
 import 'config/user_pose_provider.dart';
-
+import 'services/audio_manager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await AudioManager().init();
 
   await Supabase.initialize(
     url: 'https://dregaeeryyqlfssejzbr.supabase.co',
@@ -38,6 +41,13 @@ Future<void> main() async {
       authFlowType: AuthFlowType.pkce,
     ),
   );
+
+  // Restore Token if session exists
+  final session = Supabase.instance.client.auth.currentSession;
+  if (session != null) {
+    ApiService.authToken = session.accessToken;
+    print("Restore Token: ${session.accessToken.substring(0, 10)}...");
+  }
 
   runApp(
     MultiProvider(
@@ -49,13 +59,16 @@ Future<void> main() async {
   );
 }
 
+// สร้างตัวแปร Global เป็น Observer ตัวใหม่ของเรา
+final MusicRouteObserver musicObserver = MusicRouteObserver();
+
 class KidzKanklaiApp extends StatelessWidget {
   const KidzKanklaiApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      // ... existing code ...
+
       title: 'KidzKanklai',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -64,6 +77,9 @@ class KidzKanklaiApp extends StatelessWidget {
         useMaterial3: true,
       ),
 
+      // ลงทะเบียน Observer ของเรา
+      navigatorObservers: [musicObserver],
+
       home: const LoadingScreen(),
       
       routes: {
@@ -71,14 +87,14 @@ class KidzKanklaiApp extends StatelessWidget {
         '/auth': (context) => const AuthGate(),
         '/me': (context) => const MeScreen(),
 
-        '/test': (context) => const TestScreen(),
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
         '/forgotpw': (context) => const ForgotPWScreen(),
         '/resetpw': (context) => const ResetPWScreen(),
         '/lobby': (context) => LobbyScreen(),
+        '/fashion': (context) => const FashionPage(), // Add Fashion Route
         '/setting': (context) => const SettingScreen(),
-        '/quest': (context) => const QuestScreen(),
+        //'/allquest': (context) => const AllQuestScreen(),
         '/createnormalquest': (context) => CreateNormalQuestScreen(
           onSubmit: (data) {
             // บันทึกข้อมูลภารกิจ
@@ -102,6 +118,7 @@ class KidzKanklaiApp extends StatelessWidget {
             );
           },
         ),
+        '/questdetail': (context) => const QuestDetailScreen(),
         '/countdown': (context) => const CountdownScreen(),
         '/profile': (context) => const ProfileScreen(),
         '/notification': (context) => const NotificationScreen(),
@@ -129,6 +146,7 @@ class AuthGate extends StatelessWidget {
 
         if (session != null) {
           // ✅ login แล้ว
+          AudioManager().playBGM('lobby.mp3');
           return const LobbyScreen();
         } else {
           // ❌ ยังไม่ login
