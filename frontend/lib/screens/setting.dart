@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_application_1/screens/lobby.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_application_1/services/audio_manager.dart';
+import 'package:flutter_application_1/api_service.dart' as api;
+
+import 'package:flutter_application_1/widgets/custom_top_bar.dart';
 
 class SettingScreen extends StatefulWidget {
-  const SettingScreen({super.key});
+  final api.User? user;
+  const SettingScreen({super.key, this.user});
 
   @override
   State<SettingScreen> createState() => _SettingScreenState();
@@ -13,16 +17,16 @@ class SettingScreen extends StatefulWidget {
 class _SettingScreenState extends State<SettingScreen> {
   // State Variables
   bool _isPressed = false;
-  
+
   // [UPDATED] รับค่าจาก AudioManager แทนการ Hardcode
   bool _isMuted = false;
   double _musicVolume = 0.7;
   double _sfxVolume = 0.7;
-  
+
   // Auth State
   User? _currentUser;
   final _supabase = Supabase.instance.client;
-  
+
   // [ADDED] ตัวจัดการเสียง
   final AudioManager _audioManager = AudioManager();
 
@@ -56,9 +60,9 @@ class _SettingScreenState extends State<SettingScreen> {
     await _supabase.auth.signOut();
     if (mounted) {
       // เมื่อ SignOut เสร็จ onAuthStateChange จะทำงานและรีเฟรชหน้าจอเป็น Guest เอง
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ออกจากระบบเรียบร้อย')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('ออกจากระบบเรียบร้อย')));
 
       Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
     }
@@ -85,7 +89,7 @@ class _SettingScreenState extends State<SettingScreen> {
               fit: BoxFit.cover,
             ),
           ),
-          
+
           // Top Bar Overlay
           _buildTopBar(),
 
@@ -110,28 +114,27 @@ class _SettingScreenState extends State<SettingScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.start,
                         children: [
-                           const SizedBox(height: 50),
-                           
-                           // --- [LOGIC] ส่วนที่เปลี่ยนตามสถานะ Login ---
-                           if (isLoggedIn) ...[
-                             _buildLoggedInAccountSection(),
-                             _buildLinkedAccountSection(),
-                           ] else ...[
-                             _buildGuestAccountSection(),
-                           ],
-                           // ------------------------------------------
+                          const SizedBox(height: 50),
 
-                           _buildVolumeSettingsSection(),
-                           
-                           // ปุ่ม Logout (แสดงเฉพาะตอน Login แล้ว)
-                           if (isLoggedIn) 
-                             _buildLogoutButton(),
+                          // --- [LOGIC] ส่วนที่เปลี่ยนตามสถานะ Login ---
+                          if (isLoggedIn) ...[
+                            _buildLoggedInAccountSection(),
+                            _buildLinkedAccountSection(),
+                          ] else ...[
+                            _buildGuestAccountSection(),
+                          ],
+
+                          // ------------------------------------------
+                          _buildVolumeSettingsSection(),
+
+                          // ปุ่ม Logout (แสดงเฉพาะตอน Login แล้ว)
+                          if (isLoggedIn) _buildLogoutButton(),
                         ],
                       ),
-                    ), 
+                    ),
                   ),
                 ),
-                
+
                 // Header Title
                 _buildHeaderTitle(),
               ],
@@ -143,24 +146,29 @@ class _SettingScreenState extends State<SettingScreen> {
   }
 
   Widget _buildTopBar() {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
+    return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Top Bar Black Box
           Container(
-            height: 75,
-            color: Colors.black.withOpacity(0.4),
+            child: CustomTopBar(
+              user: widget.user,
+              onNotificationTapped: () {
+                Navigator.pushNamed(context, '/notification');
+              },
+              onSettingsTapped: () {
+                Navigator.pushNamed(context, '/settings');
+              },
+            ),
           ),
+
+          // Back Button
           Padding(
-            padding: const EdgeInsets.only(left: 20, top: 10), 
+            padding: const EdgeInsets.only(left: 20, top: 10),
             child: GestureDetector(
               onTapDown: (_) => setState(() => _isPressed = true),
-              onTapUp: (_) {}, 
+              onTapUp: (_) {},
               onTapCancel: () => setState(() => _isPressed = false),
               onTap: () async {
                 await Future.delayed(const Duration(milliseconds: 200));
@@ -229,10 +237,7 @@ class _SettingScreenState extends State<SettingScreen> {
             // แสดง Email จริงถ้ามี หรือแสดง default
             child: Text(
               "อีเมล : ${_currentUser?.email ?? 'xxxxxx@gmail.com'}",
-              style: const TextStyle(
-                fontSize: 18,
-                color: Colors.black87,
-              ),
+              style: const TextStyle(fontSize: 18, color: Colors.black87),
             ),
           ),
         ],
@@ -243,7 +248,7 @@ class _SettingScreenState extends State<SettingScreen> {
   Widget _buildLinkedAccountSection() {
     // 1. ดึง User ปัจจุบัน
     final user = Supabase.instance.client.auth.currentUser;
-    
+
     // 2. ดึง List ของ Providers ที่ User มี (เช่น ['email', 'google'])
     // ถ้าไม่มีให้เป็น List ว่าง
     final List<dynamic> providers = user?.appMetadata['providers'] ?? [];
@@ -267,16 +272,16 @@ class _SettingScreenState extends State<SettingScreen> {
           const SizedBox(height: 6),
           const Divider(height: 3, color: Color(0xFFCCE7F2)),
           const SizedBox(height: 6),
-          
+
           // --- Google Row ---
           _buildProviderRow(
             iconPath: 'assets/images/icon/iconGoogle.png',
             label: 'Google',
             isConnected: isGoogleConnected,
           ),
-          
+
           const SizedBox(height: 6),
-          
+
           // --- Email Row ---
           _buildProviderRow(
             iconPath: 'assets/images/icon/iconEmail.png',
@@ -298,10 +303,7 @@ class _SettingScreenState extends State<SettingScreen> {
       children: [
         Image.asset(iconPath, width: 40, height: 40),
         const SizedBox(width: 15),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 18, color: Colors.black),
-        ),
+        Text(label, style: const TextStyle(fontSize: 18, color: Colors.black)),
         const Spacer(),
         if (isConnected)
           Container(
@@ -358,7 +360,7 @@ class _SettingScreenState extends State<SettingScreen> {
             color: const Color(0xFFCCE7F2),
           ),
           const SizedBox(height: 20),
-          
+
           // Guest Character Image
           Center(
             child: Image.asset(
@@ -367,7 +369,7 @@ class _SettingScreenState extends State<SettingScreen> {
             ),
           ),
           const SizedBox(height: 10),
-          
+
           // "Not Logged In" Text
           const Center(
             child: Text(
@@ -380,7 +382,7 @@ class _SettingScreenState extends State<SettingScreen> {
             ),
           ),
           const SizedBox(height: 15),
-          
+
           // Login Button
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -399,10 +401,7 @@ class _SettingScreenState extends State<SettingScreen> {
                 ),
                 child: const Text(
                   "เข้าสู่ระบบ",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -447,7 +446,7 @@ class _SettingScreenState extends State<SettingScreen> {
           ),
           const SizedBox(height: 5),
           const SizedBox(height: 5),
-          
+
           // Mute Toggle
           Container(
             width: double.infinity,
@@ -481,11 +480,11 @@ class _SettingScreenState extends State<SettingScreen> {
                     duration: const Duration(milliseconds: 200),
                     width: 70,
                     height: 32,
-                    padding: const EdgeInsets.all(2), 
+                    padding: const EdgeInsets.all(2),
                     decoration: BoxDecoration(
-                      color: _isMuted 
-                          ? Colors.white.withOpacity(0.8) 
-                          : const Color(0xFF002A50), 
+                      color: _isMuted
+                          ? Colors.white.withOpacity(0.8)
+                          : const Color(0xFF002A50),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: const Color(0xFF002A50),
@@ -527,12 +526,14 @@ class _SettingScreenState extends State<SettingScreen> {
                               ),
                             ),
                           ),
-                        
+
                         AnimatedAlign(
                           duration: const Duration(milliseconds: 200),
-                          alignment: _isMuted ? Alignment.centerRight : Alignment.centerLeft,
+                          alignment: _isMuted
+                              ? Alignment.centerRight
+                              : Alignment.centerLeft,
                           child: Container(
-                            width: 24, 
+                            width: 24,
                             height: 24,
                             decoration: const BoxDecoration(
                               shape: BoxShape.circle,
@@ -548,25 +549,25 @@ class _SettingScreenState extends State<SettingScreen> {
             ),
           ),
           const SizedBox(height: 6),
-          
+
           // [UPDATED] Music Slider เชื่อมต่อกับ _audioManager
           _buildVolumeSlider(
             label: "Music / BGM",
             value: _musicVolume,
             onChanged: (val) {
               setState(() => _musicVolume = val); // อัปเดต UI
-              _audioManager.setMusicVolume(val);  // อัปเดตเสียงจริง
+              _audioManager.setMusicVolume(val); // อัปเดตเสียงจริง
             },
           ),
           const SizedBox(height: 6),
-          
+
           // [UPDATED] SFX Slider เชื่อมต่อกับ _audioManager
           _buildVolumeSlider(
             label: "Sound Effects / SFX",
             value: _sfxVolume,
             onChanged: (val) {
-              setState(() => _sfxVolume = val);   // อัปเดต UI
-              _audioManager.setSfxVolume(val);    // อัปเดตเสียงจริง
+              setState(() => _sfxVolume = val); // อัปเดต UI
+              _audioManager.setSfxVolume(val); // อัปเดตเสียงจริง
             },
           ),
         ],
@@ -604,12 +605,16 @@ class _SettingScreenState extends State<SettingScreen> {
                   final newValue = (value - 0.1).clamp(0.0, 1.0);
                   onChanged(newValue);
                 },
-                child: const Icon(Icons.arrow_left, size: 50, color: Color(0xFF2374B5)),
+                child: const Icon(
+                  Icons.arrow_left,
+                  size: 50,
+                  color: Color(0xFF2374B5),
+                ),
               ),
               Expanded(
                 child: SizedBox(
-                   height: 30, 
-                   child: SliderTheme(
+                  height: 30,
+                  child: SliderTheme(
                     data: SliderTheme.of(context).copyWith(
                       trackHeight: 10,
                       trackShape: const GradientRectSliderTrackShape(
@@ -624,15 +629,15 @@ class _SettingScreenState extends State<SettingScreen> {
                         borderColor: Color(0xFF002A50),
                         borderWidth: 2,
                       ),
-                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 12.0),
+                      overlayShape: const RoundSliderOverlayShape(
+                        overlayRadius: 12.0,
+                      ),
                       overlayColor: const Color(0xFF2374B5).withOpacity(0.2),
                       activeTrackColor: Colors.transparent, // Handled by shape
-                      inactiveTrackColor: Colors.white, // Handled by shape but used as fallback/param
+                      inactiveTrackColor: Colors
+                          .white, // Handled by shape but used as fallback/param
                     ),
-                    child: Slider(
-                      value: value,
-                      onChanged: onChanged,
-                    ),
+                    child: Slider(value: value, onChanged: onChanged),
                   ),
                 ),
               ),
@@ -641,7 +646,11 @@ class _SettingScreenState extends State<SettingScreen> {
                   final newValue = (value + 0.1).clamp(0.0, 1.0);
                   onChanged(newValue);
                 },
-                child: const Icon(Icons.arrow_right, size: 50, color: Color(0xFF2374B5)),
+                child: const Icon(
+                  Icons.arrow_right,
+                  size: 50,
+                  color: Color(0xFF2374B5),
+                ),
               ),
             ],
           ),
@@ -668,10 +677,7 @@ class _SettingScreenState extends State<SettingScreen> {
           ),
           child: const Text(
             "ออกจากระบบ",
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ),
       ),
@@ -756,12 +762,15 @@ class CircleThumbShape extends SliderComponentShape {
   }
 }
 
-class GradientRectSliderTrackShape extends SliderTrackShape with BaseSliderTrackShape {
+class GradientRectSliderTrackShape extends SliderTrackShape
+    with BaseSliderTrackShape {
   final LinearGradient gradient;
   final bool darkenInactive;
 
   const GradientRectSliderTrackShape({
-    this.gradient = const LinearGradient(colors: [Colors.lightBlue, Colors.blue]),
+    this.gradient = const LinearGradient(
+      colors: [Colors.lightBlue, Colors.blue],
+    ),
     this.darkenInactive = true,
   });
 
@@ -787,7 +796,7 @@ class GradientRectSliderTrackShape extends SliderTrackShape with BaseSliderTrack
       isEnabled: isEnabled,
       isDiscrete: isDiscrete,
     );
-    
+
     final Paint activePaint = Paint()
       ..shader = gradient.createShader(trackRect)
       ..style = PaintingStyle.fill;
@@ -801,12 +810,26 @@ class GradientRectSliderTrackShape extends SliderTrackShape with BaseSliderTrack
     final RRect fullRRect = RRect.fromRectAndRadius(trackRect, radius);
 
     context.canvas.save();
-    context.canvas.clipRect(Rect.fromLTRB(thumbCenter.dx, trackRect.top, trackRect.right, trackRect.bottom));
+    context.canvas.clipRect(
+      Rect.fromLTRB(
+        thumbCenter.dx,
+        trackRect.top,
+        trackRect.right,
+        trackRect.bottom,
+      ),
+    );
     context.canvas.drawRRect(fullRRect, inactivePaint);
     context.canvas.restore();
 
     context.canvas.save();
-    context.canvas.clipRect(Rect.fromLTRB(trackRect.left, trackRect.top, thumbCenter.dx, trackRect.bottom));
+    context.canvas.clipRect(
+      Rect.fromLTRB(
+        trackRect.left,
+        trackRect.top,
+        thumbCenter.dx,
+        trackRect.bottom,
+      ),
+    );
     context.canvas.drawRRect(fullRRect, activePaint);
     context.canvas.restore();
   }

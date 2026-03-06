@@ -190,17 +190,12 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
   }
 
   Widget _buildTopBar() {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
+    return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            height: 75,        
-            color: Colors.black.withOpacity(0.4),
             alignment: Alignment.bottomCenter,
             child: CustomTopBar(
               user: widget.user,

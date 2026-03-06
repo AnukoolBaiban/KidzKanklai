@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/screens/lobby.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http; // เพิ่ม import นี้
 import 'dart:convert'; // สำหรับ jsonEncode
+import 'package:flutter_application_1/widgets/custom_top_bar.dart';
+import 'package:flutter_application_1/widgets/bottom_navigation_bar.dart';
+import 'package:flutter_application_1/api_service.dart' as api;
+
 
 import 'package:flutter_application_1/config/app_config.dart'; // [ADDED] สำหรับดึง baseUrl
 import 'package:rive/rive.dart' hide LinearGradient, Image; // [ADDED] Rive
@@ -10,7 +15,8 @@ import 'package:flutter_application_1/config/rive_cache.dart'; // [ADDED] RiveCa
 
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final api.User? user;
+  const ProfileScreen({super.key, this.user});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -18,6 +24,8 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _supabase = Supabase.instance.client;
+  bool _isPressed = false;
+  int _selectedIndex = 4; 
 
   // --- Profile Data ---
   String _displayName = "Loading...";
@@ -351,23 +359,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ),
+          // Bottom Navigation
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0, // ให้ติดขอบล่างของ SafeArea
+            child: SafeArea( // ✅ เพิ่ม SafeArea ครอบเอาไว้
+              top: false, // ป้องกันแค่ด้านล่าง ด้านบนไม่ต้อง
+              child: CustomBottomNavigationBar(
+                selectedIndex: _selectedIndex,
+                onItemTapped: (index) {
+                  setState(() {
+                    _selectedIndex = index;
+                  });
+
+                  switch (index) {
+                    case 0:
+                      Navigator.pushNamed(context, '/fashion');
+                      break;
+                    case 1:
+                      Navigator.pushNamed(context, '/lobby');
+                      break;
+                    case 2:
+                      Navigator.pushNamed(context, '/map');
+                      break;
+                    case 3:
+                      Navigator.pushNamed(context, '/club');
+                      break;
+                  }
+                },
+                onAvatarTapped: () {
+                  Navigator.pushNamed(context, '/profile');
+                },
+              ),
+            ),
+          ),
+
         ],
       ),
     );
   }
 
   Widget _buildTopBar() {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
+    return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            height: 75,
-            color: Colors.black.withValues(alpha: 0.4),
+          Container(    
+            alignment: Alignment.bottomCenter,
+            child: CustomTopBar(
+              user: widget.user,
+              onNotificationTapped: () {
+                Navigator.pushNamed(context, '/notification');
+              },
+              onSettingsTapped: () {
+                Navigator.pushNamed(context, '/setting');
+              },
+            ),
           ),
         ],
       ),

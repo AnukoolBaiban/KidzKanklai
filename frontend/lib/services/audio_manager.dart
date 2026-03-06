@@ -1,4 +1,5 @@
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AudioManager {
@@ -36,9 +37,15 @@ class AudioManager {
     await _sfxPlayer.setReleaseMode(ReleaseMode.stop);
   }
 
-  // 5. ฟังก์ชันเล่นเพลง BGM
+  // เพิ่มตัวแปรเก็บชื่อเพลงที่กำลังเล่นอยู่
+  String? _currentBGM; 
+
+  // 5. ฟังก์ชันเล่นเพลง BGM (ฉบับอัปเดต)
   Future<void> playBGM(String fileName) async {
-    // ใส่ไฟล์เสียงใน assets/audio/bgm.mp3
+    // ถ้าไฟล์ที่จะเล่น เป็นไฟล์เดียวกับที่กำลังเล่นอยู่ ให้ข้ามคำสั่งไปเลย เพลงจะได้เล่นต่อเนื่อง
+    if (_currentBGM == fileName) return; 
+    
+    _currentBGM = fileName; // อัปเดตชื่อเพลงปัจจุบัน
     await _musicPlayer.play(AssetSource('audio/$fileName'));
   }
 
@@ -86,5 +93,35 @@ class AudioManager {
     await prefs.setDouble('musicVolume', _musicVolume);
     await prefs.setDouble('sfxVolume', _sfxVolume);
     await prefs.setBool('isMuted', _isMuted);
+  }
+}
+
+class MusicRouteObserver extends NavigatorObserver {
+  // ฟังก์ชันส่วนกลางสำหรับเช็คว่าควรเล่นเพลงอะไร
+  void _updateMusic(Route<dynamic>? route) {
+    // ดึงชื่อหน้าจอออกมา
+    final routeName = route?.settings.name;
+
+    // เทียบชื่อหน้าจอแล้วสั่งเล่นเพลงที่ต้องการเลย!
+    if (routeName == '/lobby') {
+      AudioManager().playBGM('lobby.mp3');
+    } else if (routeName == '/profile') {
+      AudioManager().playBGM('profile.mp3');
+    } 
+    // ถ้าหน้าไหนไม่มีเพลงเฉพาะ จะปล่อยให้เล่นเพลงเดิมต่อไป หรือจะสั่ง pause() ก็ได้
+  }
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPush(route, previousRoute);
+    // เมื่อเปิดหน้าใหม่ ให้เช็คว่าต้องเปลี่ยนเพลงไหม
+    _updateMusic(route);
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPop(route, previousRoute);
+    // เมื่อกดย้อนกลับ ให้เช็คเพลงของหน้าจอ "ที่กำลังจะกลับไปแสดง (previousRoute)"
+    _updateMusic(previousRoute);
   }
 }

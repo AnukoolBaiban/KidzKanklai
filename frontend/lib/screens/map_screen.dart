@@ -72,8 +72,6 @@ class _MapScreenState extends State<MapScreen> {
                     break;
                 }
               },
-              avatarUrl: null,
-              playerLevel: widget.user?.level ?? 1,
               onAvatarTapped: () {
                 Navigator.pushNamed(context, '/profile');
               },

@@ -64,6 +64,7 @@ flutter:
   assets:
     - assets/images/
     - assets/animation/
+    - assets/audio/
     - assets/images/achievement/
     - assets/images/background/
     - assets/images/button/

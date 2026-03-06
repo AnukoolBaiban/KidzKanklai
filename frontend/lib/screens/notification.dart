@@ -190,22 +190,18 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 
-  Widget _buildTopBar() {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
+ Widget _buildTopBar() {
+    return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            height: 75,
-            color: Colors.black.withOpacity(0.4),
-            alignment: Alignment.bottomCenter,
             child: CustomTopBar(
               user: widget.user,
-              onNotificationTapped: () {},
+              onNotificationTapped: () {
+                Navigator.pushNamed(context, '/notification');
+              },
               onSettingsTapped: () {
                 Navigator.pushNamed(context, '/setting');
               },

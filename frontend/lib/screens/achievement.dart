@@ -153,34 +153,35 @@ class _AchievementScreenState extends State<AchievementScreen> {
           Positioned(
             left: 0,
             right: 0,
-            bottom: 0,
-            child: CustomBottomNavigationBar(
-              selectedIndex: _selectedIndex,
-              onItemTapped: (index) {
-                setState(() {
-                  _selectedIndex = index;
-                });
+            bottom: 0, // ให้ติดขอบล่างของ SafeArea
+            child: SafeArea( // ✅ เพิ่ม SafeArea ครอบเอาไว้
+              top: false, // ป้องกันแค่ด้านล่าง ด้านบนไม่ต้อง
+              child: CustomBottomNavigationBar(
+                selectedIndex: _selectedIndex,
+                onItemTapped: (index) {
+                  setState(() {
+                    _selectedIndex = index;
+                  });
 
-                switch (index) {
-                  case 0:
-                    Navigator.pushNamed(context, '/fashion');
-                    break;
-                  case 1:
-                    Navigator.pushNamed(context, '/lobby');
-                    break;
-                  case 2:
-                    Navigator.pushNamed(context, '/map');
-                    break;
-                  case 3:
-                    Navigator.pushNamed(context, '/club');
-                    break;
-                }
-              },
-              avatarUrl: null,
-              playerLevel: widget.user?.level ?? 1,
-              onAvatarTapped: () {
-                Navigator.pushNamed(context, '/profile');
-              },
+                  switch (index) {
+                    case 0:
+                      Navigator.pushNamed(context, '/fashion');
+                      break;
+                    case 1:
+                      Navigator.pushNamed(context, '/lobby');
+                      break;
+                    case 2:
+                      Navigator.pushNamed(context, '/map');
+                      break;
+                    case 3:
+                      Navigator.pushNamed(context, '/club');
+                      break;
+                  }
+                },
+                onAvatarTapped: () {
+                  Navigator.pushNamed(context, '/profile');
+                },
+              ),
             ),
           ),
         ],
@@ -222,17 +223,12 @@ class _AchievementScreenState extends State<AchievementScreen> {
   }
 
   Widget _buildTopBar() {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
+    return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            height: 75,
-            color: Colors.black.withOpacity(0.4),
             child: CustomTopBar(
               user: widget.user,
               onNotificationTapped: () {
