@@ -102,7 +102,7 @@ class _AchievementScreenState extends State<AchievementScreen> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: Image.asset('assets/images/background/bg1.png', fit: BoxFit.cover),
+            child: Image.asset('assets/images/background/bg4.png', fit: BoxFit.cover),
           ),
 
           Padding(
@@ -595,7 +595,7 @@ class _AchievementScreenState extends State<AchievementScreen> {
 
   Widget _buildHeaderTitle() {
     return Positioned(
-      top: 160,
+      top: 175,
       left: 0,
       right: 0,
       child: Align(

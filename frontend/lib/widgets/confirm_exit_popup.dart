@@ -65,6 +65,15 @@ class _ConfirmExitPopupState extends State<ConfirmExitPopup>
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    
+    // ✅ Responsive values based on screen width
+    final containerWidth = size.width * 0.85;
+    final titleFontSize = size.width * 0.038; // ~14-15px on most phones
+    final subtitleFontSize = size.width * 0.033; // ~12-13px
+    final buttonFontSize = size.width * 0.04; // ~15-16px
+    final buttonHeight = size.width * 0.11; // ~41-45px
+
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -73,8 +82,10 @@ class _ConfirmExitPopupState extends State<ConfirmExitPopup>
         child: ScaleTransition(
           scale: _scaleAnimation,
           child: Container(
-            width: MediaQuery.of(context).size.width * 0.85,
-            constraints: BoxConstraints(maxHeight: 500),
+            width: containerWidth,
+            constraints: BoxConstraints(
+              maxWidth: 380,
+            ),
             decoration: BoxDecoration(color: Colors.transparent),
             child: Stack(
               clipBehavior: Clip.none,
@@ -82,8 +93,7 @@ class _ConfirmExitPopupState extends State<ConfirmExitPopup>
               children: [
                 // Main Container
                 Container(
-                  padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
-                  height: 180,
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                   width: double.infinity,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -105,7 +115,6 @@ class _ConfirmExitPopupState extends State<ConfirmExitPopup>
                         width: 1,
                       ),
                     ),
-
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.3),
@@ -117,37 +126,60 @@ class _ConfirmExitPopupState extends State<ConfirmExitPopup>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      SizedBox(height: 30),
-                      Text(
-                        'ยืนยันที่จะออกจากการสร้างภารกิจหรือไม่?',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                      // Title with padding to prevent overflow
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: Text(
+                          'ยืนยันที่จะออกจากการสร้างภารกิจหรือไม่?',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: titleFontSize,
+                            fontWeight: FontWeight.bold,
+                            height: 1.3, // Line height for better readability
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      
                       SizedBox(height: 8),
+                      
+                      // Subtitle
                       Text(
                         'ภารกิจของคุณจะไม่ถูกบันทึก',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: subtitleFontSize,
+                          height: 1.3,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      SizedBox(height: 20),
+                      
+                      SizedBox(height: 18),
 
+                      // Buttons
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
                           // 🔴 ยกเลิก
                           Expanded(
                             child: GestureDetector(
                               onTap: widget.onCancel,
                               child: Container(
-                                padding: EdgeInsets.symmetric(vertical: 12),
-                                margin: EdgeInsets.only(right: 8),
+                                height: buttonHeight,
+                                margin: EdgeInsets.only(right: 6),
                                 decoration: BoxDecoration(
                                   color: Color(0xFFEA4444),
                                   borderRadius: BorderRadius.circular(30),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Color(0xFFEA4444).withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: Offset(0, 4),
+                                    ),
+                                  ],
                                 ),
                                 child: Center(
                                   child: Text(
@@ -155,6 +187,7 @@ class _ConfirmExitPopupState extends State<ConfirmExitPopup>
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
+                                      fontSize: buttonFontSize,
                                     ),
                                   ),
                                 ),
@@ -167,8 +200,8 @@ class _ConfirmExitPopupState extends State<ConfirmExitPopup>
                             child: GestureDetector(
                               onTap: widget.onConfirm,
                               child: Container(
-                                padding: EdgeInsets.symmetric(vertical: 12),
-                                margin: EdgeInsets.only(left: 8),
+                                height: buttonHeight,
+                                margin: EdgeInsets.only(left: 6),
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     begin: Alignment.topCenter,
@@ -179,6 +212,13 @@ class _ConfirmExitPopupState extends State<ConfirmExitPopup>
                                     ],
                                   ),
                                   borderRadius: BorderRadius.circular(30),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Color(0xFF59ABEC).withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: Offset(0, 4),
+                                    ),
+                                  ],
                                 ),
                                 child: Center(
                                   child: Text(
@@ -186,6 +226,7 @@ class _ConfirmExitPopupState extends State<ConfirmExitPopup>
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
+                                      fontSize: buttonFontSize,
                                     ),
                                   ),
                                 ),

@@ -328,7 +328,7 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
       child: FractionalTranslation(
         translation: const Offset(0, -0.5),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 8),
           decoration: BoxDecoration(
             color: const Color(0xFF2374B5),
             borderRadius: BorderRadius.circular(5),

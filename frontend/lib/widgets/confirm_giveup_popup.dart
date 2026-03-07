@@ -65,6 +65,18 @@ class _ConfirmGiveUpPopupState extends State<ConfirmGiveUpPopup>
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Responsive values
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 360;
+    
+    final containerWidth = size.width * 0.85;
+    final containerHeight = isSmallScreen ? 160.0 : 180.0;
+    final buttonHeight = isSmallScreen ? 40.0 : 45.0;
+    final titleFontSize = isSmallScreen ? 14.0 : 16.0;
+    final subtitleFontSize = isSmallScreen ? 12.0 : 14.0;
+    final buttonFontSize = isSmallScreen ? 14.0 : 16.0;
+    final topPadding = isSmallScreen ? 20.0 : 30.0;
+
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -73,8 +85,11 @@ class _ConfirmGiveUpPopupState extends State<ConfirmGiveUpPopup>
         child: ScaleTransition(
           scale: _scaleAnimation,
           child: Container(
-            width: MediaQuery.of(context).size.width * 0.85,
-            constraints: BoxConstraints(maxHeight: 500),
+            width: containerWidth,
+            constraints: BoxConstraints(
+              maxWidth: 400,
+              maxHeight: containerHeight,
+            ),
             decoration: BoxDecoration(color: Colors.transparent),
             child: Stack(
               clipBehavior: Clip.none,
@@ -82,8 +97,8 @@ class _ConfirmGiveUpPopupState extends State<ConfirmGiveUpPopup>
               children: [
                 // Main Container
                 Container(
-                  padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
-                  height: 180,
+                  padding: EdgeInsets.fromLTRB(20, topPadding, 20, 20),
+                  height: containerHeight,
                   width: double.infinity,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -105,7 +120,6 @@ class _ConfirmGiveUpPopupState extends State<ConfirmGiveUpPopup>
                         width: 1,
                       ),
                     ),
-
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.3),
@@ -117,13 +131,12 @@ class _ConfirmGiveUpPopupState extends State<ConfirmGiveUpPopup>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      SizedBox(height: 30),
                       Text(
                         'ยืนยันที่จะยอมแพ้หรือไม่?',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 16,
+                          fontSize: titleFontSize,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -131,19 +144,21 @@ class _ConfirmGiveUpPopupState extends State<ConfirmGiveUpPopup>
                       Text(
                         'หากยอมแพ้ คุณจะไม่ได้รับของรางวัลทั้งหมด',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: subtitleFontSize,
+                        ),
                       ),
                       SizedBox(height: 20),
 
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
                           // 🔴 ยกเลิก
                           Expanded(
                             child: GestureDetector(
                               onTap: widget.onCancel,
                               child: Container(
-                                padding: EdgeInsets.symmetric(vertical: 12),
+                                height: buttonHeight,
                                 margin: EdgeInsets.only(right: 8),
                                 decoration: BoxDecoration(
                                   color: Color(0xFFEA4444),
@@ -155,6 +170,7 @@ class _ConfirmGiveUpPopupState extends State<ConfirmGiveUpPopup>
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
+                                      fontSize: buttonFontSize,
                                     ),
                                   ),
                                 ),
@@ -167,7 +183,7 @@ class _ConfirmGiveUpPopupState extends State<ConfirmGiveUpPopup>
                             child: GestureDetector(
                               onTap: widget.onConfirm,
                               child: Container(
-                                padding: EdgeInsets.symmetric(vertical: 12),
+                                height: buttonHeight,
                                 margin: EdgeInsets.only(left: 8),
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
@@ -186,6 +202,7 @@ class _ConfirmGiveUpPopupState extends State<ConfirmGiveUpPopup>
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
+                                      fontSize: buttonFontSize,
                                     ),
                                   ),
                                 ),

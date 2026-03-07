@@ -114,8 +114,8 @@ class _RewardPopupState extends State<RewardPopup>
 
                 // Main Container
                 Container(
-                  padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
-                  height: 180,
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  height: 160,
                   width: double.infinity,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -149,32 +149,37 @@ class _RewardPopupState extends State<RewardPopup>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      SizedBox(height: 9),
+                      SizedBox(height: 8),
                       Text(
                         'ได้รับรางวัล',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFFFFFFFF),
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      SizedBox(height: 10),
+                      SizedBox(height: 8),
 
                       // Reward Icon
                       _buildRewardIcon(),
 
-                      SizedBox(height: 10),
+                      SizedBox(height: 8),
 
                       // Reward Text
-                      Text(
-                        _getRewardText(),
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.normal,
-                          color: Color(0xFFFFFFFF),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: Text(
+                          _getRewardText(),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.normal,
+                            color: Color(0xFFFFFFFF),
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        textAlign: TextAlign.center,
                       ),
                       // Close Button (ไม่มีตาม Figma - ให้ tap ที่ไหนก็ได้)
                     ],
@@ -192,6 +197,8 @@ class _RewardPopupState extends State<RewardPopup>
   }
 
   Widget _buildHeader() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    
     return Positioned(
       top: -60,
       left: 0,
@@ -199,52 +206,44 @@ class _RewardPopupState extends State<RewardPopup>
       child: Align(
         alignment: Alignment.topCenter,
         child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Positioned(
-                left: 0,
-                bottom: 0,
-                child: Image.asset(
-                  'assets/images/icon/Star11.png',
-                  width: 26,
-                  height: 26,
-                  fit: BoxFit.contain,
-                ),
+              Image.asset(
+                'assets/images/icon/Star11.png',
+                width: 20,
+                height: 20,
+                fit: BoxFit.contain,
               ),
-              SizedBox(width: 4),
-              Positioned(
-                top: 0,
-                child: Center(
-                  child: Text(
-                    'รับรางวัลสำเร็จ',
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.bold,
-                      foreground: Paint()
-                        ..shader = const LinearGradient(
-                          colors: [
-                            Color(0xFFFFD700), // Gold
-                            Color(0xFFFFA500), // Orange
-                          ],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ).createShader(const Rect.fromLTWH(0, 0, 200, 40)),
-                    ),
+              SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  'รับรางวัลสำเร็จ',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    foreground: Paint()
+                      ..shader = const LinearGradient(
+                        colors: [
+                          Color(0xFFFFD700), // Gold
+                          Color(0xFFFFA500), // Orange
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ).createShader(Rect.fromLTWH(0, 0, 200, 40)),
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              SizedBox(width: 4),
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: Image.asset(
-                  'assets/images/icon/Star11.png',
-                  width: 26,
-                  height: 26,
-                  fit: BoxFit.contain,
-                ),
+              SizedBox(width: 6),
+              Image.asset(
+                'assets/images/icon/Star11.png',
+                width: 20,
+                height: 20,
+                fit: BoxFit.contain,
               ),
             ],
           ),
@@ -255,11 +254,11 @@ class _RewardPopupState extends State<RewardPopup>
 
   Widget _buildRewardIcon() {
     return Container(
-      width: 80,
-      height: 80,
+      width: 70,
+      height: 70,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
@@ -273,28 +272,21 @@ class _RewardPopupState extends State<RewardPopup>
         children: [
           Image.asset(
             "assets/images/item/EXP.png",
-            width: 40,
-            height: 40,
+            width: 35,
+            height: 35,
             fit: BoxFit.contain,
             errorBuilder: (context, error, stackTrace) {
-              return Icon(Icons.stars, size: 40, color: Color(0xFFFFA726));
+              return Icon(Icons.stars, size: 35, color: Color(0xFFFFA726));
             },
           ),
-          SizedBox(height: 4),
-          // Amount below image
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                '+${widget.amount}',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              SizedBox(width: 4),
-            ],
+          SizedBox(height: 3),
+          Text(
+            '+${widget.amount}',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
           ),
         ],
       ),
