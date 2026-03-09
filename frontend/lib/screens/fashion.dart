@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:rive/rive.dart' hide LinearGradient, Image; 
+import 'package:rive/rive.dart' hide LinearGradient, Image;
 
 import 'package:flutter_application_1/api_service.dart';
-import 'package:flutter_application_1/widgets/bottom_navigation_bar.dart'; 
-import 'package:flutter_application_1/widgets/custom_top_bar.dart'; // Import CustomTopBar
+import 'package:flutter_application_1/widgets/bottom_navigation_bar.dart';
+import 'package:flutter_application_1/widgets/custom_top_bar.dart';
 import 'package:flutter_application_1/config/rive_cache.dart';
 
+// =============================================================================
+// PAGE WIDGET
+// =============================================================================
 class FashionPage extends StatefulWidget {
   const FashionPage({super.key});
 
@@ -17,36 +20,32 @@ class FashionPage extends StatefulWidget {
 
 class _FashionPageState extends State<FashionPage> {
   // --- STATE ---
-  String selectedMainTab = FashionData.mainTabs[0]; // เสื้อผ้า, สีผิว, etc.
-  String selectedSubTab = FashionData.subTabs[0];   // Cloth, Shoes, etc.
-  int selectedItemIndex = 0;
+  String selectedMainTab = FashionData.mainTabs[0]; // เสื้อผ้า
+  String selectedSubTab = FashionData.subTabs[0];   // Grid
   String selectedAge = 'Kid';
   int selectedSkinColorIndex = 0;
-  
-  // Data
+
+  // --- LOGIC DATA ---
   List<InventoryItem> _inventory = [];
   List<InventoryItem> _equipped = [];
   bool _isLoading = true;
-  User? _user; // Store User profile for TopBar
-
-  // Selection State
+  User? _user;
   InventoryItem? _selectedItem;
 
-  // Rive Controllers
+  // --- RIVE CONTROLLERS ---
   SMINumber? _poseInput;
-  SMINumber? _hairInput; 
+  SMINumber? _hairInput;
   SMINumber? _faceInput;
   SMINumber? _skinInput;
-  SMINumber? _bodyInput; // Cloth uses BodyID or ClothID? Assuming Body / Cloth logic
   SMINumber? _clothInput;
-  
   SMITrigger? _tapInput;
   bool _isRiveLoaded = false;
-  StateMachineController? _controller; 
-  String _debugInfo = "Initializing..."; // Debug Info State 
+  StateMachineController? _controller;
 
-  // Navigation State
-  final int _selectedIndex = 2; 
+  // --- POPUP STATE (From fashion-best.dart) ---
+  String? _showingAgeText;
+  double? _agePopupTop;
+  Timer? _hideTimer;
 
   // --- INIT ---
   @override
@@ -55,192 +54,185 @@ class _FashionPageState extends State<FashionPage> {
     _fetchData();
   }
 
+  @override
+  void dispose() {
+    _hideTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _fetchData() async {
     setState(() => _isLoading = true);
-    final inv = await ApiService.getInventory();
-    final eq = await ApiService.getEquipped();
-    // Also fetch profile for TopBar stats (Coins, etc.)
-    final user = await ApiService.getProfile(0); // 0 is ignored as we use token
+    try {
+      final inv = await ApiService.getInventory();
+      final eq = await ApiService.getEquipped();
+      final user = await ApiService.getProfile(0);
 
-    if (mounted) {
-      setState(() {
-        _inventory = inv;
-        _equipped = eq;
-        _user = user;
-        _isLoading = false;
-        
-        // Sync Rive to Equipped
-        _syncRiveToEquipped();
-      });
+      if (mounted) {
+        setState(() {
+          _inventory = inv;
+          _equipped = eq;
+          _user = user;
+          _isLoading = false;
+          _syncRiveToEquipped();
+        });
+      }
+    } catch (e) {
+      print("Error fetching data: $e");
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // Helper to parse ID
+  // --- RIVE LOGIC ---
   double parseId(String s) {
-      if (s.isEmpty) return 0;
-      if (s.contains('_')) {
-         try { return double.parse(s.split('_').last); } catch (_) {}
-      }
-      if (s.startsWith("Hair Style ")) {
-         try { return double.parse(s.replaceAll("Hair Style ", "")); } catch (_) {}
-      }
-      try { return double.parse(s); } catch(_) { return 0; }
+    if (s.isEmpty) return 0;
+    if (s.contains('_')) {
+      try { return double.parse(s.split('_').last); } catch (_) {}
+    }
+    if (s.startsWith("Hair Style ")) {
+      try { return double.parse(s.replaceAll("Hair Style ", "")); } catch (_) {}
+    }
+    try { return double.parse(s); } catch(_) { return 0; }
   }
 
   void _syncRiveToEquipped() {
-     if (_controller == null) return;
-     
-     try {
-       // 1. Try using User Profile Data (Most Reliable, matches Lobby)
-       if (_user != null) {
-          if (_hairInput != null) _hairInput!.value = parseId(_user!.equippedHair);
-          if (_faceInput != null) _faceInput!.value = parseId(_user!.equippedFace);
-          if (_skinInput != null) _skinInput!.value = parseId(_user!.equippedSkin);
-          
-          // Legacy check: older users might have empty cloth, so we might check body too
-          if (_clothInput != null) {
-             double val = parseId(_user!.equippedCloth);
-             if (val == 0 && _user!.equippedBody.isNotEmpty) val = parseId(_user!.equippedBody);
-             _clothInput!.value = val;
-          }
+    if (_controller == null) return;
 
-          if (mounted) {
-           setState(() {
-             _debugInfo = "Sync (User Profile):\n"
-                          "H: ${_hairInput?.value} (${_user!.equippedHair})\n"
-                          "F: ${_faceInput?.value} (${_user!.equippedFace})\n"
-                          "S: ${_skinInput?.value}\n"
-                          "C: ${_clothInput?.value}";
-           });
-         }
-         return;
-       }
+    try {
+      // 1. Try using User Profile Data
+      if (_user != null) {
+        if (_hairInput != null) _hairInput!.value = parseId(_user!.equippedHair);
+        if (_faceInput != null) _faceInput!.value = parseId(_user!.equippedFace);
+        if (_skinInput != null) _skinInput!.value = parseId(_user!.equippedSkin);
+        
+        if (_clothInput != null) {
+          double val = parseId(_user!.equippedCloth);
+          if (val == 0 && _user!.equippedBody.isNotEmpty) val = parseId(_user!.equippedBody);
+          _clothInput!.value = val;
+        }
+        return;
+      }
 
-       // 2. Fallback: Use Equipped List (If User is null for some reason)
-       // Sync Hair
-       var hair = _equipped.firstWhere((i) => i.category == 'Hair', orElse: () => InventoryItem(type: '', id: '', category: ''));
-       if (_hairInput != null && hair.id.isNotEmpty) {
-          _hairInput!.value = hair.riveId.toDouble();
-       }
-       
-       // Sync Face
-       var face = _equipped.firstWhere((i) => i.category == 'Face', orElse: () => InventoryItem(type: '', id: '', category: ''));
-       if (_faceInput != null && face.id.isNotEmpty) {
-          _faceInput!.value = face.riveId.toDouble();
-       }
+      // 2. Fallback: Use Equipped List
+      var hair = _equipped.firstWhere((i) => i.category == 'Hair', orElse: () => InventoryItem(type: '', id: '', category: ''));
+      if (_hairInput != null && hair.id.isNotEmpty) _hairInput!.value = hair.riveId.toDouble();
+      
+      var face = _equipped.firstWhere((i) => i.category == 'Face', orElse: () => InventoryItem(type: '', id: '', category: ''));
+      if (_faceInput != null && face.id.isNotEmpty) _faceInput!.value = face.riveId.toDouble();
 
-       // Sync Skin
-       var skin = _equipped.firstWhere((i) => i.category == 'Skin', orElse: () => InventoryItem(type: '', id: '', category: ''));
-       if (_skinInput != null && skin.id.isNotEmpty) {
-          _skinInput!.value = skin.riveId.toDouble();
-       }
+      var skin = _equipped.firstWhere((i) => i.category == 'Skin', orElse: () => InventoryItem(type: '', id: '', category: ''));
+      if (_skinInput != null && skin.id.isNotEmpty) _skinInput!.value = skin.riveId.toDouble();
 
-       // Sync Cloth
-       var cloth = _equipped.firstWhere((i) => i.category == 'Cloth' || i.category == 'Body', orElse: () => InventoryItem(type: '', id: '', category: ''));
-       if (_clothInput != null && cloth.id.isNotEmpty) {
-          _clothInput!.value = cloth.riveId.toDouble();
-       }
+      var cloth = _equipped.firstWhere((i) => i.category == 'Cloth' || i.category == 'Body', orElse: () => InventoryItem(type: '', id: '', category: ''));
+      if (_clothInput != null && cloth.id.isNotEmpty) _clothInput!.value = cloth.riveId.toDouble();
 
-       if (mounted) {
-         setState(() {
-           _debugInfo = "Sync (List Fallback):\n"
-                        "H: ${_hairInput?.value}\n"
-                        "F: ${_faceInput?.value}\n"
-                        "S: ${_skinInput?.value}\n"
-                        "C: ${_clothInput?.value}";
-         });
-       }
-
-     } catch (e) {
-       print("Error syncing Rive: $e");
-       setState(() => _debugInfo = "Sync Error: $e");
-     }
+    } catch (e) {
+      print("Error syncing Rive: $e");
+    }
   }
-  
+
   void _onRiveInit(Artboard artboard) {
     var controller = StateMachineController.fromArtboard(artboard, 'State Machine 1');
     if (controller == null && artboard.stateMachines.isNotEmpty) {
-       controller = StateMachineController.fromArtboard(artboard, artboard.stateMachines.first.name);
+      controller = StateMachineController.fromArtboard(artboard, artboard.stateMachines.first.name);
     }
 
     if (controller != null) {
       artboard.addController(controller);
       _controller = controller;
-      
-      // Auto-bind inputs
-      print("--- [DEBUG] Rive Inputs for Model2.0.riv ---");
+
       for (var input in controller.inputs) {
-        print("Input Name: '${input.name}' | Type: ${input.runtimeType}");
-        
         if (input.name == 'Pose') _poseInput = input as SMINumber;
-        
         if (input.name == 'HairID') _hairInput = input as SMINumber;
         if (input.name == 'FaceID') _faceInput = input as SMINumber;
         if (input.name == 'SkinID') _skinInput = input as SMINumber;
-        // Check for common cloth names
         if (input.name == 'ClothID' || input.name == 'BodyID') _clothInput = input as SMINumber;
-
-        // Exact Match for Tapcharacter
-        if (input.name == 'Tapcharacter' && input is SMITrigger) {
-           _tapInput = input;
-        }
+        if (input.name == 'Tapcharacter' && input is SMITrigger) _tapInput = input;
       }
       
       _syncRiveToEquipped();
-      // Debug info updated in _syncRiveToEquipped
     }
-    
     if (mounted) setState(() => _isRiveLoaded = true);
   }
 
   // --- ACTIONS ---
-
   void _onMainTabChanged(String tab) {
     setState(() => selectedMainTab = tab);
-    if (tab == 'เสื้อผ้า') selectedSubTab = 'Grid'; // Reset to Grid
+    if (tab == 'เสื้อผ้า') {
+        setState(() => selectedSubTab = 'Grid');
+    }
   }
 
   void _onSubTabChanged(String tab) {
     setState(() => selectedSubTab = tab);
   }
 
-  Future<void> _onItemSelected(InventoryItem item) async {
-    setState(() => _selectedItem = item);
-    // Preview in Rive
-    print("Selecting Item: ${item.name} (${item.category}) -> RiveID: ${item.riveId}");
+  void _onAgeSelected(String ageType) {
+    setState(() => selectedAge = ageType);
+    _showAgePopup(ageType);
+    // TODO: Add logic to update Rive or API if Age affects character
+  }
 
-    if (item.category == 'Hair' && _hairInput != null) {
-       _hairInput!.value = item.riveId.toDouble();
-    } else if (item.category == 'Face' && _faceInput != null) {
-       _faceInput!.value = item.riveId.toDouble();
-    } else if (item.category == 'Skin' && _skinInput != null) {
-       _skinInput!.value = item.riveId.toDouble();
-    } else if ((item.category == 'Cloth' || item.category == 'Body') && _clothInput != null) {
-       _clothInput!.value = item.riveId.toDouble();
+  void _showAgePopup(String ageType) {
+    String text = '';
+    double top = 0;
+    switch (ageType) {
+      case 'Kid':
+        text = 'เด็ก';
+        top = 90 + 9;
+        break;
+      case 'Teen':
+        text = 'วัยรุ่น';
+        top = 148 + 9;
+        break;
+      case 'Adult':
+        text = 'ผู้ใหญ่';
+        top = 206 + 9;
+        break;
     }
 
-    // [AUTO-SAVE] Call API immediately
-    final success = await ApiService.equipItem(item.id);
-    if (success) {
+    _hideTimer?.cancel();
+    setState(() {
+      _showingAgeText = text;
+      _agePopupTop = top;
+    });
+
+    _hideTimer = Timer(const Duration(seconds: 1), () {
       if (mounted) {
-        // Show subtle feedback
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("สวมใส่ ${item.name} เรียบร้อย"),
-            duration: const Duration(milliseconds: 1000), // Short duration
-            behavior: SnackBarBehavior.floating, // Floating is less obtrusive
-          ),
-        );
-        
-        // Refresh local data to sync everything
-        _fetchData(); 
+        setState(() {
+          _showingAgeText = null;
+          _agePopupTop = null;
+        });
       }
-    } else {
-       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("เกิดข้อผิดพลาดในการใส่ชุด")),
-        );
-      }
+    });
+  }
+
+  void _onSkinColorSelected(int index) {
+      setState(() => selectedSkinColorIndex = index);
+      // Logic for skin color selection if it were a simple index
+      // But we use InventoryItems for skin usually.
+      // If 'Skin' tab is selected, we should rely on _onItemSelected with InventoryItem.
+  }
+
+  Future<void> _onItemSelected(InventoryItem item) async {
+    setState(() => _selectedItem = item);
+    
+    // Rive Preview
+    if (item.category == 'Hair' && _hairInput != null) _hairInput!.value = item.riveId.toDouble();
+    if (item.category == 'Face' && _faceInput != null) _faceInput!.value = item.riveId.toDouble();
+    if (item.category == 'Skin' && _skinInput != null) _skinInput!.value = item.riveId.toDouble();
+    if ((item.category == 'Cloth' || item.category == 'Body') && _clothInput != null) _clothInput!.value = item.riveId.toDouble();
+
+    // API Call
+    final success = await ApiService.equipItem(item.id);
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("สวมใส่ ${item.name} เรียบร้อย"),
+          duration: const Duration(milliseconds: 1000),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      _fetchData(); // Refresh to ensure sync
     }
   }
 
@@ -252,159 +244,122 @@ class _FashionPageState extends State<FashionPage> {
           const _FashionBackground(),
           
           SafeArea(
-            child: Column(
+            child: Stack(
               children: [
-                // 1. Custom Top Bar
-                CustomTopBar(
-                  user: _user,
-                  onNotificationTapped: () => Navigator.pushNamed(context, '/notification'),
-                  onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
+                Column(
+                  children: [
+                    // 1. Top Bar
+                    CustomTopBar(
+                      user: _user,
+                      onNotificationTapped: () => Navigator.pushNamed(context, '/notification'),
+                      onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
+                    ),
+
+                    // 2. Main Body
+                    Expanded(
+                      child: Column(
+                        children: [
+                          // Character Area
+                          Expanded(
+                            flex: 4,
+                            child: GestureDetector(
+                                onTap: () {
+                                  if (_tapInput != null) _tapInput!.fire();
+                                },
+                                child: Container(
+                                  color: Colors.transparent, // Hit test
+                                  alignment: Alignment.center,
+                                  child: (_isLoading || _user == null)
+                                    ? const CircularProgressIndicator()
+                                    : (RiveCache().file != null
+                                        ? RiveAnimation.direct(
+                                            RiveCache().file!,
+                                            fit: BoxFit.contain,
+                                            onInit: _onRiveInit,
+                                            stateMachines: const ['State Machine 1'],
+                                          )
+                                        : RiveAnimation.asset(
+                                            'assets/animation/Model2.0.riv',
+                                            fit: BoxFit.contain,
+                                            onInit: _onRiveInit,
+                                          )
+                                      ),
+                                ),
+                            ),
+                          ),
+
+                          // Bottom Interactable Area
+                          Expanded(
+                            flex: 5,
+                            child: Column(
+                              children: [
+                                _MainTabSelector(
+                                  tabs: FashionData.mainTabs,
+                                  selectedTab: selectedMainTab,
+                                  onTabSelected: _onMainTabChanged,
+                                ),
+                                Expanded(
+                                  child: _ContentArea(
+                                    selectedMainTab: selectedMainTab,
+                                    selectedSubTab: selectedSubTab,
+                                    selectedItemIndex: 0, // Not used primarily anymore
+                                    selectedSkinColorIndex: selectedSkinColorIndex,
+                                    onSubTabSelected: _onSubTabChanged,
+                                    onItemSelected: (index) {}, // Legacy stub
+                                    onSkinColorSelected: _onSkinColorSelected,
+                                    // New Data Props
+                                    inventory: _inventory,
+                                    selectedItem: _selectedItem,
+                                    onInventoryItemSelected: _onItemSelected,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // 3. Bottom Nav
+                    CustomBottomNavigationBar(
+                      selectedIndex: 0,
+                      onItemTapped: (index) {
+                         if (index == 0) Navigator.pushReplacementNamed(context, '/profile');
+                         if (index == 1) {} 
+                         if (index == 2) Navigator.pushReplacementNamed(context, '/lobby');
+                         if (index == 3) Navigator.pushReplacementNamed(context, '/map');
+                         if (index == 4) Navigator.pushReplacementNamed(context, '/club');
+                      },
+                      playerLevel: _user?.level ?? 1,
+                      onAvatarTapped: () => Navigator.pushReplacementNamed(context, '/profile'),
+                      onFashionTapped: () {},
+                      onRoomTapped: () => Navigator.pushReplacementNamed(context, '/lobby'),
+                      onMapTapped: () => Navigator.pushReplacementNamed(context, '/map'),
+                      onClubTapped: () => Navigator.pushReplacementNamed(context, '/club'),
+                    ),
+                  ],
                 ),
 
-                // 2. Main Content (Character + Selection)
-                Expanded(
-                  child: Column(
-                    children: [
-                      // Character Area (Preview)
-                      Expanded(
-                        flex: 4, 
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                             // Rive Character
-                             GestureDetector(
-                               onTap: () {
-                                 if (_tapInput != null) _tapInput!.fire();
-                               },
-                               child: SizedBox(
-                                  height: 400, 
-                                  width: 400,
-                                  child: (_isLoading || _user == null) 
-                                    ? const Center(child: CircularProgressIndicator())
-                                    : (RiveCache().file != null 
-                                      ? RiveAnimation.direct(
-                                          RiveCache().file!,
-                                          fit: BoxFit.contain,
-                                          onInit: _onRiveInit,
-                                          stateMachines: const ['State Machine 1'],
-                                        )
-                                      : RiveAnimation.asset(
-                                          'assets/animation/Model2.0.riv', 
-                                          fit: BoxFit.contain,
-                                          onInit: _onRiveInit,
-                                        )),
-                               ),
-                             ),
-                             
-                             // Age/Size Selector
-                             Positioned(
-                               top: 20,
-                               right: 20,
-                               child: Column(
-                                 children: [
-                                   _buildAgeButton(
-                                     iconPath: 'assets/images/Fashion/AgeIcon/icon-kid.png',
-                                     isSelected: selectedAge == 'Kid',
-                                     onTap: () => setState(() => selectedAge = 'Kid'),
-                                   ),
-                                   const SizedBox(height: 16),
-                                   _buildAgeButton(
-                                      iconPath: 'assets/images/Fashion/AgeIcon/icon-teen.png',
-                                      isSelected: selectedAge == 'Teen',
-                                      onTap: () => setState(() => selectedAge = 'Teen'),
-                                   ),
-                                   const SizedBox(height: 16),
-                                   _buildAgeButton(
-                                      iconPath: 'assets/images/Fashion/AgeIcon/icon-adult.png',
-                                      isSelected: selectedAge == 'Adult',
-                                      onTap: () => setState(() => selectedAge = 'Adult'),
-                                   ),
-                                 ],
-                               ),
-                             ),
-                           ],
-                        ),
-                      ),
-                      // Bottom Interactable Area (Tabs & Grid)
-                      Expanded(
-                        flex: 5,
-                        child: Column(
-                          children: [
-                            _MainTabSelector(
-                              tabs: FashionData.mainTabs,
-                              selectedTab: selectedMainTab,
-                              onTabSelected: _onMainTabChanged,
-                            ),
-                            Expanded(
-                              child: _ContentArea(
-                                selectedMainTab: selectedMainTab,
-                                selectedSubTab: selectedSubTab,
-                                inventory: _inventory,
-                                selectedItem: _selectedItem,
-                                onSubTabSelected: _onSubTabChanged,
-                                onItemSelected: _onItemSelected,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                // Absolute Positioned Elements (Overlays)
+                
+                // Age Selector (Right Side)
+                Positioned(
+                  top: 90,
+                  right: 10,
+                  child: _AgeSelector(
+                    selectedAge: selectedAge,
+                    onAgeSelected: _onAgeSelected,
                   ),
                 ),
-                
-                 // 3. Bottom Navigation Bar
-                CustomBottomNavigationBar(
-                  selectedIndex: 0, // Fashion Index (0 from bottom_navigation_bar.dart)
-                  onItemTapped: (index) {
-                     // Handle navigation
-                     if (index == 0) Navigator.pushReplacementNamed(context, '/profile');
-                     if (index == 1) {} // Stay here
-                     if (index == 2) Navigator.pushReplacementNamed(context, '/lobby');
-                     if (index == 3) Navigator.pushReplacementNamed(context, '/map');
-                     if (index == 4) Navigator.pushReplacementNamed(context, '/club');
-                  },
+
+                // Age Popup
+                if (_showingAgeText != null)
+                  _AgePopup(text: _showingAgeText!, top: _agePopupTop ?? 0),
                   
-                  // Callbacks matched to Lobby example:
-                  onAvatarTapped: () => Navigator.pushReplacementNamed(context, '/profile'),
-                  onFashionTapped: () {}, // User is on Fashion
-                  onRoomTapped: () => Navigator.pushReplacementNamed(context, '/lobby'),
-                  onMapTapped: () => Navigator.pushReplacementNamed(context, '/map'),
-                  onClubTapped: () => Navigator.pushReplacementNamed(context, '/club'),
-                ),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-  Widget _buildAgeButton({
-    required String iconPath,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 45, 
-        height: 45,
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF5C9DFF) : Colors.white,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.all(8), // Adjust padding
-        child: Image.asset(
-           iconPath, 
-           fit: BoxFit.contain,
-           color: isSelected ? Colors.white : null, // Try to tint white if selected
-        ),
       ),
     );
   }
@@ -439,7 +394,102 @@ class _FashionBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned.fill(
-      child: Image.asset('assets/images/background/bg4.png', fit: BoxFit.cover),
+      // Ensure this asset exists, otherwise fallback or handle error
+      child: Image.asset(
+        'assets/images/bgFashion.png', 
+        fit: BoxFit.cover,
+        errorBuilder: (_,__,___) => Image.asset('assets/images/background/bg4.png', fit: BoxFit.cover),
+      ),
+    );
+  }
+}
+
+class _AgeSelector extends StatelessWidget {
+  final String selectedAge;
+  final ValueChanged<String> onAgeSelected;
+
+  const _AgeSelector({required this.selectedAge, required this.onAgeSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _buildButton('Kid', 'assets/images/Fashion/AgeIcon/icon-kid.png'),
+        const SizedBox(height: 8),
+        _buildButton('Teen', 'assets/images/Fashion/AgeIcon/icon-teen.png'),
+        const SizedBox(height: 8),
+        _buildButton('Adult', 'assets/images/Fashion/AgeIcon/icon-adult.png'),
+      ],
+    );
+  }
+
+  Widget _buildButton(String ageType, String assetPath) {
+    final isSelected = selectedAge == ageType;
+    return GestureDetector(
+      onTap: () => onAgeSelected(ageType),
+      child: Container(
+        width: 50,
+        height: 50,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF556CEB), Color(0xFF58A9EC)],
+          ),
+          border: Border.all(
+            color: Colors.white,
+            width: isSelected ? 3.0 : 0.0, // Highlight selected
+          ),
+          boxShadow: [
+             if (isSelected) 
+               BoxShadow(color: Colors.white.withOpacity(0.5), blurRadius: 10, spreadRadius: 2)
+          ]
+        ),
+        child: SizedBox(
+          width: 35,
+          height: 35,
+          child: Image.asset(assetPath, fit: BoxFit.contain, errorBuilder: (_,__,___) => const Icon(Icons.person, color: Colors.white)),
+        ),
+      ),
+    );
+  }
+}
+
+class _AgePopup extends StatelessWidget {
+  final String text;
+  final double top;
+
+  const _AgePopup({required this.text, required this.top});
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: top,
+      right: 70, // To the left of the buttons
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: Colors.black,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -460,18 +510,14 @@ class _MainTabSelector extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       height: 45,
-      child: Center(
-        child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: tabs.map((tab) {
           final isSelected = selectedTab == tab;
-          return GestureDetector(
+          return Expanded(
+            child: GestureDetector(
               onTap: () => onTabSelected(tab),
               child: Container(
-                constraints: const BoxConstraints(minWidth: 95),
-                // padding: const EdgeInsets.symmetric(horizontal: 25),
                 margin: const EdgeInsets.symmetric(horizontal: 2),
                 decoration: BoxDecoration(
                   color: isSelected ? const Color(0xFF002A50) : null,
@@ -498,10 +544,9 @@ class _MainTabSelector extends StatelessWidget {
                   ),
                 ),
               ),
+            ),
           );
         }).toList(),
-        ),
-      ),
       ),
     );
   }
@@ -510,28 +555,36 @@ class _MainTabSelector extends StatelessWidget {
 class _ContentArea extends StatelessWidget {
   final String selectedMainTab;
   final String selectedSubTab;
+  final int selectedItemIndex;
+  final int selectedSkinColorIndex;
+  final ValueChanged<String> onSubTabSelected;
+  final ValueChanged<int> onItemSelected;
+  final ValueChanged<int> onSkinColorSelected;
+
+  // New Data
   final List<InventoryItem> inventory;
   final InventoryItem? selectedItem;
-  final ValueChanged<String> onSubTabSelected;
-  final ValueChanged<InventoryItem> onItemSelected;
+  final ValueChanged<InventoryItem> onInventoryItemSelected;
 
   const _ContentArea({
     required this.selectedMainTab,
     required this.selectedSubTab,
-    required this.inventory,
-    required this.selectedItem,
+    required this.selectedItemIndex,
+    required this.selectedSkinColorIndex,
     required this.onSubTabSelected,
     required this.onItemSelected,
+    required this.onSkinColorSelected,
+    required this.inventory,
+    required this.selectedItem,
+    required this.onInventoryItemSelected,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Determine category to filter
+    // Filter Items
     List<InventoryItem> filteredItems = [];
-
     if (selectedMainTab == 'เสื้อผ้า') {
        if (selectedSubTab == 'Grid') {
-         // Show both Cloth and Shoes
          filteredItems = inventory.where((i) => i.category == 'Cloth' || i.category == 'Shoes').toList();
        } else {
          filteredItems = inventory.where((i) => i.category == selectedSubTab).toList();
@@ -552,7 +605,7 @@ class _ContentArea extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Sub-Tabs (Only for Clothes)
+          // Sub-Tabs
           if (selectedMainTab == 'เสื้อผ้า')
             _SubTabSelector(
               tabs: FashionData.subTabs,
@@ -560,14 +613,21 @@ class _ContentArea extends StatelessWidget {
               onTabSelected: onSubTabSelected,
             ),
 
-          // Main Content Grid
+          // Main Content
           Expanded(
-             child: filteredItems.isEmpty 
-               ? const Center(child: Text("ไม่มีไอเทมในหมวดนี้"))
-               : _FashionGrid(
+            child: selectedMainTab == 'สีผิว'
+                ? _SkinColorSelector(
+                    colors: FashionData.skinColors,
+                    selectedIndex: selectedSkinColorIndex, // Keep visual index for now
+                    onColorSelected: onSkinColorSelected,
+                    inventory: filteredItems, // Pass actual skin items
+                    onInventoryItemSelected: onInventoryItemSelected,
+                    selectedItem: selectedItem,
+                  )
+                : _FashionGrid(
                     items: filteredItems,
                     selectedItem: selectedItem,
-                    onItemSelected: onItemSelected,
+                    onItemSelected: onInventoryItemSelected,
                   ),
           ),
         ],
@@ -591,23 +651,17 @@ class _SubTabSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16),
-      child: Align(
-        alignment: Alignment.centerRight,
-        child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: tabs.map((tab) => _buildIcon(tab)).toList(),
-        ),
-        ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: tabs.map((tab) => _buildIcon(tab)).toList(),
       ),
     );
   }
 
   Widget _buildIcon(String tab) {
     final isSelected = selectedTab == tab;
-    // Basic icon map
-    String iconAsset = 'assets/images/icon/all-fashion.png'; 
+    // Map assets
+    String iconAsset = 'assets/images/icon/all-fashion.png';
     if (tab == 'Cloth') iconAsset = 'assets/images/icon/dress-fashion.png';
     if (tab == 'Shoes') iconAsset = 'assets/images/icon/shoe-fashion.png';
 
@@ -631,6 +685,15 @@ class _SubTabSelector extends StatelessWidget {
           border: isSelected
               ? null
               : Border.all(color: const Color(0xFF5C9DFF), width: 2),
+          boxShadow: isSelected
+              ? [
+                  const BoxShadow(
+                    color: Color(0xFF4AC4F3),
+                    blurRadius: 6,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : [],
         ),
         child: Container(
           padding: const EdgeInsets.all(4),
@@ -638,13 +701,11 @@ class _SubTabSelector extends StatelessWidget {
             color: Colors.white,
             shape: BoxShape.circle,
           ),
-          child: Image.asset(iconAsset, fit: BoxFit.contain, errorBuilder: (_,__,___) => Icon(Icons.checkroom)),
+          child: Image.asset(iconAsset, fit: BoxFit.contain, errorBuilder: (_,__,___) => const Icon(Icons.checkroom)),
         ),
       ),
     );
   }
-
-
 }
 
 class _FashionGrid extends StatelessWidget {
@@ -660,9 +721,12 @@ class _FashionGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const Center(child: Text("ไม่มีไอเทมในหมวดนี้"));
+    }
+
     return GridView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 20),
+      padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 120),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
         childAspectRatio: 0.65,
@@ -691,24 +755,9 @@ class _ItemCard extends StatelessWidget {
   });
 
   String get _itemImagePath {
-    // 1. Hair Logic
-    if (item.category == 'Hair') {
-      return 'assets/images/Fashion/HairStyle/hair0${item.riveId}.PNG';
-    } 
-    
-    // 2. Cloth Logic
-    if (item.category == 'Cloth') {
-       return 'assets/images/Fashion/Cloth/Clothes${item.riveId + 1}.png';
-    }
-
-    return ''; 
-  }
-
-  // Helper to get category icon
-  String? get _categoryIcon {
-    if (item.category == 'Cloth') return 'assets/images/icon/dress-fashion.png';
-    if (item.category == 'Shoes') return 'assets/images/icon/shoe-fashion.png';
-    return null;
+    if (item.category == 'Hair') return 'assets/images/Fashion/HairStyle/hair0${item.riveId}.PNG';
+    if (item.category == 'Cloth') return 'assets/images/Fashion/Cloth/Clothes${item.riveId + 1}.png';
+    return '';
   }
 
   @override
@@ -718,103 +767,229 @@ class _ItemCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8), 
-          color: Colors.white, 
-          border: isSelected 
-            ? Border.all(color: const Color(0xFF5C9DFF), width: 3) 
-            : Border.all(color: Colors.grey.shade300, width: 1), 
+          borderRadius: BorderRadius.circular(4),
+          gradient: isSelected
+              ? const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFFCEFFB2), Color(0xFF6FBBDE)],
+                )
+              : null,
+          color: isSelected ? null : const Color(0xFFAAD7EA),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 2,
+              offset: const Offset(1, 1),
             ),
           ],
         ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Column(
-              children: [
-                // Image Area
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(2.0),
-                    child: _itemImagePath.isNotEmpty
-                      ? Transform.scale(
-                          // Hair gets bigger (1.45), Cloth gets smaller (0.85)
-                          scale: item.category == 'Hair' ? 1.45 : (item.category == 'Cloth' ? 0.85 : 1.0),
-                          child: Image.asset(
-                            _itemImagePath,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Center(child: Icon(Icons.image_not_supported, color: Colors.grey));
-                            },
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(1),
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Column(
+                children: [
+                  // Icon Top Right (Type) - Only show for Cloth and Shoes
+                  if (item.category == 'Cloth' || item.category == 'Shoes')
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: Padding(
+                        padding: const EdgeInsets.all(4.0),
+                        child: Container(
+                          width: 35,
+                          height: 35,
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xFFC8E5F1),
+                              width: 1.5,
+                            ),
                           ),
-                        )
-                      : Center(
-                          child: Text(
-                            item.name,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          // Determine small icon based on category
+                          child: Image.asset(
+                            item.category == 'Shoes' ? 'assets/images/icon/shoe-fashion.png' :
+                            'assets/images/icon/dress-fashion.png',
+                            errorBuilder: (_,__,___) => const Icon(Icons.star, size: 10),
                           ),
                         ),
-                  ),
-                ),
-
-                // Name Only
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0),
-                  child: Text(
-                    item.name,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                      color: Colors.black87,
+                      ),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            
-            // Category Icon (Top-Right)
-            if (_categoryIcon != null)
-              Positioned(
-                top: 6, // Slightly more padding from top
-                right: 6, // Slightly more padding from right
-                child: Container(
-                  width: 30, // Increased size (was 20)
-                  height: 30,
-                  padding: const EdgeInsets.all(4), // Slightly more padding inside
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFF5C9DFF), width: 1.5), // Slightly thicker border
-                  ),
-                  child: Image.asset(_categoryIcon!, fit: BoxFit.contain),
-                ),
-              ),
 
-            // Selected Checkmark
-            if (isSelected)
-              Positioned(
-                top: 0, 
-                right: 0,
-                child: Container(
-                  width: 18, // Adjust size
-                  height: 18,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Color(0xFF5C9DFF), 
+                  // Main Image
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(4.0),
+                      child: Center(
+                        child: _itemImagePath.isNotEmpty 
+                          ? Image.asset(
+                              _itemImagePath,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_not_supported),
+                            )
+                          : const Icon(Icons.checkroom, color: Colors.grey),
+                      ),
+                    ),
                   ),
-                  child: const Icon(Icons.check, color: Colors.white, size: 12),
-                ),
+
+                  // Text Name
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      bottom: 8.0,
+                      top: 4.0,
+                      left: 4,
+                      right: 4,
+                    ),
+                    child: Text(
+                      item.name,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Colors.black,
+                        height: 1.1,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
-          ],
+              if (isSelected)
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0xFFCEFFB2), Color(0xFF70BCDE)],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.check,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _SkinColorSelector extends StatelessWidget {
+  final List<Color> colors;
+  final int selectedIndex;
+  final ValueChanged<int> onColorSelected;
+  // Logic
+  final List<InventoryItem> inventory;
+  final InventoryItem? selectedItem;
+  final ValueChanged<InventoryItem> onInventoryItemSelected;
+
+
+  const _SkinColorSelector({
+    required this.colors,
+    required this.selectedIndex,
+    required this.onColorSelected,
+    required this.inventory,
+    required this.selectedItem,
+    required this.onInventoryItemSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // If we have actual skin items from API, display them as colors if possible, or just buttons
+    // For now, mapping colors to API items is tricky without explicit color codes in API.
+    // We will assume the inventory order matches color order or just display available skins.
+    
+    // If inventory is empty, show default UI for visual fallback
+    if (inventory.isEmpty) {
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.only(top: 40),
+          alignment: Alignment.topCenter,
+          child: const Text("ไม่มีไอเทมสีผิว"),
+        );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.only(top: 40),
+      alignment: Alignment.topCenter,
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 20,
+        children: List.generate(inventory.length, (index) {
+          final item = inventory[index];
+          final isSelected = selectedItem?.id == item.id;
+          
+          // Fallback colors if we don't have enough defined
+          Color displayColor = Colors.grey;
+          if (index < colors.length) displayColor = colors[index];
+          
+          return GestureDetector(
+            onTap: () {
+               onColorSelected(index);
+               onInventoryItemSelected(item);
+            },
+            child: Container(
+              width: 60,
+              height: 60,
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: isSelected
+                    ? const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0xFFCEFFB2), Color(0xFF70BCDE)],
+                      )
+                    : null,
+                color: isSelected ? null : Colors.white,
+                border: isSelected
+                    ? null
+                    : Border.all(color: Colors.white, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: displayColor,
+                  shape: BoxShape.circle,
+                ),
+                child: isSelected
+                    ? const Center(
+                        child: Icon(Icons.check, color: Colors.white, size: 30),
+                      )
+                    : null,
+              ),
+            ),
+          );
+        }),
       ),
     );
   }
