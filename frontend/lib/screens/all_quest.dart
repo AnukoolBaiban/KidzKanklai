@@ -266,7 +266,6 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
       right: 0,
       child: CustomBottomNavigationBar(
         selectedIndex: -1,
-        playerLevel: widget.user?.level ?? 1,
         avatarUrl: null,
         onItemTapped: (index) {},
         onAvatarTapped: () =>
@@ -475,18 +474,18 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
               context,
               MaterialPageRoute(
                 builder: (context) => QuestDetailScreen(
-                  quest: QuestItem(
-                    id: index.toString(),
-                    name: filteredQuests[index]['title'],
-                    description: "รายละเอียดภารกิจ...",
-                    imagePath: null,
-                    startDate: DateTime.now(),
-                    dueDate: DateTime.now().add(
-                      Duration(days: filteredQuests[index]['daysLeft'] ?? 1),
-                    ),
-                    isCompleted: filteredQuests[index]['isClaimed'] ?? false,
-                  ),
-                  user: widget.user,
+                  // quest: QuestItem(
+                  //   id: index.toString(),
+                  //   name: filteredQuests[index]['title'],
+                  //   description: "รายละเอียดภารกิจ...",
+                  //   imagePath: null,
+                  //   startDate: DateTime.now(),
+                  //   dueDate: DateTime.now().add(
+                  //     Duration(days: filteredQuests[index]['daysLeft'] ?? 1),
+                  //   ),
+                  //   isCompleted: filteredQuests[index]['isClaimed'] ?? false,
+                  // ),
+                  // user: widget.user,
                 ),
               ),
             );
