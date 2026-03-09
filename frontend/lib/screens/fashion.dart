@@ -330,7 +330,6 @@ class _FashionPageState extends State<FashionPage> {
                          if (index == 3) Navigator.pushReplacementNamed(context, '/map');
                          if (index == 4) Navigator.pushReplacementNamed(context, '/club');
                       },
-                      playerLevel: _user?.level ?? 1,
                       onAvatarTapped: () => Navigator.pushReplacementNamed(context, '/profile'),
                       onFashionTapped: () {},
                       onRoomTapped: () => Navigator.pushReplacementNamed(context, '/lobby'),
