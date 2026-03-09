@@ -94,7 +94,7 @@ class KidzKanklaiApp extends StatelessWidget {
         '/lobby': (context) => LobbyScreen(),
         '/fashion': (context) => const FashionPage(), // Add Fashion Route
         '/setting': (context) => const SettingScreen(),
-        //'/allquest': (context) => const AllQuestScreen(),
+        '/allquest': (context) => const AllQuestScreen(),
         '/createnormalquest': (context) => CreateNormalQuestScreen(
           onSubmit: (data) {
             // บันทึกข้อมูลภารกิจ
