@@ -24,6 +24,7 @@ import 'screens/loading.dart';
 import 'screens/me.dart';
 import 'screens/fashion.dart';
 import 'screens/create_normal_quest.dart';
+import 'screens/quest_detail.dart';
 import 'config/rive_cache.dart';
 import 'config/user_pose_provider.dart';
 import 'services/audio_manager.dart';
@@ -117,6 +118,7 @@ class KidzKanklaiApp extends StatelessWidget {
             );
           },
         ),
+        '/questdetail': (context) => const QuestDetailScreen(),
         '/countdown': (context) => const CountdownScreen(),
         '/profile': (context) => const ProfileScreen(),
         '/notification': (context) => const NotificationScreen(),
