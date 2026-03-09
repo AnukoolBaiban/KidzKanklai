@@ -264,17 +264,20 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
       bottom: 0,
       left: 0,
       right: 0,
-      child: CustomBottomNavigationBar(
-        selectedIndex: -1,
-        avatarUrl: null,
-        onItemTapped: (index) {},
-        onAvatarTapped: () =>
-            Navigator.pushReplacementNamed(context, '/profile'),
-        onFashionTapped: () =>
-            Navigator.pushReplacementNamed(context, '/fashion'),
-        onRoomTapped: () => Navigator.pushReplacementNamed(context, '/lobby'),
-        onMapTapped: () => Navigator.pushReplacementNamed(context, '/map'),
-        onClubTapped: () => Navigator.pushReplacementNamed(context, '/club'),
+      child: SafeArea( // 🌟 เพิ่ม SafeArea ครอบเอาไว้ตรงนี้
+        top: false,    // 🌟 ป้องกันแค่ขอบจอด้านล่าง ส่วนด้านบนไม่ต้องไปยุ่งกับมัน
+        child: CustomBottomNavigationBar(
+          selectedIndex: -1,
+          avatarUrl: null,
+          onItemTapped: (index) {},
+          onAvatarTapped: () =>
+              Navigator.pushReplacementNamed(context, '/profile'),
+          onFashionTapped: () =>
+              Navigator.pushReplacementNamed(context, '/fashion'),
+          onRoomTapped: () => Navigator.pushReplacementNamed(context, '/lobby'),
+          onMapTapped: () => Navigator.pushReplacementNamed(context, '/map'),
+          onClubTapped: () => Navigator.pushReplacementNamed(context, '/club'),
+        ),
       ),
     );
   }
