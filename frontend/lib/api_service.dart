@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_application_1/config/app_config.dart';
 
 // --- Data Models ---
 
@@ -148,7 +149,7 @@ class InventoryItem {
 
 class ApiService {
   // Use 10.0.2.2 for Android Emulator, localhost for iOS/Web
-  static const String baseUrl = "http://10.0.2.2:8080";
+  static const String baseUrl = '${AppConfig.baseUrl}';
   static String? authToken; // Token for Authentication
 
   static Map<String, String> get _headers => {
