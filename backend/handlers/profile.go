@@ -38,7 +38,7 @@ func UpdateUserProfileName(c *gin.Context) {
 	query := `UPDATE public.user_profiles SET name = $1 WHERE id = $2`
 	
 	// ใช้ config.DB ที่ประกาศไว้ใน package configs
-	_, err := config.DB.Exec(context.Background(), query, input.Name, userID)
+	_, err := configs.DB.Exec(context.Background(), query, input.Name, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update name: " + err.Error()})
 		return
@@ -70,7 +70,7 @@ func UpdateUserProfileBio(c *gin.Context) {
 	// หมายเหตุ: ใน struct UserProfile คุณใช้ชื่อ Detail ซึ่งมักจะ map กับ column "detail" ใน DB
 	query := `UPDATE public.user_profiles SET detail = $1 WHERE id = $2`
 
-	_, err := config.DB.Exec(context.Background(), query, input.Bio, userID)
+	_, err := configs.DB.Exec(context.Background(), query, input.Bio, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update bio: " + err.Error()})
 		return

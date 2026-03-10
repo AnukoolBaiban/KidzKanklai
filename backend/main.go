@@ -1,7 +1,7 @@
 package main
 
 import (
-	config "backend/configs"
+	"backend/configs"
 	"backend/handlers"
 
 	"github.com/gin-gonic/gin"
@@ -9,7 +9,7 @@ import (
 
 func main() {
 	// 1. เชื่อมต่อฐานข้อมูล
-	config.ConnectDB()
+	configs.ConnectDB()
 
 	// config.ResetDatabase() // Drop และ Create ตารางพร้อมเปิด RLS + Policies ตามปกติ
 	// config.DisableRLS()    // ปิด RLS + ลบ Policies ทั้งหมด
@@ -35,6 +35,11 @@ func main() {
 	auth.GET("/inventory", handlers.GetInventory)
 	auth.POST("/equip", handlers.EquipItem)
 	auth.GET("/equipped", handlers.GetEquippedItems)
+
+	// --- Rewards ---
+	auth.POST("/rewards/login-bonus", handlers.ClaimLoginTickets)
+	auth.POST("/rewards/add-coins", handlers.AddTestCoins) 
+	auth.POST("/rewards/claim-achievement", handlers.ClaimAchievementReward)
 
 	r.Run(":8080")
 }

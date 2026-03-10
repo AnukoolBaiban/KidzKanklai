@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	config "backend/configs"
+	"backend/configs"
 	"context"
 	"fmt"
 	"log"
@@ -21,7 +21,7 @@ var jwks *keyfunc.JWKS
 func InitAuth() {
 
 	// ดึงจาก config ที่เราโหลดไว้แล้ว
-	projectRef := config.SupabaseProjectRef
+	projectRef := configs.SupabaseProjectRef
 
 	if projectRef == "" {
 		// ถ้าขี้เกียจแก้ .env บ่อยๆ ใส่รหัส Project ตรงนี้ได้เลย (เช่น "abcdefghijklm")
@@ -147,7 +147,7 @@ func Me(c *gin.Context) {
 		WHERE u.id = $1
 	`
 	// Note: u.id is uuid, casting to text for scan
-	err := config.DB.QueryRow(ctx, query, userId).Scan(
+	err := configs.DB.QueryRow(ctx, query, userId).Scan(
 		&id, &email, &username, &bio,
 		&level, &exp,
 		&intelligence, &strength, &creative,
@@ -169,7 +169,7 @@ func Me(c *gin.Context) {
 		JOIN public.items i ON w.item_id = i.id
 		WHERE w.character_id = (SELECT id FROM public.characters WHERE user_id = $1)
 	`
-	rows, err := config.DB.Query(ctx, itemQuery, userId)
+	rows, err := configs.DB.Query(ctx, itemQuery, userId)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
@@ -187,25 +187,11 @@ func Me(c *gin.Context) {
 	// 3. Construct Response
 	// Note: Dart side expects snake_case keys for some reason (based on User.fromJson)
 	c.JSON(http.StatusOK, gin.H{
-		"id":              userId, // UUID
-		"username":        username,
-		"email":           email,
-		"level":           level,
-		"exp":             exp,
-		"coins":           999, // Mocking currency as it's missing in schema
-		"tickets":         0,
-		"vouchers":        0,
-		"bio":             bio,
-		"sound_bgm":       1,
-		"sound_sfx":       1,
 		"equipped_skin":   equipped["Skin"],
 		"equipped_hair":   equipped["Hair"],
 		"equipped_face":   equipped["Face"],
 		"equipped_body":   equipped["Body"],
 		"equipped_cloth":  equipped["Cloth"],
 		"equipped_shoes":  equipped["Shoes"],
-		"stat_intellect":  intelligence,
-		"stat_strength":   strength,
-		"stat_creativity": creative,
 	})
 }

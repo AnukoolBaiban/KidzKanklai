@@ -226,4 +226,75 @@ class ApiService {
       return false;
     }
   }
+
+  // ฟังก์ชันเคลมโบนัสล็อกอินรายวัน/รายสัปดาห์
+  static Future<List<dynamic>> claimLoginBonus() async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/rewards/login-bonus'),
+        headers: _headers, // ใช้ _headers ที่มี Authorization Token อยู่แล้ว
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['rewards'] != null) {
+          // ถ้ามีของรางวัลส่งกลับมา จะคืนค่าเป็น List กลับไป
+          return data['rewards']; 
+        }
+      } 
+    } catch (e) {
+      print("Claim Login Bonus Error: $e");
+    }
+    return []; // ถ้าไม่ได้อะไรเลย หรือเกิด Error ให้คืนค่า List ว่าง
+  }
+
+  // ฟังก์ชันสำหรับทดสอบเพิ่มเหรียญ 7,500 เหรียญ + เช็ค Achievement
+  static Future<Map<String, dynamic>?> addTestCoins() async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/rewards/add-coins'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          return data; // คืนค่ากลับไปทั้งหมด (มี added_coin, total_coins)
+        }
+      } else {
+        print("Add Test Coins Failed: ${response.statusCode} - ${response.body}");
+      }
+    } catch (e) {
+      print("Add Test Coins Error: $e");
+    }
+    return null; // คืนค่า null ถ้าเกิด Error
+  }
+
+  // ฟังก์ชันกดรับรางวัลจาก Achievement
+  // 🌟 เปลี่ยนจาก Future<List<dynamic>> เป็น Future<List<dynamic>?> (ใส่ ?)
+  static Future<List<dynamic>?> claimAchievementReward(int achievementId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/rewards/claim-achievement'),
+        headers: _headers,
+        body: jsonEncode({
+          "achievement_id": achievementId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          // ถ้าสำเร็จ คืนค่าลิสต์ของรางวัลกลับไป (ถ้าไม่มีของจะคืน [] ไม่ใช่ null)
+          return data['rewards'] ?? []; 
+        }
+      } else {
+        print("Claim Achievement Failed: ${response.statusCode} - ${response.body}");
+      }
+    } catch (e) {
+      print("Claim Achievement Error: $e");
+    }
+    // 🌟 คืนค่า null กรณีเกิด Error เท่านั้น
+    return null; 
+  }
 }
