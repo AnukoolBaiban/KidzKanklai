@@ -3,13 +3,14 @@ import 'package:flutter_application_1/api_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_application_1/screens/all_quest.dart';
 
 import 'screens/login.dart';
 import 'screens/register.dart';
 import 'screens/forgotpw.dart';
 import 'screens/resetpw.dart';
 import 'screens/lobby.dart';
-import 'screens/quest_screen.dart';
+import 'screens/all_quest.dart';
 import 'screens/countdown_screen.dart';
 import 'screens/profile.dart';
 import 'screens/notification.dart';
@@ -23,6 +24,7 @@ import 'screens/loading.dart';
 import 'screens/me.dart';
 import 'screens/fashion.dart';
 import 'screens/create_normal_quest.dart';
+import 'screens/quest_detail.dart';
 import 'config/rive_cache.dart';
 import 'config/user_pose_provider.dart';
 import 'services/audio_manager.dart';
@@ -92,7 +94,7 @@ class KidzKanklaiApp extends StatelessWidget {
         '/lobby': (context) => LobbyScreen(),
         '/fashion': (context) => const FashionPage(), // Add Fashion Route
         '/setting': (context) => const SettingScreen(),
-        '/quest': (context) => const QuestScreen(),
+        '/allquest': (context) => const AllQuestScreen(),
         '/createnormalquest': (context) => CreateNormalQuestScreen(
           onSubmit: (data) {
             // บันทึกข้อมูลภารกิจ
@@ -116,6 +118,7 @@ class KidzKanklaiApp extends StatelessWidget {
             );
           },
         ),
+        '/questdetail': (context) => const QuestDetailScreen(),
         '/countdown': (context) => const CountdownScreen(),
         '/profile': (context) => const ProfileScreen(),
         '/notification': (context) => const NotificationScreen(),

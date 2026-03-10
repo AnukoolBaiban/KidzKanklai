@@ -146,49 +146,70 @@ class _SettingScreenState extends State<SettingScreen> {
   }
 
   Widget _buildTopBar() {
-    return SafeArea(
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
+            height: screenHeight * 0.098, // responsive
+            color: Colors.black.withOpacity(0.4),
+            alignment: Alignment.bottomCenter,
             child: CustomTopBar(
               onNotificationTapped: () {
                 Navigator.pushNamed(context, '/notification');
               },
               onSettingsTapped: () {
-                Navigator.pushNamed(context, '/settings');
+                Navigator.pushNamed(context, '/setting');
               },
             ),
           ),
 
-          // Back Button
-          Padding(
-            padding: const EdgeInsets.only(left: 20, top: 10),
-            child: GestureDetector(
-              onTapDown: (_) => setState(() => _isPressed = true),
-              onTapUp: (_) {},
-              onTapCancel: () => setState(() => _isPressed = false),
-              onTap: () async {
-                await Future.delayed(const Duration(milliseconds: 200));
-                if (!mounted) return;
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LobbyScreen()),
-                ).then((_) {
-                  setState(() => _isPressed = false);
-                });
-              },
-              child: Image.asset(
-                _isPressed
-                    ? 'assets/images/button/bt-hover-Back.png'
-                    : 'assets/images/button/bt-Back.png',
-                width: 50,
-                height: 50,
-              ),
-            ),
-          ),
+          // เรียก Back Button
+          _buildBackButton(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBackButton() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    // ขนาดปุ่มตามขนาดจอ
+    final buttonSize = screenWidth * 0.12; // 12% ของความกว้างจอ
+    final topPadding = screenHeight * 0.010;
+
+    return Padding(
+      padding: EdgeInsets.only(left: screenWidth * 0.05, top: topPadding),
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapCancel: () => setState(() => _isPressed = false),
+        onTap: () async {
+          await Future.delayed(const Duration(milliseconds: 150));
+          if (!mounted) return;
+
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => LobbyScreen(user: widget.user),
+            ),
+          ).then((_) {
+            setState(() => _isPressed = false);
+          });
+        },
+        child: Image.asset(
+          _isPressed
+              ? 'assets/images/button/bt-hover-Back.png'
+              : 'assets/images/button/bt-Back.png',
+          width: buttonSize,
+          height: buttonSize,
+        ),
       ),
     );
   }

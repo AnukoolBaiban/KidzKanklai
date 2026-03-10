@@ -133,7 +133,7 @@ class _RewardPopupState extends State<RewardPopup> with SingleTickerProviderStat
                       const Text(
                         'ได้รับรางวัล',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFFFFFFFF),
                         ),
@@ -160,7 +160,6 @@ class _RewardPopupState extends State<RewardPopup> with SingleTickerProviderStat
                           fontWeight: FontWeight.normal,
                           color: Color(0xFFFFFFFF),
                         ),
-                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
@@ -221,6 +220,8 @@ class _RewardPopupState extends State<RewardPopup> with SingleTickerProviderStat
   }
 
   Widget _buildHeader() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    
     return Positioned(
       top: -60,
       left: 0,
@@ -231,16 +232,13 @@ class _RewardPopupState extends State<RewardPopup> with SingleTickerProviderStat
           padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
           child: Row(
             mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Positioned(
-                left: 0,
-                bottom: 0,
-                child: Image.asset(
-                  'assets/images/icon/Star11.png',
-                  width: 26,
-                  height: 26,
-                  fit: BoxFit.contain,
-                ),
+              Image.asset(
+                'assets/images/icon/Star11.png',
+                width: 20,
+                height: 20,
+                fit: BoxFit.contain,
               ),
               const SizedBox(width: 4),
               Positioned(
@@ -259,6 +257,8 @@ class _RewardPopupState extends State<RewardPopup> with SingleTickerProviderStat
                         ).createShader(const Rect.fromLTWH(0, 0, 200, 40)),
                     ),
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 4),

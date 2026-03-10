@@ -143,7 +143,7 @@ class _AchievementScreenState extends State<AchievementScreen> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: Image.asset('assets/images/background/bg1.png', fit: BoxFit.cover),
+            child: Image.asset('assets/images/background/bg4.png', fit: BoxFit.cover),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -240,40 +240,76 @@ class _AchievementScreenState extends State<AchievementScreen> {
     return widgets;
   }
 
-  Widget _buildTopBar() {
-    return SafeArea(
+    Widget _buildTopBar() {
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          CustomTopBar(
-            onNotificationTapped: () => Navigator.pushNamed(context, '/notification'),
-            onSettingsTapped: () => Navigator.pushNamed(context, '/settings'),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 20, top: 10),
-            child: GestureDetector(
-              onTapDown: (_) => setState(() => _isPressed = true),
-              onTapCancel: () => setState(() => _isPressed = false),
-              onTap: () async {
-                await Future.delayed(const Duration(milliseconds: 200));
-                if (!mounted) return;
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LobbyScreen()),
-                ).then((_) => setState(() => _isPressed = false));
+          Container(
+            height: screenHeight * 0.098, // responsive
+            color: Colors.black.withOpacity(0.4),
+            alignment: Alignment.bottomCenter,
+            child: CustomTopBar(
+              user: widget.user,
+              onNotificationTapped: () {
+                Navigator.pushNamed(context, '/notification');
               },
-              child: Image.asset(
-                _isPressed ? 'assets/images/button/bt-hover-Back.png' : 'assets/images/button/bt-Back.png',
-                width: 50,
-                height: 50,
-              ),
+              onSettingsTapped: () {
+                Navigator.pushNamed(context, '/setting');
+              },
             ),
           ),
+
+          // เรียก Back Button
+          _buildBackButton(),
         ],
       ),
     );
   }
+
+  Widget _buildBackButton() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    // ขนาดปุ่มตามขนาดจอ
+    final buttonSize = screenWidth * 0.12; // 12% ของความกว้างจอ
+    final topPadding = screenHeight * 0.010;
+
+    return Padding(
+      padding: EdgeInsets.only(left: screenWidth * 0.05, top: topPadding),
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapCancel: () => setState(() => _isPressed = false),
+        onTap: () async {
+          await Future.delayed(const Duration(milliseconds: 150));
+          if (!mounted) return;
+
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => LobbyScreen(user: widget.user),
+            ),
+          ).then((_) {
+            setState(() => _isPressed = false);
+          });
+        },
+        child: Image.asset(
+          _isPressed
+              ? 'assets/images/button/bt-hover-Back.png'
+              : 'assets/images/button/bt-Back.png',
+          width: buttonSize,
+          height: buttonSize,
+        ),
+      ),
+    );
+  }
+
 
   Widget _buildAchievementItem(Achievement achievement, int index) {
     final isExpanded = _expandedAchievementIndex == index;
@@ -537,7 +573,7 @@ class _AchievementScreenState extends State<AchievementScreen> {
 
   Widget _buildHeaderTitle() {
     return Positioned(
-      top: 160,
+      top: 175,
       left: 0,
       right: 0,
       child: Align(
