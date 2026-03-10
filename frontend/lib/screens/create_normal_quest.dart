@@ -5,6 +5,7 @@ import 'package:flutter_application_1/widgets/custom_top_bar.dart';
 import 'package:flutter_application_1/widgets/quest_info_card.dart';
 import 'package:flutter_application_1/widgets/confirm_exit_popup.dart';
 import 'package:flutter_application_1/widgets/confirm_save_popup.dart';
+import 'package:flutter_application_1/widgets/annotation_normal.dart';
 
 class CreateNormalQuestScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
@@ -115,8 +116,21 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
     final topBarHeight = 75.0 + topPadding;
     final headerHeight = 80.0;
 
-    return Scaffold(
-      body: Stack(
+    // ignore: deprecated_member_use
+    return WillPopScope(
+      onWillPop: () async {
+        // เมื่อกดปุ่ม back → แสดง ConfirmExitPopup
+        await ConfirmExitPopup.show(
+          context,
+          onConfirm: () {
+            Navigator.pop(context); // ปิด popup
+            Navigator.pop(context); // ออกจากหน้า (ไม่บันทึก)
+          },
+        );
+        return false; // ไม่ให้กลับทันที
+      },
+      child: Scaffold(
+        body: Stack(
         children: [
           _buildBackground(),
 
@@ -193,6 +207,7 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
               ),
             ),
         ],
+      ),
       ),
     );
   }
@@ -274,72 +289,40 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
       top: topOffset,
       left: 0,
       right: 0,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // Header Bar
-          Container(
-            height: 80,
-            padding: EdgeInsets.only(top: 10),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF015496), Color(0xFF2273B4)],
-              ),
-            ),
-            child: Row(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(left: 20),
-                  child: _buildBackButton(),
-                ),
-
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      "ภารกิจทั่วไป",
-                      style: TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-
-                SizedBox(width: 20), // เว้นที่ให้ Back Button
-
-                // ปุ่ม
-                Padding(
-                  padding: const EdgeInsets.only(right: 15, top: 15),
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _showQuestInfo = !_showQuestInfo;
-                      });
-                    },
-                    child: Icon(
-                      Icons.help_outline,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+      child: Container(
+        height: 80,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF015496), Color(0xFF2273B4)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
-
-          // Info Card (อยู่นอก Header)
-          if (_showQuestInfo)
-            Positioned(
-              top: 80,
-              right: 20,
-              child: QuestInfoCard(
-                title: "ภารกิจทั่วไป",
-                description:
-                    "เหมาะสำหรับผู้เล่นที่จะทำกิจกรรมต่าง ๆ ในภายหลังและต้องเป็นกิจกรรมที่มีการกำหนดระยะเวลาสิ้นสุดของกิจกรรมที่ทำ",
+        ),
+        child: Stack(
+          children: [
+            Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildBackButton(),
+                  const SizedBox(width: 60),
+                  const Text(
+                    "ภารกิจทั่วไป",
+                    style: TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                const SizedBox(width: 80),
+                ],
               ),
             ),
-        ],
+            // Annotation button stays at bottom right
+            const Positioned(bottom: 8, right: 15, child: AnnotationButton()),
+          ],
+        ),
       ),
     );
   }

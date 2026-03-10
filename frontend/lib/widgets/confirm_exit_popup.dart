@@ -67,12 +67,12 @@ class _ConfirmExitPopupState extends State<ConfirmExitPopup>
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     
-    // ✅ Responsive values based on screen width
+    // ✅ Responsive with max limits to prevent oversized text on tablets
     final containerWidth = size.width * 0.85;
-    final titleFontSize = size.width * 0.038; // ~14-15px on most phones
-    final subtitleFontSize = size.width * 0.033; // ~12-13px
-    final buttonFontSize = size.width * 0.04; // ~15-16px
-    final buttonHeight = size.width * 0.11; // ~41-45px
+    final titleFontSize = (size.width * 0.038).clamp(14.0, 18.0);
+    final subtitleFontSize = (size.width * 0.033).clamp(12.0, 14.0);
+    final buttonFontSize = (size.width * 0.038).clamp(14.0, 16.0);
+    final buttonHeight = (size.width * 0.105).clamp(39.0, 50.0);
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -93,7 +93,7 @@ class _ConfirmExitPopupState extends State<ConfirmExitPopup>
               children: [
                 // Main Container
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   width: double.infinity,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -128,7 +128,7 @@ class _ConfirmExitPopupState extends State<ConfirmExitPopup>
                     children: [
                       // Title with padding to prevent overflow
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        padding: EdgeInsets.symmetric(horizontal: 4),
                         child: Text(
                           'ยืนยันที่จะออกจากการสร้างภารกิจหรือไม่?',
                           textAlign: TextAlign.center,
@@ -136,14 +136,14 @@ class _ConfirmExitPopupState extends State<ConfirmExitPopup>
                             color: Colors.white,
                             fontSize: titleFontSize,
                             fontWeight: FontWeight.bold,
-                            height: 1.3, // Line height for better readability
+                            height: 1.2,
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       
-                      SizedBox(height: 8),
+                      SizedBox(height: 6),
                       
                       // Subtitle
                       Text(
@@ -152,13 +152,13 @@ class _ConfirmExitPopupState extends State<ConfirmExitPopup>
                         style: TextStyle(
                           color: Colors.white70,
                           fontSize: subtitleFontSize,
-                          height: 1.3,
+                          height: 1.2,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       
-                      SizedBox(height: 18),
+                      SizedBox(height: 14),
 
                       // Buttons
                       Row(
@@ -169,7 +169,7 @@ class _ConfirmExitPopupState extends State<ConfirmExitPopup>
                               onTap: widget.onCancel,
                               child: Container(
                                 height: buttonHeight,
-                                margin: EdgeInsets.only(right: 6),
+                                margin: EdgeInsets.only(right: 5),
                                 decoration: BoxDecoration(
                                   color: Color(0xFFEA4444),
                                   borderRadius: BorderRadius.circular(30),
@@ -201,7 +201,7 @@ class _ConfirmExitPopupState extends State<ConfirmExitPopup>
                               onTap: widget.onConfirm,
                               child: Container(
                                 height: buttonHeight,
-                                margin: EdgeInsets.only(left: 6),
+                                margin: EdgeInsets.only(left: 5),
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     begin: Alignment.topCenter,
