@@ -279,7 +279,6 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
         color: Colors.black.withOpacity(0.4),
         alignment: Alignment.bottomCenter,
         child: CustomTopBar(
-          user: widget.user,
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
           onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
@@ -444,14 +443,14 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
   }
 
   void _openRewardPopup() {
-    RewardPopup.show(
-      context,
-      rewardType: 'EXP',
-      amount: 100,
-      onClose: () {
-        Navigator.pop(context);
-      },
-    );
+    // RewardPopup.show(
+    //   context,
+    //   rewardType: 'EXP',
+    //   amount: 100,
+    //   onClose: () {
+    //     Navigator.pop(context);
+    //   },
+    // );
   }
 }
 

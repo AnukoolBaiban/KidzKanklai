@@ -234,6 +234,7 @@ class _RewardPopupState extends State<RewardPopup> with SingleTickerProviderStat
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // ดาวดวงที่ 1
               Image.asset(
                 'assets/images/icon/Star11.png',
                 width: 20,
@@ -241,36 +242,32 @@ class _RewardPopupState extends State<RewardPopup> with SingleTickerProviderStat
                 fit: BoxFit.contain,
               ),
               const SizedBox(width: 4),
-              Positioned(
-                top: 0,
-                child: Center(
-                  child: Text(
-                    'รับรางวัลสำเร็จ',
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.bold,
-                      foreground: Paint()
-                        ..shader = const LinearGradient(
-                          colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ).createShader(const Rect.fromLTWH(0, 0, 200, 40)),
-                    ),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              
+              // 🌟 แก้ไขตรงนี้: เอา Positioned กับ Center ออก และย้าย maxLines เข้ามาใน Text
+              Text(
+                'รับรางวัลสำเร็จ',
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold,
+                  foreground: Paint()
+                    ..shader = const LinearGradient(
+                      colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ).createShader(const Rect.fromLTWH(0, 0, 200, 40)),
                 ),
+                maxLines: 1, // ✅ ย้ายเข้ามาอยู่ในวงเล็บของ Text แล้ว
+                overflow: TextOverflow.ellipsis, // ✅ ย้ายเข้ามาอยู่ในวงเล็บของ Text แล้ว
               ),
+              
               const SizedBox(width: 4),
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: Image.asset(
-                  'assets/images/icon/Star11.png',
-                  width: 26,
-                  height: 26,
-                  fit: BoxFit.contain,
-                ),
+              
+              // ดาวดวงที่ 2 (เอา Positioned ออกเช่นกัน เพราะอยู่ใน Row อยู่แล้ว)
+              Image.asset(
+                'assets/images/icon/Star11.png',
+                width: 26,
+                height: 26,
+                fit: BoxFit.contain,
               ),
             ],
           ),
