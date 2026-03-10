@@ -256,7 +256,6 @@ class _FashionPageState extends State<FashionPage> {
               children: [
                 // 1. Custom Top Bar
                 CustomTopBar(
-                  user: _user,
                   onNotificationTapped: () => Navigator.pushNamed(context, '/notification'),
                   onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
                 ),

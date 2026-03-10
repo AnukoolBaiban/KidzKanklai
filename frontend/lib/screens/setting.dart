@@ -153,7 +153,6 @@ class _SettingScreenState extends State<SettingScreen> {
         children: [
           Container(
             child: CustomTopBar(
-              user: widget.user,
               onNotificationTapped: () {
                 Navigator.pushNamed(context, '/notification');
               },

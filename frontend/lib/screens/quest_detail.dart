@@ -36,7 +36,6 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
             children: [
               // Top Bar
               CustomTopBar(
-                user: widget.user,
                 onNotificationTapped: () {
                   Navigator.pushNamed(context, '/notification');
                 },

@@ -1,4 +1,4 @@
-package config
+package configs
 
 import (
 	"context"
@@ -7,10 +7,12 @@ import (
 	"os"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool" // ✅ 1. เพิ่มแพ็กเกจ pgxpool
 	"github.com/joho/godotenv"
 )
 
-var DB *pgx.Conn
+// ✅ 2. เปลี่ยนชนิดตัวแปรเป็น *pgxpool.Pool
+var DB *pgxpool.Pool
 var SupabaseProjectRef string
 
 func ConnectDB() {
@@ -31,21 +33,23 @@ func ConnectDB() {
 		log.Fatal("SUPABASE_PROJECT_REF is not set")
 	}
 
-	// 3. เชื่อมต่อฐานข้อมูล (Use ParseConfig to disable prepared statements for Supabase/PgBouncer)
-	config, err := pgx.ParseConfig(databaseURL)
+	// ✅ 3. ใช้ pgxpool.ParseConfig เพื่อสร้างคอนฟิกของ Pool
+	config, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
-		log.Fatal("❌ Failed to parse config:", err)
+		log.Fatal("❌ Failed to parse pool config:", err)
 	}
 
-	// ⚠️ Fix for "prepared statement already exists" error
-	config.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+	// ✅ 4. อัปเดตวิธีเข้าถึงการตั้งค่า Simple Protocol (ต้องเข้าผ่าน ConnConfig)
+	// ⚠️ Fix for "prepared statement already exists" error for Supabase
+	config.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 
-	DB, err = pgx.ConnectConfig(context.Background(), config)
+	// ✅ 5. สร้าง Connection Pool ด้วย NewWithConfig
+	DB, err = pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
-		log.Fatal("❌ DB connection failed:", err)
+		log.Fatal("❌ DB pool connection failed:", err)
 	}
 
-	log.Println("✅ Connected to Supabase DB (Simple Protocol)")
+	log.Println("✅ Connected to Supabase DB via Connection Pool (Simple Protocol)")
 }
 
 // ✅ [เพิ่มฟังก์ชันนี้] สำหรับ Reset Database
@@ -71,8 +75,6 @@ func ResetDatabase() {
 	}
 	fmt.Println("🎉 All tables created successfully!")
 }
-
-// ... (โค้ดเดิมของคุณ) ...
 
 // ✅ [เพิ่มฟังก์ชันนี้] สำหรับลบ Policy ทั้งหมดและปิด RLS
 func DisableRLS() {

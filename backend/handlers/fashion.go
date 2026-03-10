@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	config "backend/configs"
+	"backend/configs"
 	"context"
 	"fmt"
 	"net/http"
@@ -39,7 +39,7 @@ func GetInventory(c *gin.Context) {
 		WHERE col.user_id = $1
 	`
 
-	rows, err := config.DB.Query(context.Background(), query, userId)
+	rows, err := configs.DB.Query(context.Background(), query, userId)
 	if err != nil {
 		fmt.Println("❌ GetInventory Query Error:", err) // Add Log here
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch inventory: " + err.Error()})
@@ -86,7 +86,7 @@ func EquipItem(c *gin.Context) {
 		JOIN public.categories c ON i.category_id = c.id
 		WHERE col.user_id = $1 AND col.item_id = $2
 	`
-	err := config.DB.QueryRow(ctx, checkQuery, userId, input.ItemID).Scan(&categoryName)
+	err := configs.DB.QueryRow(ctx, checkQuery, userId, input.ItemID).Scan(&categoryName)
 	if err != nil {
 		fmt.Println("❌ EquipItem Ownership Check Failed:", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "You do not own this item"})
@@ -95,11 +95,11 @@ func EquipItem(c *gin.Context) {
 
 	// 2. หา Character ID ของ User
 	var charID int64
-	err = config.DB.QueryRow(ctx, "SELECT id FROM public.characters WHERE user_id = $1", userId).Scan(&charID)
+	err = configs.DB.QueryRow(ctx, "SELECT id FROM public.characters WHERE user_id = $1", userId).Scan(&charID)
 	if err != nil {
 		// ⚠️ ถ้าไม่มี Character ให้สร้างใหม่เลย (Self-Healing)
 		fmt.Println("⚠️ Character not found, creating new one for user:", userId)
-		err = config.DB.QueryRow(ctx, "INSERT INTO public.characters (user_id) VALUES ($1) RETURNING id", userId).Scan(&charID)
+		err = configs.DB.QueryRow(ctx, "INSERT INTO public.characters (user_id) VALUES ($1) RETURNING id", userId).Scan(&charID)
 		if err != nil {
 			fmt.Println("❌ Failed to create character:", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create character record"})
@@ -112,7 +112,7 @@ func EquipItem(c *gin.Context) {
 	// หมายเหตุ: Table 'wear' ออกแบบมาให้เก็บ character_id, item_id, type
 	// เราจะลบ item ที่มี type เดียวกันของ character นี้ออกก่อน
 
-	tx, err := config.DB.Begin(ctx)
+	tx, err := configs.DB.Begin(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction failed"})
 		return
@@ -163,7 +163,7 @@ func GetEquippedItems(c *gin.Context) {
 		WHERE ch.user_id = $1
 	`
 
-	rows, err := config.DB.Query(context.Background(), query, userId)
+	rows, err := configs.DB.Query(context.Background(), query, userId)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch equipped items"})
 		return
