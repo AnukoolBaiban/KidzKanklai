@@ -131,83 +131,86 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
       },
       child: Scaffold(
         body: Stack(
-        children: [
-          _buildBackground(),
+          children: [
+            _buildBackground(),
 
-          // Main Content with boundary
-          Padding(
-            padding: EdgeInsets.only(
-              top: topBarHeight + headerHeight + 10, // เว้นที่ให้ Header ด้านบน
-              // bottom: 110 + bottomPadding, // เว้นที่ให้ Bottom Bar ด้านล่าง
-              left: size.width * 0.05,
-              right: size.width * 0.05,
-            ),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 10),
-
-                  _buildTextField(
-                    controller: _nameController,
-                    hintText: 'ชื่อภารกิจ',
-                  ),
-
-                  SizedBox(height: 24),
-
-                  // เนื้อหา (อยู่นอกกล่อง)
-                  _buildSectionTitle('เนื้อหา'),
-                  SizedBox(height: 8),
-
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.8),
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    padding: EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildDatePicker(),
-
-                        _buildDetailTextField(),
-                        SizedBox(height: 16),
-
-                        _buildCameraButton(),
-                        SizedBox(height: 32),
-
-                        _buildSubmitButton(),
-                        SizedBox(height: 20),
-                      ],
-                    ),
-                  ),
-                ],
+            // Main Content with boundary
+            Padding(
+              padding: EdgeInsets.only(
+                top:
+                    topBarHeight +
+                    headerHeight +
+                    10, // เว้นที่ให้ Header ด้านบน
+                // bottom: 110 + bottomPadding, // เว้นที่ให้ Bottom Bar ด้านล่าง
+                left: size.width * 0.05,
+                right: size.width * 0.05,
               ),
-            ),
-          ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 10),
 
-          // Top Bar (อยู่บนสุด)
-          _buildTopBar(topPadding, topBarHeight),
+                    _buildTextField(
+                      controller: _nameController,
+                      hintText: 'ชื่อภารกิจ',
+                    ),
 
-          // Header Title
-          _buildBlueHeader(topBarHeight),
+                    SizedBox(height: 24),
 
-          if (_showQuestInfo)
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _showQuestInfo = false;
-                  });
-                },
-                child: Container(
-                  color: Colors.black.withOpacity(0.0), // 👈 พื้นหลังจาง ๆ
+                    // เนื้อหา (อยู่นอกกล่อง)
+                    _buildSectionTitle('เนื้อหา'),
+                    SizedBox(height: 8),
+
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      padding: EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildDatePicker(),
+
+                          _buildDetailTextField(),
+                          SizedBox(height: 16),
+
+                          _buildCameraButton(),
+                          SizedBox(height: 32),
+
+                          _buildSubmitButton(),
+                          SizedBox(height: 20),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-        ],
-      ),
+
+            // Top Bar (อยู่บนสุด)
+            _buildTopBar(topPadding, topBarHeight),
+
+            // Header Title
+            _buildBlueHeader(topBarHeight),
+
+            if (_showQuestInfo)
+              Positioned.fill(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _showQuestInfo = false;
+                    });
+                  },
+                  child: Container(
+                    color: Colors.black.withOpacity(0.0), // 👈 พื้นหลังจาง ๆ
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -300,26 +303,27 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
         ),
         child: Stack(
           children: [
-            Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildBackButton(),
-                  const SizedBox(width: 60),
-                  const Text(
-                    "ภารกิจทั่วไป",
-                    style: TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                const SizedBox(width: 80),
-                ],
+            /// ปุ่ม Back (ชิดซ้าย)
+            Positioned(
+              left: 15,
+              top: 0,
+              bottom: 0,
+              child: Center(child: _buildBackButton()),
+            ),
+
+            /// Title (อยู่กลางจริง)
+            const Center(
+              child: Text(
+                "ภารกิจทั่วไป",
+                style: TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             ),
-            // Annotation button stays at bottom right
+
+            /// Annotation button
             const Positioned(bottom: 8, right: 15, child: AnnotationButton()),
           ],
         ),

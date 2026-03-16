@@ -16,7 +16,7 @@ import 'screens/profile.dart';
 import 'screens/notification.dart';
 import 'screens/achievement.dart';
 import 'screens/lootbox_screen.dart';
-import 'screens/map_screen.dart';
+import 'screens/map.dart';
 import 'screens/club_screen.dart';
 import 'screens/setting.dart';
 import 'screens/startgame.dart';
