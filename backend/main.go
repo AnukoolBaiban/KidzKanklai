@@ -20,6 +20,19 @@ func main() {
 	// 3. เริ่ม Server
 	r := gin.Default()
 
+	// CORS Middleware — อนุญาตให้ Flutter Web (Chrome) เรียก API ได้
+	r.Use(func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		c.Next()
+	})
+
 	auth := r.Group("/")
 	auth.Use(handlers.AuthMiddleware)
 	auth.GET("/me", handlers.Me)
@@ -38,9 +51,11 @@ func main() {
 
 	// --- Rewards ---
 	auth.POST("/rewards/login-bonus", handlers.ClaimLoginTickets)
-	auth.POST("/rewards/add-coins", handlers.AddTestCoins) 
+	auth.POST("/rewards/add-coins", handlers.AddTestCoins)
 	auth.POST("/rewards/claim-achievement", handlers.ClaimAchievementReward)
 
+	// --- AI ---
+	auth.POST("/ai/dialogue", handlers.GenerateDialogue)
 	// --- Quests ---
 	auth.POST("/quests/create", handlers.CreateNormalQuest)
 	auth.POST("/quests/complete", handlers.CompleteNormalQuest)

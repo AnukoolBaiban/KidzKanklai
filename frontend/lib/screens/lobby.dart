@@ -28,7 +28,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     _loadUserData();
     // สั่งเช็คของรางวัลทันทีที่เปิดหน้านี้
     _checkDailyLoginRewards();
-    // _giveMeCoins(); // สำหรับเทสเพิ่มเหรียญ 
+    // _giveMeCoins(); // สำหรับเทสเพิ่มเหรียญ
   }
 
   Future<void> _loadUserData() async {
@@ -53,17 +53,16 @@ class _LobbyScreenState extends State<LobbyScreen> {
       List<RewardData> collectedRewards = [];
 
       for (var reward in apiRewards) {
-        collectedRewards.add(RewardData.item(
-          name: reward['name'],
-          amount: reward['added'],
-          image: reward['image'], // 🌟 จับค่าใส่ตรงๆ ได้เลย โค้ดสั้นลงมาก!
-        ));
+        collectedRewards.add(
+          RewardData.item(
+            name: reward['name'],
+            amount: reward['added'],
+            image: reward['image'], // 🌟 จับค่าใส่ตรงๆ ได้เลย โค้ดสั้นลงมาก!
+          ),
+        );
       }
 
-      await RewardPopup.show(
-        context,
-        rewards: collectedRewards,
-      );
+      await RewardPopup.show(context, rewards: collectedRewards);
     }
   }
 
@@ -80,16 +79,11 @@ class _LobbyScreenState extends State<LobbyScreen> {
         context,
         rewards: [
           // 🌟 ใช้ RewardData.item เพื่อยัดรูปและชื่อที่ดึงจาก DB เข้าไปตรงๆ
-          RewardData.item(
-            name: itemName,
-            amount: addedCoin,
-            image: itemImage, 
-          ),
+          RewardData.item(name: itemName, amount: addedCoin, image: itemImage),
         ],
       );
     }
   }
-
 
   // Right Menu Items
   List<MenuItem> get _menuItems => [
@@ -104,7 +98,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
       imagePath: "assets/images/icon/iconQuest.png",
       label: 'ภารกิจ',
       onTap: () {
-        Navigator.pushNamed(context,'/allquest');
+        Navigator.pushNamed(context, '/allquest');
       },
     ),
     MenuItem(
@@ -151,7 +145,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                       child: _isLoading || _user == null
                           ? const SizedBox() // Or CircularProgressIndicator() if you want to see it loading
                           : CharacterWidget(
-                              height: 600, 
+                              height: 600,
                               width: 500,
                               user: _user, // Pass Updated User to Character
                             ),
