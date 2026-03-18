@@ -11,7 +11,7 @@ import 'screens/forgotpw.dart';
 import 'screens/resetpw.dart';
 import 'screens/lobby.dart';
 import 'screens/all_quest.dart';
-import 'screens/countdown_screen.dart';
+import 'screens/countdown_quest.dart';
 import 'screens/profile.dart';
 import 'screens/notification.dart';
 import 'screens/achievement.dart';
@@ -104,7 +104,7 @@ class KidzKanklaiApp extends StatelessWidget {
           },
         ),
         '/questdetail': (context) => const QuestDetailScreen(),
-        '/countdown': (context) => const CountdownScreen(),
+        '/countdown': (context) => const CountdownQuestScreen(),
         '/profile': (context) => const ProfileScreen(),
         '/notification': (context) => const NotificationScreen(),
         '/achievement': (context) => const AchievementScreen(),
