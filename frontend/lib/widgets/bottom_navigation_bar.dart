@@ -1,3 +1,4 @@
+import 'dart:async'; // 🌟 1. เพิ่ม import สำหรับ Stream
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:math';
@@ -57,7 +58,6 @@ class CustomBottomNavigationBar extends StatefulWidget {
   final VoidCallback? onClubTapped;
 
   final String? avatarUrl;
-  // ลบ playerLevel ออกจากพารามิเตอร์ได้เลย เพราะเราจะดึงเองจาก DB แล้ว
 
   const CustomBottomNavigationBar({
     Key? key,
@@ -78,6 +78,9 @@ class CustomBottomNavigationBar extends StatefulWidget {
 class _CustomBottomNavigationBarState extends State<CustomBottomNavigationBar> {
   final _supabase = Supabase.instance.client;
 
+  // 🌟 2. เพิ่ม Subscription ตัวดักฟังข้อมูล
+  StreamSubscription<List<Map<String, dynamic>>>? _characterSubscription;
+
   // State สำหรับเก็บข้อมูลจริง
   int _level = 1;
   double _expPercent = 0.0;
@@ -85,10 +88,17 @@ class _CustomBottomNavigationBarState extends State<CustomBottomNavigationBar> {
   @override
   void initState() {
     super.initState();
-    _fetchCharacterData(); // สั่งดึงข้อมูลตอนโหลด UI
+    _setupRealtimeCharacter(); // 🌟 3. สั่งรันตัวดักฟังตอนเปิด UI
   }
 
-  // Logic เดียวกับใน Profile.dart
+  @override
+  void dispose() {
+    // 🌟 4. ยกเลิกการดักฟังเมื่อ UI ถูกปิด ป้องกัน Memory Leak
+    _characterSubscription?.cancel();
+    super.dispose();
+  }
+
+  // Logic คิดเปอร์เซ็นต์หลอดเลือด
   void _updateLevelUI(int dbLevel, int totalExp) {
     int remainingExp = totalExp;
     int requiredExpForNextLevel = 0;
@@ -119,26 +129,32 @@ class _CustomBottomNavigationBarState extends State<CustomBottomNavigationBar> {
     }
   }
 
-  // ดึงแค่ Level และ Experience จาก Character
-  Future<void> _fetchCharacterData() async {
+  // 🌟 5. ฟังก์ชันดักฟังตาราง characters แบบ Real-time
+  void _setupRealtimeCharacter() {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
     try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) return;
-
-      final charData = await _supabase
+      _characterSubscription = _supabase
           .from('characters')
-          .select('level, experience')
+          .stream(primaryKey: ['user_id']) // ⚠️ อ้างอิงด้วย Primary Key
           .eq('user_id', user.id)
-          .maybeSingle();
+          .listen((data) {
+        if (!mounted) return;
 
-      if (charData != null) {
-        final dbLevel = charData['level'] as int? ?? 1;
-        final totalExp = charData['experience'] as int? ?? 0;
-        
-        _updateLevelUI(dbLevel, totalExp); 
-      }
+        // ถ้าพบข้อมูลตัวละคร ให้อัปเดต UI ทันที
+        if (data.isNotEmpty) {
+          final charData = data.first;
+          final dbLevel = charData['level'] as int? ?? 1;
+          final totalExp = charData['experience'] as int? ?? 0;
+          
+          _updateLevelUI(dbLevel, totalExp); 
+        }
+      }, onError: (error) {
+        debugPrint('Error fetching realtime character: $error');
+      });
     } catch (e) {
-      debugPrint('Error fetching character for nav bar: $e');
+      debugPrint('Stream setup error: $e');
     }
   }
 

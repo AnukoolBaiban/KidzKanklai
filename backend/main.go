@@ -56,6 +56,10 @@ func main() {
 
 	// --- AI ---
 	auth.POST("/ai/dialogue", handlers.GenerateDialogue)
+	// --- Quests ---
+	auth.POST("/quests/create", handlers.CreateNormalQuest)
+	auth.POST("/quests/complete", handlers.CompleteNormalQuest)
+	auth.POST("/quests/cancel", handlers.CancelQuest)
 
 	r.Run(":8080")
 }

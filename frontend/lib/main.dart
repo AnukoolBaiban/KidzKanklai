@@ -11,7 +11,7 @@ import 'screens/forgotpw.dart';
 import 'screens/resetpw.dart';
 import 'screens/lobby.dart';
 import 'screens/all_quest.dart';
-import 'screens/countdown_screen.dart';
+import 'screens/countdown_quest.dart';
 import 'screens/profile.dart';
 import 'screens/notification.dart';
 import 'screens/achievement.dart';
@@ -95,29 +95,14 @@ class KidzKanklaiApp extends StatelessWidget {
         '/allquest': (context) => const AllQuestScreen(),
         '/createnormalquest': (context) => CreateNormalQuestScreen(
           onSubmit: (data) {
-            // บันทึกข้อมูลภารกิจ
+            // ปริ้นท์เช็คเฉยๆ ว่าได้ข้อมูลกลับมาไหม (เอาไว้เช็คตอน Debug)
+            print('✅ สร้างเควสสำเร็จและกลับมาที่เมนเมนูแล้ว');
             print('Quest Name: ${data['name']}');
-            print('Quest Detail: ${data['detail']}');
-            print('Due Date: ${data['date']}');
-            print('Has Image: ${data['hasImage']}');
 
-            // TODO: บันทึกลง database
-            // await questService.createQuest(data);
-
-            // กลับหน้าเดิม
-            Navigator.pop(context);
-
-            // แสดงข้อความสำเร็จ
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('สร้างภารกิจสำเร็จ!'),
-                backgroundColor: Colors.green,
-              ),
-            );
           },
         ),
         '/questdetail': (context) => const QuestDetailScreen(),
-        '/countdown': (context) => const CountdownScreen(),
+        '/countdown': (context) => const CountdownQuestScreen(),
         '/profile': (context) => const ProfileScreen(),
         '/notification': (context) => const NotificationScreen(),
         '/achievement': (context) => const AchievementScreen(),
