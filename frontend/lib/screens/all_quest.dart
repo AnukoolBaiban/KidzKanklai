@@ -7,6 +7,7 @@ import 'package:flutter_application_1/screens/quest_detail.dart';
 import 'package:flutter_application_1/widgets/annotation.dart';
 import 'package:flutter_application_1/widgets/tutorial_quest.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide User; // 🌟 เพิ่ม Supabase
 
 class AllQuestScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
@@ -20,75 +21,153 @@ class AllQuestScreen extends StatefulWidget {
 
 class _AllQuestScreenState extends State<AllQuestScreen> {
   // --- ตัวแปร State ---
-  bool _isPressed = false; // สถานะการกดปุ่ม Back
-  int _selectedTabIndex = 0; // Tab ที่เลือกปัจจุบัน
+  bool _isPressed = false;
+  int _selectedTabIndex = 0;
   final List<String> _tabs = [
     "ทั้งหมด",
     "ระบบ",
     "ส่วนตัว",
     "ประวัติ",
-  ]; // รายชื่อ Tab
-
-  // --- ข้อมูลจำลอง (Mock Data) ---
-  final List<Map<String, dynamic>> _allQuests = [
-    {
-      "title": "สรุปฟิสิกส์บทที่ 5",
-      "type": "ทั่วไป",
-      "category": "ส่วนตัว",
-      "exp": 100,
-      "item": "assets/images/item/Gasha.png",
-      "itemAmount": 1,
-      "daysLeft": 1,
-      "isSystem": false,
-    },
-    {
-      "title": "สรุปคณิตบทที่ 1",
-      "type": "ทั่วไป",
-      "category": "ส่วนตัว",
-      "exp": 100,
-      "item": "assets/images/item/Ticket_exam_img.png",
-      "itemAmount": 1,
-      "daysLeft": 5,
-      "isSystem": false,
-    },
-    {
-      "title": "สำเร็จภารกิจระบบ 6 อย่าง",
-      "type": "ระบบ",
-      "category": "ระบบ",
-      "exp": 100,
-      "item": "assets/images/item/Ticket_exam_img.png",
-      "itemAmount": 1,
-      "daysLeft": 1,
-      "isSystem": true,
-      "progress": 0,
-      "totalReq": 6,
-      "isClaimed": false,
-    },
-    {
-      "title": "เข้าร่วมการสอบ 3 ครั้ง",
-      "type": "ระบบ",
-      "category": "ระบบ",
-      "exp": 100,
-      "item": "assets/images/item/Ticket_exam_img.png",
-      "itemAmount": 1,
-      "daysLeft": 1,
-      "isSystem": true,
-      "progress": 3,
-      "totalReq": 3,
-      "isClaimed": false,
-    },
   ];
 
-  // --- Widget: Tutorial Quest Popup ---
+  // 🌟 ลบ Mock Data ออก และสร้างตัวแปรรับข้อมูลจริงจาก DB
+  List<Map<String, dynamic>> _allQuests = [];
+  bool _isLoading = true;
+
   @override
   void initState() {
     super.initState();
+    // 🌟 ดึงข้อมูลทันทีเมื่อเข้าหน้านี้
+    _fetchQuestsFromDB(); 
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       showDialog(
         context: context,
         builder: (context) => const TutorialQuestPopup(),
       );
     });
+  }
+
+  // 🌟 ฟังก์ชันดึงข้อมูลจาก Supabase (รองรับของรางวัลไม่อั้น)
+  Future<void> _fetchQuestsFromDB() async {
+    try {
+      final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+      if (currentUserId == null) return;
+
+      final response = await Supabase.instance.client
+          .from('do_quests')
+          .select('''
+            status, 
+            completed_date, 
+            quests (
+              id, 
+              name, 
+              type, 
+              due_date, 
+              image,
+              receive (
+                quantity,
+                items (
+                  name,
+                  image
+                )
+              )
+            )
+          ''')
+          .eq('user_id', currentUserId);
+
+      List<Map<String, dynamic>> loadedQuests = [];
+      final now = DateTime.now();
+
+      for (var row in response) {
+        final questData = row['quests'];
+        if (questData == null) continue;
+
+        String status = row['status'] ?? 'in_progress';
+        bool isClaimed = (status == 'completed');
+        
+        DateTime? completedDate;
+        if (row['completed_date'] != null) {
+          completedDate = DateTime.parse(row['completed_date']);
+        }
+
+        DateTime dueDate = DateTime.parse(questData['due_date']);
+        Duration diff = dueDate.difference(now);
+
+        // 🌟 เพิ่มตัวแปรเช็คว่า "หมดเวลาหรือยัง" โดยดูว่า diff ติดลบไหม
+        bool isExpired = diff.isNegative;
+
+        int daysLeft = diff.inDays;
+        int hoursLeft = diff.inHours; 
+        
+        if (daysLeft < 0) daysLeft = 0; 
+        if (hoursLeft < 0) hoursLeft = 0;
+
+        String type = questData['type'] ?? 'ทั่วไป';
+        bool isSystem = (type == 'ระบบ');
+        String category = isSystem ? 'ระบบ' : 'ส่วนตัว';
+
+        // --------------------------------------------------------
+        // 🌟 สร้าง List เก็บของรางวัลทั้งหมดที่ดึงมาจาก DB
+        // --------------------------------------------------------
+        List<Map<String, dynamic>> rewardsList = [];
+
+        if (questData['receive'] != null && (questData['receive'] as List).isNotEmpty) {
+          final receiveList = questData['receive'] as List;
+          
+          for (var r in receiveList) {
+            final int qty = r['quantity'] ?? 0;
+            final itemInfo = r['items'];
+            
+            if (itemInfo != null) {
+              final String itemName = (itemInfo['name'] ?? '').toString();
+              final String imgPath = itemInfo['image'] ?? "assets/images/item/default_item.png";
+              
+              // เช็คว่าไอเทมนี้ใช่ EXP หรือไม่
+              final bool isExp = itemName.toUpperCase() == 'EXP';
+
+              rewardsList.add({
+                "name": itemName,
+                "amount": qty,
+                "image": imgPath,
+                "isExp": isExp, // ระบุว่าเป็น EXP เพื่อโชว์เครื่องหมาย + 
+              });
+            }
+          }
+        }
+
+        loadedQuests.add({
+          "id": questData['id'],
+          "title": questData['name'] ?? 'ไม่มีชื่อ',
+          "type": type,
+          "category": category,
+          "rewards": rewardsList, 
+          "daysLeft": daysLeft,
+          "hoursLeft": hoursLeft, 
+          "isSystem": isSystem,
+          "progress": isClaimed ? 1 : 0,
+          "totalReq": 1,
+          "status": status, // 🌟 เพิ่มบรรทัดนี้ เพื่อเก็บสถานะ 'in_progress', 'completed', 'failed' ไว้ใช้ตอนกรอง
+          "isClaimed": isClaimed,
+          "isExpired": isExpired, // 🌟 ส่งค่านี้ไปให้ UI ใช้เช็คแทน
+          "completedDate": completedDate, 
+        });
+      }
+
+      if (mounted) {
+        setState(() {
+          _allQuests = loadedQuests;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching quests: $e");
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   // --- Main Screen ---
@@ -109,34 +188,28 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
           // Main Content
           Padding(
             padding: EdgeInsets.only(
-              top: topBarHeight + headerHeight + 10, // เว้นที่ให้ Header ด้านบน
-              bottom: 110 + bottomPadding, // เว้นที่ให้ Bottom Bar ด้านล่าง
+              top: topBarHeight + headerHeight + 10,
+              bottom: 110 + bottomPadding,
               left: size.width * 0.05,
               right: size.width * 0.05,
             ),
             child: Column(
               children: [
-                _buildTabs(), // ส่วน Tab และปุ่มสร้าง Quest
+                _buildTabs(), 
                 const SizedBox(height: 4),
-                Expanded(child: _buildQuestContent()), // รายการ Quest
+                Expanded(child: _buildQuestContent()),
               ],
             ),
           ),
 
-          // Top Bar
           _buildTopBar(topPadding, topBarHeight),
-
-          // Header & Title
           _buildBlueHeader(topBarHeight),
-
-          // Bottom Navigation
           _buildBottomNavBar(),
         ],
       ),
     );
   }
 
-  // --- Widget: พื้นหลัง (Background Layer) ---
   Widget _buildBackground() {
     return Container(
       color: Colors.white,
@@ -153,7 +226,6 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
     );
   }
 
-  // --- Widget: แถบข้อมูลผู้ใช้ (Top Bar Overlay) ---
   Widget _buildTopBar(double topPadding, double height) {
     return Positioned(
       top: 0,
@@ -173,7 +245,6 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
     );
   }
 
-  // Header with Back Button & Title
   Widget _buildBlueHeader(double topOffset) {
     return Positioned(
       top: topOffset,
@@ -257,14 +328,13 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
     );
   }
 
-  // Bottom Navigation
   Widget _buildBottomNavBar() {
     return Positioned(
       bottom: 0,
       left: 0,
       right: 0,
-      child: SafeArea( // 🌟 เพิ่ม SafeArea ครอบเอาไว้ตรงนี้
-        top: false,    // 🌟 ป้องกันแค่ขอบจอด้านล่าง ส่วนด้านบนไม่ต้องไปยุ่งกับมัน
+      child: SafeArea(
+        top: false,
         child: CustomBottomNavigationBar(
           selectedIndex: -1,
           avatarUrl: null,
@@ -281,14 +351,12 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
     );
   }
 
-  // ส่วน Tab และปุ่มสร้าง Quest
   Widget _buildTabs() {
     return Row(
       children: [
         for (int i = 0; i < _tabs.length; i++)
           Expanded(child: _buildTabItem(i)),
         const SizedBox(width: 8),
-        // ปุ่มสร้าง Quest
         Builder(
           builder: (ctx) =>
               _CreateQuestButton(onTap: () => _showCreateQuestPopup(ctx)),
@@ -331,11 +399,10 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
     showDialog(
       context: context,
       barrierColor: Colors.black26,
-      useSafeArea: false, // เพื่อให้พิกัด absolute ตรงกันทุกขนาดจอ
+      useSafeArea: false,
       builder: (BuildContext dialogContext) {
         return Stack(
           children: [
-            // Replica button to prevent the barrier from darkening it
             Positioned(
               left: offset.dx,
               top: offset.dy,
@@ -344,13 +411,8 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
               ),
             ),
             Positioned(
-              top:
-                  offset.dy +
-                  renderBox.size.height +
-                  15, // ระยะห่างลงมาจากปุ่มมากขึ้นเพื่อไม่ให้บัง
-              right:
-                  MediaQuery.of(context).size.width *
-                  0.05, // จัดขวาให้ตรงกับขอบ padding หน้าจอเหมือนปุ่ม
+              top: offset.dy + renderBox.size.height + 15,
+              right: MediaQuery.of(context).size.width * 0.05,
               child: Material(
                 color: Colors.transparent,
                 child: Container(
@@ -376,7 +438,10 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
                     children: [
                       _buildPopupButton("ภารกิจทั่วไป", () {
                         Navigator.pop(dialogContext);
-                        Navigator.pushNamed(context, '/createnormalquest');
+                        // เมื่อกลับมาจากการสร้างเควส ให้ Refresh ดึงข้อมูลใหม่ด้วย
+                        Navigator.pushNamed(context, '/createnormalquest').then((_) {
+                          _fetchQuestsFromDB();
+                        });
                       }),
                       const SizedBox(height: 6),
                       _buildPopupButton("ภารกิจทันที", () {
@@ -409,7 +474,7 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
         ),
         alignment: Alignment.center,
         child: FittedBox(
-          fit: BoxFit.scaleDown, // บีบอักษรให้พอดีกล่องถ้าจอแคบ
+          fit: BoxFit.scaleDown,
           child: Text(
             text,
             style: GoogleFonts.kanit(
@@ -423,28 +488,41 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
     );
   }
 
-  // --- Widget: รายการ Quest (List View Logic) ---
+  // --- 🌟 Logic การกรองข้อมูลตาม Tab แบบใหม่ ---
   Widget _buildQuestContent() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     List<Map<String, dynamic>> filteredQuests = [];
+    final threeMonthsAgo = DateTime.now().subtract(const Duration(days: 90)); // ย้อนหลัง 3 เดือน
 
     // กรองข้อมูลตาม Tab ที่เลือก
     if (_selectedTabIndex == 0) {
-      filteredQuests = _allQuests;
-    } else {
-      String category = _tabs[_selectedTabIndex];
-      filteredQuests = _allQuests
-          .where((q) => q['category'] == category)
-          .toList();
+      // "ทั้งหมด" = ทุกหมวดหมู่ เฉพาะที่กำลังทำอยู่ (in_progress)
+      filteredQuests = _allQuests.where((q) => q['status'] == 'in_progress').toList();
+    } else if (_selectedTabIndex == 1) {
+      // "ระบบ" = หมวดระบบ เฉพาะที่กำลังทำอยู่
+      filteredQuests = _allQuests.where((q) => q['category'] == 'ระบบ' && q['status'] == 'in_progress').toList();
+    } else if (_selectedTabIndex == 2) {
+      // "ส่วนตัว" = หมวดส่วนตัว เฉพาะที่กำลังทำอยู่
+      filteredQuests = _allQuests.where((q) => q['category'] == 'ส่วนตัว' && q['status'] == 'in_progress').toList();
+    } else if (_selectedTabIndex == 3) {
+      // "ประวัติ" = ทำสำเร็จแล้ว (completed) หรือ หมดเวลา (failed) และไม่เกิน 3 เดือน
+      filteredQuests = _allQuests.where((q) {
+        bool isDoneOrFailed = (q['status'] == 'completed' || q['status'] == 'failed');
+        
+        // หมายเหตุ: ถ้าเป็น failed อาจจะไม่มี completedDate ก็ให้โชว์ไปเลย หรือจะเช็คจาก dueDate แทนก็ได้
+        if (isDoneOrFailed) {
+          if (q['completedDate'] != null) {
+            DateTime compDate = q['completedDate'];
+            return compDate.isAfter(threeMonthsAgo);
+          }
+          return true; // ถ้าไม่มีวันที่สำเร็จ (เช่น fail ไปเฉยๆ) ก็อนุญาตให้แสดงในประวัติ
+        }
+        return false;
+      }).toList();
     }
-
-    // เรียงลำดับ: Quest ที่ยังไม่รับรางวัลขึ้นก่อน
-    filteredQuests.sort((a, b) {
-      bool aClaimed = a['isClaimed'] ?? false;
-      bool bClaimed = b['isClaimed'] ?? false;
-      if (aClaimed && !bClaimed) return 1;
-      if (!aClaimed && bClaimed) return -1;
-      return 0;
-    });
 
     if (filteredQuests.isEmpty) {
       return Center(
@@ -465,29 +543,18 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
       itemBuilder: (context, index) {
         return QuestCard(
           quest: filteredQuests[index],
-          onClaim: () {
+          onClaim: () async {
+            // เมื่อกดรับรางวัลหน้า UI (สำหรับเควสระบบ ถ้ามี)
             setState(() {
               filteredQuests[index]['isClaimed'] = true;
             });
           },
           onViewDetails: () {
-            // เชื่อมไปหน้าดูรายละเอียด
             Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => QuestDetailScreen(
-                  // quest: QuestItem(
-                  //   id: index.toString(),
-                  //   name: filteredQuests[index]['title'],
-                  //   description: "รายละเอียดภารกิจ...",
-                  //   imagePath: null,
-                  //   startDate: DateTime.now(),
-                  //   dueDate: DateTime.now().add(
-                  //     Duration(days: filteredQuests[index]['daysLeft'] ?? 1),
-                  //   ),
-                  //   isCompleted: filteredQuests[index]['isClaimed'] ?? false,
-                  // ),
-                  // user: widget.user,
+                  questId: filteredQuests[index]['id'], // 🌟 ส่ง ID ไปให้หน้า Detail
                 ),
               ),
             );
@@ -558,19 +625,21 @@ class QuestCard extends StatelessWidget {
     int totalReq = quest['totalReq'] ?? 1;
     bool isComplete = progress >= totalReq;
 
-    // Badge Colors
     List<Color> badgeColors = isSystem
-        ? [const Color(0xFF6CC732), const Color(0xFFCEFFB2)] // System: Green
-        : [const Color(0xFF59ABEC), const Color(0xFFC6F4FF)]; // General: Blue
+        ? [const Color(0xFF6CC732), const Color(0xFFCEFFB2)]
+        : [const Color(0xFF59ABEC), const Color(0xFFC6F4FF)];
 
-    // Background Logic
+    // 🌟 1. ดึงสถานะ Failed ออกมาเช็ค
+    bool isFailed = quest['status'] == 'failed' || quest['isExpired'] == true;
+
+    // 🌟 2. เปลี่ยนเงื่อนไขการใส่สีพื้นหลังและขอบ
     Decoration backgroundDecoration = BoxDecoration(
-      color: isClaimed
+      color: (isClaimed || isFailed) // ถ้าสำเร็จแล้ว หรือ ยอมแพ้แล้ว ให้เป็นสีเทา
           ? Colors.grey.shade300.withOpacity(0.85)
           : Colors.white.withOpacity(0.8),
       borderRadius: BorderRadius.circular(15),
       border: Border.all(
-        color: isClaimed ? Colors.grey : const Color(0xFF9DD0E7),
+        color: (isClaimed || isFailed) ? Colors.grey : const Color(0xFF9DD0E7),
         width: 2,
       ),
     );
@@ -581,7 +650,6 @@ class QuestCard extends StatelessWidget {
       child: IntrinsicHeight(
         child: Row(
           children: [
-            // Left Content (Type, Rewards)
             Expanded(
               flex: 4,
               child: Padding(
@@ -589,14 +657,12 @@ class QuestCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Type Badge & Title Row
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Type Badge
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 16, // slightly reduced padding
+                            horizontal: 16,
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
@@ -613,7 +679,7 @@ class QuestCard extends StatelessWidget {
                             child: Text(
                               isSystem ? 'ระบบ' : quest['type'],
                               style: const TextStyle(
-                                fontSize: 13, // slightly smaller font
+                                fontSize: 13,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.black,
                               ),
@@ -621,12 +687,11 @@ class QuestCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        // Title
                         Expanded(
                           child: Text(
                             quest['title'],
                             style: const TextStyle(
-                              fontSize: 15, // slightly smaller font
+                              fontSize: 15,
                               fontWeight: FontWeight.bold,
                               color: Colors.black87,
                             ),
@@ -637,39 +702,34 @@ class QuestCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    // Rewards
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: [
-                        RewardBadge(
-                          label: "EXP",
-                          value: "+${quest['exp']}",
-                          color: Colors.green.shade100,
-                          iconPath: 'assets/images/item/EXP.png',
+                      // 🌟 เปลี่ยนมาใช้การวนลูปสร้าง RewardBadge ตามจำนวนของรางวัลจริงๆ ใน List
+                      children: (quest['rewards'] as List<dynamic>? ?? []).map<Widget>((reward) {
+                        bool isExp = reward['isExp'] ?? false;
+                        
+                        return RewardBadge(
+                          label: isExp ? "EXP" : "Item",
+                          // ถ้าเป็น EXP โชว์เครื่องหมาย +, ถ้าเป็นของทั่วไปโชว์ตัว x
+                          value: isExp ? "+${reward['amount']}" : "x${reward['amount']}",
+                          color: isExp ? Colors.green.shade100 : Colors.orange.shade100,
+                          iconPath: reward['image'],
                           isClaimed: isClaimed,
-                        ),
-                        RewardBadge(
-                          label: "Item",
-                          value: "x${quest['itemAmount']}",
-                          color: Colors.orange.shade100,
-                          iconPath: quest['item'],
-                          isClaimed: isClaimed,
-                        ),
-                      ],
+                        );
+                      }).toList(),
                     ),
                   ],
                 ),
               ),
             ),
 
-            // Vertical Divider
             Container(
               width: 1,
-              color: isClaimed ? Colors.grey : const Color(0xFF9DD0E7),
+              // 🌟 เช็ค isFailed ด้วย เพื่อให้เส้นกั้นเป็นสีเทาเหมือนกัน
+              color: (isClaimed || isFailed) ? Colors.grey : const Color(0xFF9DD0E7),
             ),
 
-            // Right Content (Button, Status)
             Expanded(
               flex: 2,
               child: Container(
@@ -677,9 +737,13 @@ class QuestCard extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Action Button
+                    // 🌟 1. แก้ปุ่มจาก "สำเร็จ" (ที่กดไม่ได้) เป็นปุ่ม "รายละเอียด"
                     if (isClaimed)
-                      _buildActionButton(text: 'สำเร็จ', onPressed: null)
+                      _buildActionButton(
+                        text: 'รายละเอียด', 
+                        onPressed: onViewDetails,
+                        bgColor: const Color(0xFF536DFE),
+                      )
                     else if (isSystem && isComplete)
                       _buildActionButton(
                         text: 'รับรางวัล',
@@ -696,10 +760,9 @@ class QuestCard extends StatelessWidget {
                             ? Colors.grey
                             : const Color(0xFF536DFE),
                       ),
-
+                      
                     const SizedBox(height: 12),
-
-                    // Progress or Days Left
+                    
                     if (isSystem) ...[
                       _buildProgressBar(
                         isClaimed || isComplete,
@@ -709,14 +772,41 @@ class QuestCard extends StatelessWidget {
                       const SizedBox(height: 4),
                     ],
 
-                    Text(
-                      "เหลืออีก ${quest['daysLeft']} วัน",
-                      style: const TextStyle(
-                        color: Colors.red,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    // 🌟 2. เงื่อนไขเวลาแบบใหม่ (<3 วันโชว์, <1 วันโชว์เป็นชั่วโมง, เป็น 0 โชว์น้อยกว่า 1 ชั่วโมง)
+                    if (isClaimed)
+                      const Text(
+                        "สำเร็จ",
+                        style: TextStyle(
+                          color: Color(0xFF34C759), // สีเขียว
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    // 🌟 เพิ่มเงื่อนไขเช็คว่า ถ้ายอมแพ้ (failed) ให้ขึ้นว่า "ไม่สำเร็จ" ทันที ไม่สนเวลาที่เหลือ
+                    else if (quest['status'] == 'failed' || quest['isExpired'] == true) 
+                      const Text(
+                        "ไม่สำเร็จ",
+                        style: TextStyle(
+                          color: Color.fromARGB(255, 255, 0, 0), // สีแดง
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    else if (quest['daysLeft'] != null && quest['daysLeft'] < 3)
+                      Text(
+                        quest['daysLeft'] < 1 
+                            ? (quest['hoursLeft'] <= 0 
+                                ? "เหลือน้อยกว่า 1 ชั่วโมง" 
+                                : "เหลืออีก ${quest['hoursLeft']} ชั่วโมง")
+                            : "เหลืออีก ${quest['daysLeft']} วัน",
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    else
+                      const SizedBox(), // ไม่แสดงอะไรถ้าเวลาเหลือตั้งแต่ 3 วันขึ้นไป
                   ],
                 ),
               ),
@@ -734,9 +824,7 @@ class QuestCard extends StatelessWidget {
     Gradient? gradient,
   }) {
     final style = ElevatedButton.styleFrom(
-      backgroundColor: gradient == null
-          ? (bgColor ?? Colors.grey)
-          : Colors.transparent,
+      backgroundColor: gradient == null ? (bgColor ?? Colors.grey) : Colors.transparent,
       shadowColor: Colors.transparent,
       foregroundColor: Colors.white,
       disabledBackgroundColor: Colors.grey,
@@ -754,7 +842,7 @@ class QuestCard extends StatelessWidget {
         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
       ),
     );
-    if (gradient != null)
+    if (gradient != null) {
       btn = Container(
         width: double.infinity,
         height: 36,
@@ -764,6 +852,7 @@ class QuestCard extends StatelessWidget {
         ),
         child: btn,
       );
+    }
     return btn;
   }
 

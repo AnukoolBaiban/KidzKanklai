@@ -1,3 +1,4 @@
+import 'dart:async'; // 🌟 1. เพิ่ม import นี้สำหรับการทำ Stream
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -17,6 +18,9 @@ class CustomTopBar extends StatefulWidget {
 
 class _CustomTopBarState extends State<CustomTopBar> {
   final _supabase = Supabase.instance.client;
+  
+  // 🌟 2. เพิ่มตัวแปร Subscription สำหรับเก็บสถานะการดักฟังแบบ Real-time
+  StreamSubscription<List<Map<String, dynamic>>>? _inventorySubscription;
 
   int _coins = 0;
   int _tickets = 0; // QUEST_TICKET (id: 17)
@@ -28,21 +32,29 @@ class _CustomTopBarState extends State<CustomTopBar> {
   @override
   void initState() {
     super.initState();
-    _fetchInventoryData();
+    _setupRealtimeInventory(); // 🌟 3. เรียกใช้ฟังก์ชันแบบ Real-time
   }
 
-  Future<void> _fetchInventoryData() async {
+  @override
+  void dispose() {
+    // 🌟 4. ยกเลิกการดักฟังเมื่อเปลี่ยนหน้า เพื่อไม่ให้เปลืองเมมโมรี่
+    _inventorySubscription?.cancel();
+    super.dispose();
+  }
+
+  // 🌟 5. ฟังก์ชันใหม่ที่ใช้ .stream() ดักฟังการเปลี่ยนแปลง
+  void _setupRealtimeInventory() {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
     try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) return;
-
-      final data = await _supabase
+      _inventorySubscription = _supabase
           .from('collect')
-          .select('item_id, quantity')
+          .stream(primaryKey: ['user_id', 'item_id']) // ⚠️ ต้องระบุ Primary Keys ให้ครบ
           .eq('user_id', user.id)
-          .inFilter('item_id', [_coinItemId, 17, 18]); 
+          .listen((data) {
+        if (!mounted) return;
 
-      if (mounted) {
         int tempCoins = 0;
         int tempTickets = 0;
         int tempVouchers = 0;
@@ -65,17 +77,17 @@ class _CustomTopBarState extends State<CustomTopBar> {
           _tickets = tempTickets;
           _vouchers = tempVouchers;
         });
-      }
+      }, onError: (error) {
+        debugPrint('Error fetching realtime inventory: $error');
+      });
     } catch (e) {
-      debugPrint('Error fetching top bar inventory: $e');
+      debugPrint('Stream setup error: $e');
     }
   }
 
-  // 🌟 ฟังก์ชันช่วยจัด Format ตัวเลขให้มีลูกน้ำ (คอมมา) ถ้าเกินหลักพัน (Option เสริม)
+  // 🌟 ฟังก์ชันช่วยจัด Format ตัวเลขให้มีลูกน้ำ (คอมมา) ถ้าเกินหลักพัน
   String _formatNumber(int number) {
     if (number >= 1000) {
-      // แปลงเป็น 1.2K หรือ 10K เพื่อประหยัดพื้นที่ 
-      // (ถ้าอยากให้โชว์เต็มๆ เช่น 10,000 ให้เอาบล็อก if นี้ออกได้เลยครับ)
       if (number >= 1000000) return '${(number / 1000000).toStringAsFixed(1)}M';
       return '${(number / 1000).toStringAsFixed(1)}K';
     }
@@ -91,7 +103,7 @@ class _CustomTopBarState extends State<CustomTopBar> {
           // กรอบหลักที่มี coins, tickets, vouchers
           Expanded(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4), // 🌟 ลด padding แนวนอนลง
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(25),
@@ -104,12 +116,12 @@ class _CustomTopBarState extends State<CustomTopBar> {
                 ],
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly, // 🌟 ใช้ spaceEvenly ให้เกลี่ยระยะห่างเท่าๆ กัน
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  Expanded( // 🌟 ใส่ Expanded ให้ไอเทมยืดหยุ่น
+                  Expanded(
                     child: _buildTopBarItem(
                       imagePath: 'assets/images/item/coin.png',
-                      value: _formatNumber(_coins), // โชว์ค่า Coin
+                      value: _formatNumber(_coins), 
                     ),
                   ),
                   Container(
@@ -117,7 +129,7 @@ class _CustomTopBarState extends State<CustomTopBar> {
                     height: 20,
                     color: Colors.grey[300],
                   ),
-                  Expanded( // 🌟 ใส่ Expanded
+                  Expanded(
                     child: _buildTopBarItem(
                       imagePath: 'assets/images/item/Ticket_quest_img.png',
                       value: '$_tickets/7', 
@@ -128,7 +140,7 @@ class _CustomTopBarState extends State<CustomTopBar> {
                     height: 20,
                     color: Colors.grey[300],
                   ),
-                  Expanded( // 🌟 ใส่ Expanded
+                  Expanded(
                     child: _buildTopBarItem(
                       imagePath: 'assets/images/item/Ticket_exam_img.png',
                       value: '$_vouchers/3', 
@@ -176,9 +188,9 @@ class _CustomTopBarState extends State<CustomTopBar> {
     required String value,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2), // 🌟 ลด padding ข้างในลง
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center, // 🌟 จัดให้อยู่ตรงกลางของพื้นที่ที่เหลือ
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Image.asset(
             imagePath,
@@ -190,7 +202,6 @@ class _CustomTopBarState extends State<CustomTopBar> {
             },
           ),
           const SizedBox(width: 4),
-          // 🌟 ใส่ Flexible และ FittedBox เพื่อย่อขนาดข้อความอัตโนมัติถ้าที่เต็ม!
           Flexible(
             child: FittedBox(
               fit: BoxFit.scaleDown,
@@ -200,7 +211,7 @@ class _CustomTopBarState extends State<CustomTopBar> {
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                 ),
-                maxLines: 1, // บังคับให้อยู่บรรทัดเดียว
+                maxLines: 1,
               ),
             ),
           ),
