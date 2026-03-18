@@ -446,6 +446,10 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
                       const SizedBox(height: 6),
                       _buildPopupButton("ภารกิจทันที", () {
                         Navigator.pop(dialogContext);
+
+                        Navigator.pushNamed(context, '/countdown').then((_) {
+                          _fetchQuestsFromDB();
+                        });
                       }),
                     ],
                   ),

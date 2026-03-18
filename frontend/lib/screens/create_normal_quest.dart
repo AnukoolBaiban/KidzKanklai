@@ -315,51 +315,37 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
 
   Widget _buildBlueHeader(double topOffset) {
     return Positioned(
-      top: topOffset, left: 0, right: 0,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            height: 80,
-            padding: const EdgeInsets.only(top: 10),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(colors: [Color(0xFF015496), Color(0xFF2273B4)]),
-            ),
-            child: Row(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(left: 20),
-                  child: _buildBackButton(),
-                ),
-                const Expanded(
-                  child: Center(
-                    child: Text(
-                      "ภารกิจทั่วไป",
-                      style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.white),
+      top: topOffset,
+      left: 0,
+      right: 0,
+      child: Container(
+        height: 80,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF015496), Color(0xFF2273B4)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Stack(
+          children: [
+            Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildBackButton(),
+                  const SizedBox(width: 60),
+                  const Text(
+                    "ภารกิจทั่วไป",
+                    style: TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
-                ),
-                const SizedBox(width: 20), 
-                Padding(
-                  padding: const EdgeInsets.only(right: 15, top: 15),
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _showQuestInfo = !_showQuestInfo;
-                      });
-                    },
-                    child: const Icon(Icons.help_outline, color: Colors.white, size: 24),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (_showQuestInfo)
-            Positioned(
-              top: 80, right: 20,
-              child: const QuestInfoCard(
-                title: "ภารกิจทั่วไป",
-                description: "เหมาะสำหรับผู้เล่นที่จะทำกิจกรรมต่าง ๆ ในภายหลังและต้องเป็นกิจกรรมที่มีการกำหนดระยะเวลาสิ้นสุดของกิจกรรมที่ทำ",
+                const SizedBox(width: 80),
+                ],
               ),
             ),
             // Annotation button stays at bottom right

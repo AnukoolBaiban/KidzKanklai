@@ -222,7 +222,6 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
         color: Colors.black.withValues(alpha: 0.4),
         alignment: Alignment.bottomCenter,
         child: CustomTopBar(
-          user: widget.user,
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
           onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
