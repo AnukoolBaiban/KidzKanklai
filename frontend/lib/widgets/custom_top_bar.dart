@@ -1,91 +1,178 @@
+import 'dart:async'; // 🌟 1. เพิ่ม import นี้สำหรับการทำ Stream
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/api_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class CustomTopBar extends StatelessWidget {
-  final User? user;
+class CustomTopBar extends StatefulWidget {
   final VoidCallback? onNotificationTapped;
   final VoidCallback? onSettingsTapped;
 
   const CustomTopBar({
     Key? key,
-    this.user,
     this.onNotificationTapped,
     this.onSettingsTapped,
   }) : super(key: key);
 
   @override
+  State<CustomTopBar> createState() => _CustomTopBarState();
+}
+
+class _CustomTopBarState extends State<CustomTopBar> {
+  final _supabase = Supabase.instance.client;
+  
+  // 🌟 2. เพิ่มตัวแปร Subscription สำหรับเก็บสถานะการดักฟังแบบ Real-time
+  StreamSubscription<List<Map<String, dynamic>>>? _inventorySubscription;
+
+  int _coins = 0;
+  int _tickets = 0; // QUEST_TICKET (id: 17)
+  int _vouchers = 0; // EXAM_TICKET (id: 18)
+
+  // ⚠️ กำหนด ID ของ Coin ในฐานข้อมูล
+  final int _coinItemId = 20; 
+
+  @override
+  void initState() {
+    super.initState();
+    _setupRealtimeInventory(); // 🌟 3. เรียกใช้ฟังก์ชันแบบ Real-time
+  }
+
+  @override
+  void dispose() {
+    // 🌟 4. ยกเลิกการดักฟังเมื่อเปลี่ยนหน้า เพื่อไม่ให้เปลืองเมมโมรี่
+    _inventorySubscription?.cancel();
+    super.dispose();
+  }
+
+  // 🌟 5. ฟังก์ชันใหม่ที่ใช้ .stream() ดักฟังการเปลี่ยนแปลง
+  void _setupRealtimeInventory() {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      _inventorySubscription = _supabase
+          .from('collect')
+          .stream(primaryKey: ['user_id', 'item_id']) // ⚠️ ต้องระบุ Primary Keys ให้ครบ
+          .eq('user_id', user.id)
+          .listen((data) {
+        if (!mounted) return;
+
+        int tempCoins = 0;
+        int tempTickets = 0;
+        int tempVouchers = 0;
+
+        for (var item in data) {
+          final itemId = item['item_id'] as int;
+          final qty = item['quantity'] as int? ?? 0;
+
+          if (itemId == _coinItemId) {
+            tempCoins = qty;
+          } else if (itemId == 17) {
+            tempTickets = qty;
+          } else if (itemId == 18) {
+            tempVouchers = qty;
+          }
+        }
+
+        setState(() {
+          _coins = tempCoins;
+          _tickets = tempTickets;
+          _vouchers = tempVouchers;
+        });
+      }, onError: (error) {
+        debugPrint('Error fetching realtime inventory: $error');
+      });
+    } catch (e) {
+      debugPrint('Stream setup error: $e');
+    }
+  }
+
+  // 🌟 ฟังก์ชันช่วยจัด Format ตัวเลขให้มีลูกน้ำ (คอมมา) ถ้าเกินหลักพัน
+  String _formatNumber(int number) {
+    if (number >= 1000) {
+      if (number >= 1000000) return '${(number / 1000000).toStringAsFixed(1)}M';
+      return '${(number / 1000).toStringAsFixed(1)}K';
+    }
+    return number.toString();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
-      margin: EdgeInsets.all(12),
+      margin: const EdgeInsets.all(12),
       child: Row(
         children: [
           // กรอบหลักที่มี coins, tickets, vouchers
           Expanded(
             child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(25),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 10,
-                    offset: Offset(0, 4),
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildTopBarItem(
-                    imagePath: 'assets/images/item/coin.png',
-                    value: '${user?.coins ?? 0}',
+                  Expanded(
+                    child: _buildTopBarItem(
+                      imagePath: 'assets/images/item/coin.png',
+                      value: _formatNumber(_coins), 
+                    ),
                   ),
                   Container(
                     width: 1,
                     height: 20,
                     color: Colors.grey[300],
                   ),
-                  _buildTopBarItem(
-                    imagePath: 'assets/images/item/Ticket_quest_img.png',
-                    value: '${user?.tickets ?? 0}/7',
+                  Expanded(
+                    child: _buildTopBarItem(
+                      imagePath: 'assets/images/item/Ticket_quest_img.png',
+                      value: '$_tickets/7', 
+                    ),
                   ),
                   Container(
                     width: 1,
                     height: 20,
                     color: Colors.grey[300],
                   ),
-                  _buildTopBarItem(
-                    imagePath: 'assets/images/item/Ticket_exam_img.png',
-                    value: '${user?.vouchers ?? 0}/3',
+                  Expanded(
+                    child: _buildTopBarItem(
+                      imagePath: 'assets/images/item/Ticket_exam_img.png',
+                      value: '$_vouchers/3', 
+                    ),
                   ),
                 ],
               ),
             ),
           ),
 
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
 
-          // Notification Button (นอกกรอบ)
+          // Notification Button
           _buildTopBarIconButton(
             imagePath: 'assets/images/icon/icon-notification.png',
             onTap: () {
-              if (onNotificationTapped != null) {
-                onNotificationTapped!();
+              if (widget.onNotificationTapped != null) {
+                widget.onNotificationTapped!();
               } else {
                 Navigator.pushNamed(context, '/notification');
               }
             },
           ),
 
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
 
-          // Settings Button (นอกกรอบ)
+          // Settings Button
           _buildTopBarIconButton(
             imagePath: 'assets/images/icon/icon-setting.png',
             onTap: () {
-              if (onSettingsTapped != null) {
-                onSettingsTapped!();
+              if (widget.onSettingsTapped != null) {
+                widget.onSettingsTapped!();
               } else {
                 Navigator.pushNamed(context, '/settings');
               }
@@ -101,9 +188,9 @@ class CustomTopBar extends StatelessWidget {
     required String value,
   }) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 2),
-      
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Image.asset(
             imagePath,
@@ -111,19 +198,21 @@ class CustomTopBar extends StatelessWidget {
             height: 20,
             fit: BoxFit.contain,
             errorBuilder: (context, error, stackTrace) {
-              return Icon(
-                Icons.image_not_supported,
-                size: 20,
-                color: Colors.grey,
-              );
+              return const Icon(Icons.image_not_supported, size: 20, color: Colors.grey);
             },
           ),
-          SizedBox(width: 6),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
+          const SizedBox(width: 4),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+                maxLines: 1,
+              ),
             ),
           ),
         ],
@@ -139,20 +228,20 @@ class CustomTopBar extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: EdgeInsets.all(8),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          gradient: LinearGradient(
+          gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [Color(0xFF59ABEC), Color(0xFF93C8D0)],
           ),
-          border: Border.all(color: Color(0xFF114575), width: 1),
+          border: Border.all(color: const Color(0xFF114575), width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.15),
+              color: Colors.black.withValues(alpha: 0.15),
               blurRadius: 10,
-              offset: Offset(0, 4),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -161,13 +250,9 @@ class CustomTopBar extends StatelessWidget {
           width: 18,
           height: 18,
           fit: BoxFit.contain,
-          color: Color(0xFF002A50),
+          color: const Color(0xFF002A50),
           errorBuilder: (context, error, stackTrace) {
-            return Icon(
-              Icons.settings,
-              size: 25,
-              color: Color(0xFF002A50),
-            );
+            return const Icon(Icons.settings, size: 25, color: Color(0xFF002A50));
           },
         ),
       ),

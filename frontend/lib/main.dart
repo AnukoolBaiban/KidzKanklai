@@ -11,7 +11,7 @@ import 'screens/forgotpw.dart';
 import 'screens/resetpw.dart';
 import 'screens/lobby.dart';
 import 'screens/all_quest.dart';
-import 'screens/countdown_screen.dart';
+import 'screens/countdown_quest.dart';
 import 'screens/profile.dart';
 import 'screens/notification.dart';
 import 'screens/achievement.dart';
@@ -36,7 +36,8 @@ Future<void> main() async {
 
   await Supabase.initialize(
     url: 'https://dregaeeryyqlfssejzbr.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRyZWdhZWVyeXlxbGZzc2VqemJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0NjAzMzgsImV4cCI6MjA4NDAzNjMzOH0.QEyCrkki7K-RgaejMTdYsx-N-dt87Qi1LjJSZ4VFNLw',
+    anonKey:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRyZWdhZWVyeXlxbGZzc2VqemJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0NjAzMzgsImV4cCI6MjA4NDAzNjMzOH0.QEyCrkki7K-RgaejMTdYsx-N-dt87Qi1LjJSZ4VFNLw',
     authOptions: const FlutterAuthClientOptions(
       authFlowType: AuthFlowType.pkce,
     ),
@@ -51,9 +52,7 @@ Future<void> main() async {
 
   runApp(
     MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => UserPoseProvider()),
-      ],
+      providers: [ChangeNotifierProvider(create: (_) => UserPoseProvider())],
       child: const KidzKanklaiApp(),
     ),
   );
@@ -68,7 +67,6 @@ class KidzKanklaiApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-
       title: 'KidzKanklai',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -81,9 +79,9 @@ class KidzKanklaiApp extends StatelessWidget {
       navigatorObservers: [musicObserver],
 
       home: const LoadingScreen(),
-      
+
       routes: {
-         // ... routes ...
+        // ... routes ...
         '/auth': (context) => const AuthGate(),
         '/me': (context) => const MeScreen(),
 
@@ -94,32 +92,17 @@ class KidzKanklaiApp extends StatelessWidget {
         '/lobby': (context) => LobbyScreen(),
         '/fashion': (context) => const FashionPage(), // Add Fashion Route
         '/setting': (context) => const SettingScreen(),
-        //'/allquest': (context) => const AllQuestScreen(),
+        '/allquest': (context) => const AllQuestScreen(),
         '/createnormalquest': (context) => CreateNormalQuestScreen(
           onSubmit: (data) {
-            // บันทึกข้อมูลภารกิจ
+            // ปริ้นท์เช็คเฉยๆ ว่าได้ข้อมูลกลับมาไหม (เอาไว้เช็คตอน Debug)
+            print('✅ สร้างเควสสำเร็จและกลับมาที่เมนเมนูแล้ว');
             print('Quest Name: ${data['name']}');
-            print('Quest Detail: ${data['detail']}');
-            print('Due Date: ${data['date']}');
-            print('Has Image: ${data['hasImage']}');
 
-            // TODO: บันทึกลง database
-            // await questService.createQuest(data);
-
-            // กลับหน้าเดิม
-            Navigator.pop(context);
-
-            // แสดงข้อความสำเร็จ
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('สร้างภารกิจสำเร็จ!'),
-                backgroundColor: Colors.green,
-              ),
-            );
           },
         ),
         '/questdetail': (context) => const QuestDetailScreen(),
-        '/countdown': (context) => const CountdownScreen(),
+        '/countdown': (context) => const CountdownQuestScreen(),
         '/profile': (context) => const ProfileScreen(),
         '/notification': (context) => const NotificationScreen(),
         '/achievement': (context) => const AchievementScreen(),

@@ -42,6 +42,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _strStat = "10";
   String _creStat = "10";
 
+
   // --- Rive State ---
   SMINumber? _poseInput;
   SMINumber? _hairInput;
@@ -96,21 +97,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
     }
   }
+  
+  // --- ตัวแปรใหม่สำหรับ Achievement ---
+  int _totalAchievements = 18; // ค่าเริ่มต้น สมมติมี 18 อัน (คุณปรับได้ตามจริง)
+  int _unlockedAchievements = 0;
+  List<String> _achievementImages = [];
 
   Future<void> _fetchUserProfile() async {
     try {
-      final user = _supabase.auth.currentUser; // Supabase User
+      final user = _supabase.auth.currentUser;
       if (user == null) return;
 
       setState(() {
         _uid = user.id.substring(0, 8);
       });
 
-      // 1. ดึงข้อมูล Profile (เหมือนเดิม)
+      // 1. ดึงข้อมูล Profile
       final profileData = await _supabase
           .from('user_profiles')
           .select('name, detail')
-          .eq('id', user.id) // แก้ตรงนี้ให้ตรงกับ PK ของคุณ (id หรือ user_id)
+          .eq('id', user.id)
           .maybeSingle();
 
       if (profileData != null) {
@@ -120,10 +126,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
       }
 
-      // 2. ดึงข้อมูล Character (Stats, EXP และ ✅ LEVEL)
+      // 2. ดึงข้อมูล Character
       final charData = await _supabase
           .from('characters')
-          .select('level, experience, intelligence, strength, creative') // [ADDED] เพิ่ม level
+          .select('level, experience, intelligence, strength, creative')
           .eq('user_id', user.id)
           .maybeSingle();
 
@@ -134,11 +140,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _creStat = charData['creative'].toString();
         });
 
-        // [UPDATED] ส่งทั้ง Level และ EXP ไปคำนวณ UI
         final dbLevel = charData['level'] as int? ?? 1;
         final totalExp = charData['experience'] as int? ?? 0;
         
         _updateLevelUI(dbLevel, totalExp); 
+      }
+
+      // 🌟 3. ดึงข้อมูล Achievement 🌟
+      // นับจำนวน Achievement ทั้งหมดในระบบ
+      final allAchResponse = await _supabase.from('achievements').select('id');
+      final int totalAchCount = allAchResponse.length; 
+
+      // 🌟 ใช้ตาราง 'attain' ตามโครงสร้าง DB จริงของคุณ
+      final userAchResponse = await _supabase
+          .from('attain') 
+          .select('achievements ( image )') // Join ข้ามไปเอา image จากตาราง achievements
+          .eq('user_id', user.id)
+          .inFilter('status', ['completed', 'claimed']); // กรองเฉพาะที่สำเร็จแล้ว
+
+      List<String> unlockedImages = [];
+      for (var row in userAchResponse) {
+        final achData = row['achievements'];
+        // ตรวจสอบว่าดึงข้อมูลมาได้ และมีรูปภาพ
+        if (achData != null && achData['image'] != null) {
+          unlockedImages.add(achData['image']);
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _totalAchievements = totalAchCount;
+          _unlockedAchievements = unlockedImages.length;
+          _achievementImages = unlockedImages;
+        });
       }
 
     } catch (e) {
@@ -409,7 +443,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Container(    
             alignment: Alignment.bottomCenter,
             child: CustomTopBar(
-              user: widget.user,
               onNotificationTapped: () {
                 Navigator.pushNamed(context, '/notification');
               },
@@ -822,27 +855,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
       children: [
         _buildBoxHeader(
           iconPath: 'assets/images/icon/iconAchievement.png',
-          title: "ความสำเร็จ 3/18",
+          // 🌟 อัปเดตข้อความ Header ตามตัวแปร
+          title: "ความสำเร็จ $_unlockedAchievements/$_totalAchievements",
         ),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(15),
           decoration: _buildBoxDecoration(),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.start,
-            children: [
-              _buildAchievementItem('assets/images/achievement/achievement1.png'),
-              const SizedBox(width: 10),
-              _buildAchievementItem('assets/images/achievement/achievement2.png'),
-              const SizedBox(width: 10),
-              _buildAchievementItem('assets/images/achievement/achievement3.png'),
-            ],
+          child: SingleChildScrollView( // ป้องกัน overflow กรณีมีหลายอัน
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              // 🌟 สร้าง Item ตามรูปที่ดึงมาได้
+              children: _achievementImages.isEmpty 
+                ? [
+                    // ถ้ายังไม่มีสักอัน โชว์ข้อความ หรือเว้นว่าง
+                    const Padding(
+                      padding: EdgeInsets.only(left: 8.0),
+                      child: Text("ยังไม่มีความสำเร็จที่ปลดล็อก", style: TextStyle(color: Colors.grey)),
+                    )
+                  ]
+                : _achievementImages.map((imagePath) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: _buildAchievementItem(imagePath),
+                    );
+                  }).toList(),
+            ),
           ),
         ),
       ],
     );
   }
 
+  // 🌟 ปรับให้รองรับ URL หรือ Asset path
   Widget _buildAchievementItem(String imagePath) {
     return Container(
       width: 55,
@@ -854,10 +900,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         border: Border.all(color: const Color(0xFF9DD0E7), width: 2),
       ),
       child: ClipOval(
-        child: Image.asset(
-          imagePath,
-          fit: BoxFit.cover,
-        ),
+        child: imagePath.startsWith('http')
+            ? Image.network(
+                imagePath,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const Icon(Icons.star, color: Colors.grey),
+              )
+            : Image.asset(
+                imagePath,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const Icon(Icons.star, color: Colors.grey),
+              ),
       ),
     );
   }

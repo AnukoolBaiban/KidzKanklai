@@ -198,7 +198,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
         children: [
           Container(
             child: CustomTopBar(
-              user: widget.user,
               onNotificationTapped: () {
                 Navigator.pushNamed(context, '/notification');
               },

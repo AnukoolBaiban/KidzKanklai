@@ -198,7 +198,6 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
           Container(
             alignment: Alignment.bottomCenter,
             child: CustomTopBar(
-              user: widget.user,
               onNotificationTapped: () {
                 Navigator.pushNamed(context, '/notification');
               },

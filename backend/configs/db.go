@@ -1,4 +1,4 @@
-package config
+package configs
 
 import (
 	"context"
@@ -7,10 +7,12 @@ import (
 	"os"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool" // ✅ 1. เพิ่มแพ็กเกจ pgxpool
 	"github.com/joho/godotenv"
 )
 
-var DB *pgx.Conn
+// ✅ 2. เปลี่ยนชนิดตัวแปรเป็น *pgxpool.Pool
+var DB *pgxpool.Pool
 var SupabaseProjectRef string
 
 func ConnectDB() {
@@ -31,13 +33,23 @@ func ConnectDB() {
 		log.Fatal("SUPABASE_PROJECT_REF is not set")
 	}
 
-	// 3. เชื่อมต่อฐานข้อมูล
-	DB, err = pgx.Connect(context.Background(), databaseURL)
+	// ✅ 3. ใช้ pgxpool.ParseConfig เพื่อสร้างคอนฟิกของ Pool
+	config, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
-		log.Fatal("DB connection failed:", err)
+		log.Fatal("❌ Failed to parse pool config:", err)
 	}
 
-	log.Println("✅ Connected to Supabase DB")
+	// ✅ 4. อัปเดตวิธีเข้าถึงการตั้งค่า Simple Protocol (ต้องเข้าผ่าน ConnConfig)
+	// ⚠️ Fix for "prepared statement already exists" error for Supabase
+	config.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+
+	// ✅ 5. สร้าง Connection Pool ด้วย NewWithConfig
+	DB, err = pgxpool.NewWithConfig(context.Background(), config)
+	if err != nil {
+		log.Fatal("❌ DB pool connection failed:", err)
+	}
+
+	log.Println("✅ Connected to Supabase DB via Connection Pool (Simple Protocol)")
 }
 
 // ✅ [เพิ่มฟังก์ชันนี้] สำหรับ Reset Database
@@ -64,8 +76,6 @@ func ResetDatabase() {
 	fmt.Println("🎉 All tables created successfully!")
 }
 
-// ... (โค้ดเดิมของคุณ) ...
-
 // ✅ [เพิ่มฟังก์ชันนี้] สำหรับลบ Policy ทั้งหมดและปิด RLS
 func DisableRLS() {
 	if DB == nil {
@@ -82,7 +92,6 @@ func DisableRLS() {
 
 	fmt.Println("🔓 RLS Disabled & Policies Dropped successfully!")
 }
-
 
 // SQL สำหรับลบตาราง (เรียงย้อนศรจากลูกไปหาแม่)
 const dropSchemaSQL = `
@@ -386,10 +395,27 @@ const createSchemaSQL = `
     -- 5.3 ฟังก์ชันสร้าง Character เริ่มต้น
     CREATE OR REPLACE FUNCTION public.handle_new_user_character()
     RETURNS trigger AS $$
+    DECLARE
+        char_id bigint; -- ตัวแปรเก็บ ID ของ Character ที่เพิ่งสร้าง
     BEGIN
+        -- 1. สร้าง Character ปกติ และเก็บ ID ไว้ใว้ตัวแปร char_id
         INSERT INTO public.characters (user_id)
-        VALUES (new.id);
-        -- ค่าอื่นๆ (Level, Stat) จะเข้าตาม DEFAULT ที่ตั้งไว้ในตาราง
+        VALUES (new.id)
+        RETURNING id INTO char_id;
+        
+        -- 2. แจก Item เริ่มต้น (ชื่อลงท้ายด้วย _0) เข้ากระเป๋า User (Table: collect)
+        INSERT INTO public.collect (user_id, item_id, quantity)
+        SELECT new.id, id, 1 
+        FROM public.items 
+        WHERE name LIKE '%_0';
+
+        -- 3. สวมใส่ Item เริ่มต้น (Table: wear) ให้ Character ทันที
+        INSERT INTO public.wear (character_id, item_id, type)
+        SELECT char_id, i.id, c.name
+        FROM public.items i
+        JOIN public.categories c ON i.category_id = c.id
+        WHERE i.name LIKE '%_0';
+
         RETURN new;
     END;
     $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -444,6 +470,26 @@ const createSchemaSQL = `
     BEFORE UPDATE OF experience ON public.characters
     FOR EACH ROW
     EXECUTE PROCEDURE public.handle_character_exp_update();
+
+	-- ==========================================
+    -- [เพิ่มส่วนนี้] 7. Seed Data (ข้อมูลเริ่มต้น)
+    -- ==========================================
+    INSERT INTO public.categories (name, description) VALUES 
+    ('Skin', 'Skin Color'),
+    ('Hair', 'Hairstyle'),
+    ('Face', 'Facial Expression'),
+    ('Body', 'Body Type'),
+    ('Cloth', 'Full Body Outfit'),
+    ('Shoes', 'Footwear');
+
+    -- Item Default (ลงท้ายด้วย _0 เพื่อให้ตรงกับ Animation Name ใน Rive)
+    INSERT INTO public.items (name, description, rarity, category_id) VALUES
+    ('Skin_0', 'Default Skin', 'COMMON', (SELECT id FROM public.categories WHERE name='Skin')),
+    ('Hair_0', 'Default Hair', 'COMMON', (SELECT id FROM public.categories WHERE name='Hair')),
+    ('Face_0', 'Default Face', 'COMMON', (SELECT id FROM public.categories WHERE name='Face')),
+    ('Body_0', 'Default Body', 'COMMON', (SELECT id FROM public.categories WHERE name='Body')),
+    ('Cloth_0', 'Default Cloth', 'COMMON', (SELECT id FROM public.categories WHERE name='Cloth')),
+    ('Shoes_0', 'Default Shoes', 'COMMON', (SELECT id FROM public.categories WHERE name='Shoes'));
 `
 const disableRLSSQL = `
 	-- 1. ลบ Policy ทั้งหมดใน Schema 'public' แบบอัตโนมัติ

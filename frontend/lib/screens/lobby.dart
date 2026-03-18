@@ -5,6 +5,7 @@ import 'package:flutter_application_1/widgets/bottom_navigation_bar.dart';
 import 'package:flutter_application_1/widgets/right_side_menu.dart';
 import 'package:flutter_application_1/widgets/custom_top_bar.dart';
 import 'package:flutter_application_1/widgets/character_widget.dart';
+import 'package:flutter_application_1/widgets/reward_popup.dart';
 
 class LobbyScreen extends StatefulWidget {
   final User? user;
@@ -25,6 +26,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
     super.initState();
     _user = widget.user; // Initialize with passed user
     _loadUserData();
+    // สั่งเช็คของรางวัลทันทีที่เปิดหน้านี้
+    _checkDailyLoginRewards();
+    // _giveMeCoins(); // สำหรับเทสเพิ่มเหรียญ
   }
 
   Future<void> _loadUserData() async {
@@ -41,6 +45,46 @@ class _LobbyScreenState extends State<LobbyScreen> {
     }
   }
 
+  // ฟังก์ชันเช็คและโชว์ป๊อปอัป
+  Future<void> _checkDailyLoginRewards() async {
+    final apiRewards = await ApiService.claimLoginBonus();
+
+    if (apiRewards.isNotEmpty && mounted) {
+      List<RewardData> collectedRewards = [];
+
+      for (var reward in apiRewards) {
+        collectedRewards.add(
+          RewardData.item(
+            name: reward['name'],
+            amount: reward['added'],
+            image: reward['image'], // 🌟 จับค่าใส่ตรงๆ ได้เลย โค้ดสั้นลงมาก!
+          ),
+        );
+      }
+
+      await RewardPopup.show(context, rewards: collectedRewards);
+    }
+  }
+
+  Future<void> _giveMeCoins() async {
+    final result = await ApiService.addTestCoins();
+
+    if (result != null && mounted) {
+      final addedCoin = result['added_coin'] as int;
+      // 🌟 รับค่าภาพและชื่อจาก API
+      final itemName = result['item_name'] as String;
+      final itemImage = result['item_image'] as String;
+
+      await RewardPopup.show(
+        context,
+        rewards: [
+          // 🌟 ใช้ RewardData.item เพื่อยัดรูปและชื่อที่ดึงจาก DB เข้าไปตรงๆ
+          RewardData.item(name: itemName, amount: addedCoin, image: itemImage),
+        ],
+      );
+    }
+  }
+
   // Right Menu Items
   List<MenuItem> get _menuItems => [
     MenuItem(
@@ -54,7 +98,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
       imagePath: "assets/images/icon/iconQuest.png",
       label: 'ภารกิจ',
       onTap: () {
-        Navigator.pushNamed(context,'/createnormalquest');
+        Navigator.pushNamed(context, '/allquest');
       },
     ),
     MenuItem(
@@ -81,7 +125,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
             children: [
               // Top Bar - ใช้ CustomTopBar
               CustomTopBar(
-                user: _user, // Use local state
                 onNotificationTapped: () {
                   Navigator.pushNamed(context, '/notification');
                 },

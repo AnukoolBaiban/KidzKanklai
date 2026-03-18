@@ -30,7 +30,6 @@ class _MapScreenState extends State<MapScreen> {
           children: [
             // Top Bar
             CustomTopBar(
-              user: widget.user,
               onNotificationTapped: () {
                 Navigator.pushNamed(context, '/notification');
               },

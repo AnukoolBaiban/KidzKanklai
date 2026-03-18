@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide User; // 🌟 นำเข้า Supabase
 import '../widgets/custom_top_bar.dart';
 import '../api_service.dart';
 import '../screens/lobby.dart';
@@ -7,8 +8,9 @@ import '../widgets/reward_popup.dart';
 
 class QuestDetailScreen extends StatefulWidget {
   final User? user;
+  final int? questId; // 🌟 เพิ่มตัวแปรสำหรับรับ ID ภารกิจ
 
-  const QuestDetailScreen({Key? key, this.user}) : super(key: key);
+  const QuestDetailScreen({Key? key, this.user, this.questId}) : super(key: key);
 
   @override
   State<QuestDetailScreen> createState() => _QuestDetailScreenState();
@@ -16,14 +18,116 @@ class QuestDetailScreen extends StatefulWidget {
 
 class _QuestDetailScreenState extends State<QuestDetailScreen> {
   bool _isPressed = false;
+  bool _isLoading = true; // 🌟 ตัวแปรเช็คสถานะโหลดข้อมูล
 
-  // Mock Data
-  final String mockTitle = "สรุปคณิตบทที่ 1";
-  final String mockDescription =
-      "อ่านวันละ 2 บท และทำการบ้านบทที่ 1 หน้า 75";
-  final String mockStartDate = "25/06/68";
-  final String mockEndDate = "27/06/68";
-  final String? mockImagePath = "assets/images/achievement/achievement1.png";
+  // 🌟 ตัวแปรสำหรับเก็บข้อมูลที่ดึงมาจาก DB
+  String _title = "กำลังโหลด...";
+  String _description = "";
+  String _startDate = "--/--/--";
+  String _endDate = "--/--/--";
+  String? _imagePath;
+  String _questStatus = ""; // 🌟 1. เพิ่มตัวแปรเก็บสถานะ
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchQuestDetail(); // 🌟 ดึงข้อมูลเมื่อเปิดหน้านี้
+  }
+
+  // 🌟 ฟังก์ชันดึงข้อมูลจาก Database
+  Future<void> _fetchQuestDetail() async {
+    if (widget.questId == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
+      final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+
+      // 🌟 2. เปลี่ยนมาดึงจาก do_quests เพื่อเอา status ของผู้เล่นคนนี้
+      final data = await Supabase.instance.client
+          .from('do_quests')
+          .select('''
+            status,
+            quests (
+              name, detail, start_date, due_date, image
+            )
+          ''')
+          .eq('quest_id', widget.questId as Object)
+          .eq('user_id', currentUserId ?? '')
+          .single();
+
+      final questData = data['quests'];
+
+      if (mounted) {
+        setState(() {
+          _questStatus = data['status'] ?? 'in_progress'; // 🌟 เก็บสถานะ
+          _title = questData['name'] ?? 'ไม่มีชื่อภารกิจ';
+          _description = questData['detail'] ?? 'ไม่มีรายละเอียด';
+          _startDate = _formatDate(questData['start_date']);
+          _endDate = _formatDate(questData['due_date']);
+          _imagePath = questData['image']; 
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching quest detail: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  // 🌟 2. เพิ่มฟังก์ชันสำหรับแสดง Dialog รูปภาพแบบเต็ม
+  void _showFullScreenImage(BuildContext context, String path) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.9), // พื้นหลังดำเข้มโปร่งแสง
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.zero, // ให้ขยายเต็มหน้าจอ
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // 🌟 สามารถบีบซูมรูปได้
+              InteractiveViewer(
+                panEnabled: true,
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: path.startsWith('http')
+                    ? Image.network(path, fit: BoxFit.contain)
+                    : Image.asset(path, fit: BoxFit.contain),
+              ),
+              // ปุ่มปิดสีขาวมุมขวาบน
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 10,
+                right: 10,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 🌟 ฟังก์ชันแปลงเวลาเป็นรูปแบบ วว/ดด/ปป (พ.ศ.)
+  String _formatDate(String? dateStr) {
+    if (dateStr == null) return "--/--/--";
+    try {
+      DateTime dt = DateTime.parse(dateStr);
+      int thaiYear = (dt.year + 543) % 100; // เอาแค่ 2 หลักท้าย เช่น 68
+      String dd = dt.day.toString().padLeft(2, '0');
+      String mm = dt.month.toString().padLeft(2, '0');
+      return "$dd/$mm/$thaiYear";
+    } catch (e) {
+      return "--/--/--";
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,7 +175,9 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
                         // Scrollable Content
                         Padding(
                           padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
-                          child: SingleChildScrollView(
+                          child: _isLoading 
+                              ? const Center(child: CircularProgressIndicator()) // แสดงวงกลมโหลด
+                              : SingleChildScrollView(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -80,12 +186,15 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(
-                                      mockTitle,
-                                      style: TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF447199),
+                                    Expanded(
+                                      child: Text(
+                                        _title,
+                                        style: TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF447199),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                     Column(
@@ -93,14 +202,14 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
                                           CrossAxisAlignment.end,
                                       children: [
                                         Text(
-                                          'สร้าง $mockStartDate',
+                                          'สร้าง $_startDate',
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: Colors.grey.shade600,
                                           ),
                                         ),
                                         Text(
-                                          'วันที่สิ้นสุด $mockEndDate',
+                                          'วันที่สิ้นสุด $_endDate',
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: Colors.grey.shade600,
@@ -117,7 +226,7 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
                                 SizedBox(height: 20),
 
                                 // รูปภาพ Section
-                                if (mockImagePath != null) ...[
+                                if (_imagePath != null && _imagePath!.isNotEmpty) ...[
                                   Container(
                                     width: double.infinity,
                                     padding: EdgeInsets.all(16),
@@ -136,7 +245,6 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
                                         ),
                                       ],
                                     ),
-
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
@@ -158,45 +266,31 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
                                           builder: (context, constraints) {
                                             return Center(
                                               child: Container(
-                                                width:
-                                                    constraints.maxWidth *
-                                                    0.6, // responsive
+                                                width: constraints.maxWidth * 0.6, // responsive
                                                 constraints: BoxConstraints(
                                                   maxWidth: 300,
                                                   maxHeight: 300,
                                                 ),
                                                 child: AspectRatio(
-                                                  aspectRatio:
-                                                      1, // ทำให้รูปเป็นสี่เหลี่ยม
-                                                  child: ClipRRect(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          12,
-                                                        ),
-                                                    child: Image.asset(
-                                                      mockImagePath!,
-                                                      fit: BoxFit.cover,
-                                                      errorBuilder:
-                                                          (
-                                                            context,
-                                                            error,
-                                                            stackTrace,
-                                                          ) {
-                                                            return Container(
-                                                              color: Color(
-                                                                0xFFE8F4F8,
-                                                              ),
-                                                              child: Center(
-                                                                child: Icon(
-                                                                  Icons
-                                                                      .broken_image,
-                                                                  size: 60,
-                                                                  color: Colors
-                                                                      .grey,
-                                                                ),
-                                                              ),
-                                                            );
-                                                          },
+                                                  aspectRatio: 1, // ทำให้รูปเป็นสี่เหลี่ยม
+                                                  // 🌟 1. พันด้วย GestureDetector เพื่อให้กดที่รูปได้
+                                                  child: GestureDetector(
+                                                    onTap: () => _showFullScreenImage(context, _imagePath!), // เรียกฟังก์ชันแสดงรูปเต็ม
+                                                    child: ClipRRect(
+                                                      borderRadius:
+                                                          BorderRadius.circular(12),
+                                                      // 🌟 ปรับให้รองรับทั้ง Network URL (Cloudinary) และ Asset ปกติ
+                                                      child: _imagePath!.startsWith('http')
+                                                          ? Image.network(
+                                                              _imagePath!,
+                                                              fit: BoxFit.cover,
+                                                              errorBuilder: _buildImageError,
+                                                            )
+                                                          : Image.asset(
+                                                              _imagePath!,
+                                                              fit: BoxFit.cover,
+                                                              errorBuilder: _buildImageError,
+                                                            ),
                                                     ),
                                                   ),
                                                 ),
@@ -213,7 +307,7 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
 
                                 // Description
                                 Text(
-                                  mockDescription,
+                                  _description,
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Color(0xFF313131),
@@ -249,6 +343,19 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
 
   // ==================== Components ====================
 
+  Widget _buildImageError(BuildContext context, Object error, StackTrace? stackTrace) {
+    return Container(
+      color: Color(0xFFE8F4F8),
+      child: Center(
+        child: Icon(
+          Icons.broken_image,
+          size: 60,
+          color: Colors.grey,
+        ),
+      ),
+    );
+  }
+
   Widget _buildBackground() {
     return Container(
       color: Colors.white,
@@ -279,7 +386,6 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
         color: Colors.black.withOpacity(0.4),
         alignment: Alignment.bottomCenter,
         child: CustomTopBar(
-          user: widget.user,
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
           onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
@@ -347,6 +453,11 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
   }
 
   Widget _buildBottomButtons(double bottomPadding) {
+    // 🌟 3. ถ้าสถานะไม่ใช่ in_progress ให้ซ่อนปุ่มไปเลย 
+    if (_questStatus != 'in_progress') {
+      return const SizedBox.shrink(); // คืนค่าพื้นที่ว่างๆ แทนปุ่ม
+    }
+    
     return Positioned(
       bottom: bottomPadding + 20,
       left: MediaQuery.of(context).size.width * 0.1,
@@ -430,28 +541,109 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
   void _openGiveUpPopup() {
     ConfirmGiveUpPopup.show(
       context,
-      onConfirm: () {
-        Navigator.pop(context); // ปิด popup
+      onConfirm: () async {
+        if (widget.questId == null) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('ยอมแพ้ภารกิจแล้ว'),
-            backgroundColor: Colors.red,
-          ),
+        // 1. ปิด Popup ยืนยันก่อน
+        Navigator.pop(context); 
+
+        // 2. แสดงวงกลม Loading เพื่อบล็อกหน้าจอระหว่างรอ API
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return const Center(child: CircularProgressIndicator());
+          },
         );
+
+        // 3. ยิง API ยอมแพ้ภารกิจ
+        bool success = await ApiService.cancelQuest(widget.questId!);
+
+        // 4. ปิดวงกลม Loading
+        if (mounted) {
+          Navigator.pop(context); 
+        }
+
+        if (success) {
+          if (mounted) {
+            // 5.1 ถ้าสำเร็จ แจ้งเตือน และเด้งกลับไปหน้าก่อนหน้า
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('คุณได้ยอมแพ้ภารกิจนี้แล้ว'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            // ส่งค่า true กลับไปให้หน้า AllQuestScreen รู้ว่ามีการอัปเดต จะได้รีเฟรชรายการ
+            Navigator.pop(context, true); 
+          }
+        } else {
+          // 5.2 ถ้าไม่สำเร็จ หรือเควสหมดเวลา/เสร็จไปแล้ว แจ้งเตือน Error
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('เกิดข้อผิดพลาด ไม่สามารถยอมแพ้ภารกิจนี้ได้'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
       },
     );
   }
 
-  void _openRewardPopup() {
-    RewardPopup.show(
-      context,
-      rewardType: 'EXP',
-      amount: 100,
-      onClose: () {
-        Navigator.pop(context);
+  void _openRewardPopup() async {
+    if (widget.questId == null) return;
+
+    // แสดง Loading ระหว่างรอ API
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return const Center(child: CircularProgressIndicator());
       },
     );
+
+    // ยิง API (ใช้ฟังก์ชันที่เราเพิ่งสร้างใน ApiService)
+    final apiRewards = await ApiService.completeNormalQuest(widget.questId!);
+
+    // ปิด Loading
+    if (mounted) {
+      Navigator.pop(context);
+    }
+
+    // ถ้า API ทำงานสำเร็จ และส่งของรางวัลกลับมา
+    if (apiRewards != null && apiRewards.isNotEmpty && mounted) {
+      
+      // 🌟 แปลงข้อมูล JSON จาก API ให้กลายเป็น RewardData List ของคุณ
+      List<RewardData> popupRewards = apiRewards.map<RewardData>((rw) {
+        return RewardData(
+          type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM', // ระบุประเภทคร่าวๆ
+          amount: rw['added'],
+          itemName: rw['name'],
+          itemImage: rw['image'], // ส่งรูปจาก Database ไปเลย (ถ้ามี)
+        );
+      }).toList();
+
+      // 🌟 เรียกใช้ RewardPopup ที่คุณมีอยู่
+      RewardPopup.show(
+        context,
+        rewards: popupRewards,
+        onClose: () {
+          Navigator.pop(context); // พอผู้ใช้กดปิด Popup ก็จะเด้งกลับไปหน้าก่อนหน้า (หน้ารวมเควส)
+        },
+      );
+
+    } else {
+      // ❌ กรณีส่งล้มเหลว (อาจจะเพราะเควสส่งไปแล้ว หรือไม่มีเน็ต)
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('เกิดข้อผิดพลาด หรือภารกิจนี้ถูกส่งไปแล้ว'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
 
