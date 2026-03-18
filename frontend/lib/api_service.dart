@@ -45,7 +45,7 @@ class User {
     required this.statStrength,
     required this.statCreativity,
   });
-  
+
   final String equippedCloth;
   final String equippedShoes;
   final String equippedBody;
@@ -90,9 +90,9 @@ class InventoryItem {
   final String category;
   final String imagePath;
   final int riveId;
-  
+
   InventoryItem({
-    required this.type, 
+    required this.type,
     required this.id,
     this.name = '',
     this.category = '',
@@ -104,34 +104,36 @@ class InventoryItem {
     String name = json['name'] ?? '';
     int parseRiveId(String n) {
       if (n.isEmpty) return 0;
-      
+
       // Try splitting by _ first (Format: Name_ID)
       if (n.contains('_')) {
         try {
           var parts = n.split('_');
-           // Ensure the last part is actually a number
+          // Ensure the last part is actually a number
           return int.parse(parts.last);
         } catch (e) {
           // Fallback or ignore
         }
       }
-      
+
       // Try splitting by space (Format: Name ID)
       if (n.contains(' ')) {
         try {
-           var parts = n.split(' ');
-           return int.parse(parts.last);
+          var parts = n.split(' ');
+          return int.parse(parts.last);
         } catch (e) {}
       }
-      
+
       // Try identifying if the whole string is a number? Unlikely but possible for IDs
       try {
         return int.parse(n);
       } catch (e) {}
 
       // Log warning for dev (print is okay here for debug)
-      print("Warning: Could not parse RiveID from item name: '$n'. Defaulting to 0.");
-      return 0; 
+      print(
+        "Warning: Could not parse RiveID from item name: '$n'. Defaulting to 0.",
+      );
+      return 0;
     }
 
     return InventoryItem(
@@ -153,8 +155,8 @@ class ApiService {
   static String? authToken; // Token for Authentication
 
   static Map<String, String> get _headers => {
-        "Content-Type": "application/json",
-        if (authToken != null) "Authorization": "Bearer $authToken",
+    "Content-Type": "application/json",
+    if (authToken != null) "Authorization": "Bearer $authToken",
   };
 
   // Auth
@@ -167,7 +169,10 @@ class ApiService {
   // Profile
   static Future<User?> getProfile(int userId) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/me'), headers: _headers);
+      final response = await http.get(
+        Uri.parse('$baseUrl/me'),
+        headers: _headers,
+      );
       if (response.statusCode == 200) {
         return User.fromJson(jsonDecode(response.body));
       }
@@ -180,10 +185,14 @@ class ApiService {
   // Inventory
   static Future<List<InventoryItem>> getInventory() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/inventory'), headers: _headers);
+      final response = await http.get(
+        Uri.parse('$baseUrl/inventory'),
+        headers: _headers,
+      );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final list = (data['inventory'] as List?) ?? []; // Handle null inventory
+        final list =
+            (data['inventory'] as List?) ?? []; // Handle null inventory
         return list.map((e) => InventoryItem.fromJson(e)).toList();
       }
     } catch (e) {
@@ -192,10 +201,13 @@ class ApiService {
     return [];
   }
 
-   // Equipped
+  // Equipped
   static Future<List<InventoryItem>> getEquipped() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/equipped'), headers: _headers);
+      final response = await http.get(
+        Uri.parse('$baseUrl/equipped'),
+        headers: _headers,
+      );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final list = (data['equipped'] as List?) ?? []; // Handle null equipped
@@ -209,13 +221,11 @@ class ApiService {
 
   // Equip
   static Future<bool> equipItem(String itemId) async {
-     try {
+    try {
       final response = await http.post(
         Uri.parse('$baseUrl/equip'),
         headers: _headers,
-        body: jsonEncode({
-          "item_id": int.parse(itemId) 
-        }),
+        body: jsonEncode({"item_id": int.parse(itemId)}),
       );
       if (response.statusCode != 200) {
         print("Equip Failed (${response.statusCode}): ${response.body}");
@@ -239,9 +249,9 @@ class ApiService {
         final data = jsonDecode(response.body);
         if (data['success'] == true && data['rewards'] != null) {
           // ถ้ามีของรางวัลส่งกลับมา จะคืนค่าเป็น List กลับไป
-          return data['rewards']; 
+          return data['rewards'];
         }
-      } 
+      }
     } catch (e) {
       print("Claim Login Bonus Error: $e");
     }
@@ -262,7 +272,9 @@ class ApiService {
           return data; // คืนค่ากลับไปทั้งหมด (มี added_coin, total_coins)
         }
       } else {
-        print("Add Test Coins Failed: ${response.statusCode} - ${response.body}");
+        print(
+          "Add Test Coins Failed: ${response.statusCode} - ${response.body}",
+        );
       }
     } catch (e) {
       print("Add Test Coins Error: $e");
@@ -272,29 +284,52 @@ class ApiService {
 
   // ฟังก์ชันกดรับรางวัลจาก Achievement
   // 🌟 เปลี่ยนจาก Future<List<dynamic>> เป็น Future<List<dynamic>?> (ใส่ ?)
-  static Future<List<dynamic>?> claimAchievementReward(int achievementId) async {
+  static Future<List<dynamic>?> claimAchievementReward(
+    int achievementId,
+  ) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/rewards/claim-achievement'),
         headers: _headers,
-        body: jsonEncode({
-          "achievement_id": achievementId,
-        }),
+        body: jsonEncode({"achievement_id": achievementId}),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true) {
           // ถ้าสำเร็จ คืนค่าลิสต์ของรางวัลกลับไป (ถ้าไม่มีของจะคืน [] ไม่ใช่ null)
-          return data['rewards'] ?? []; 
+          return data['rewards'] ?? [];
         }
       } else {
-        print("Claim Achievement Failed: ${response.statusCode} - ${response.body}");
+        print(
+          "Claim Achievement Failed: ${response.statusCode} - ${response.body}",
+        );
       }
     } catch (e) {
       print("Claim Achievement Error: $e");
     }
     // 🌟 คืนค่า null กรณีเกิด Error เท่านั้น
-    return null; 
+    return null;
+  }
+
+  // ฟังก์ชันดึงคำทักทายจาก AI (Groq)
+  static Future<String?> generateGreeting() async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/ai/dialogue'),
+        headers: _headers,
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['dialogue'] as String?;
+      } else {
+        print(
+          "Generate Greeting Failed: ${response.statusCode} - ${response.body}",
+        );
+      }
+    } catch (e) {
+      print("Generate Greeting Error: $e");
+    }
+    return null;
   }
 }
