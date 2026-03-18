@@ -7,6 +7,7 @@ import 'package:flutter_application_1/widgets/custom_top_bar.dart';
 import 'package:flutter_application_1/widgets/quest_info_card.dart';
 import 'package:flutter_application_1/widgets/confirm_exit_popup.dart';
 import 'package:flutter_application_1/widgets/confirm_save_popup.dart';
+import 'package:flutter_application_1/widgets/annotation_normal.dart';
 
 class CreateNormalQuestScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
@@ -169,8 +170,21 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
     final topBarHeight = 75.0 + topPadding;
     final headerHeight = 80.0;
 
-    return Scaffold(
-      body: Stack(
+    // ignore: deprecated_member_use
+    return WillPopScope(
+      onWillPop: () async {
+        // เมื่อกดปุ่ม back → แสดง ConfirmExitPopup
+        await ConfirmExitPopup.show(
+          context,
+          onConfirm: () {
+            Navigator.pop(context); // ปิด popup
+            Navigator.pop(context); // ออกจากหน้า (ไม่บันทึก)
+          },
+        );
+        return false; // ไม่ให้กลับทันที
+      },
+      child: Scaffold(
+        body: Stack(
         children: [
           _buildBackground(),
 
@@ -237,6 +251,7 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
               ),
             ),
         ],
+      ),
       ),
     );
   }
@@ -347,7 +362,10 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
                 description: "เหมาะสำหรับผู้เล่นที่จะทำกิจกรรมต่าง ๆ ในภายหลังและต้องเป็นกิจกรรมที่มีการกำหนดระยะเวลาสิ้นสุดของกิจกรรมที่ทำ",
               ),
             ),
-        ],
+            // Annotation button stays at bottom right
+            const Positioned(bottom: 8, right: 15, child: AnnotationButton()),
+          ],
+        ),
       ),
     );
   }
