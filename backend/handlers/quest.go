@@ -185,6 +185,7 @@ func CreateNormalQuest(c *gin.Context) {
 
 	// 🌟 ทริกเกอร์เควสระบบ: บวกความคืบหน้าเควส ID 10001 (สร้างเควสทั่วไป)
 	IncrementSystemQuestProgress(ctx, tx, userID, 10001)
+	IncrementSystemQuestProgress(ctx, tx, userID, 10004)
 
 	// ยืนยัน Transaction (บันทึกเควส + หักตั๋วเสร็จสมบูรณ์)
 	if err := tx.Commit(ctx); err != nil {
@@ -699,7 +700,8 @@ func InitSystemQuests(c *gin.Context) {
 		VALUES 
 			($1, 10001, 'in_progress', 0),
 			($1, 10002, 'in_progress', 0),
-			($1, 10003, 'in_progress', 0)
+			($1, 10003, 'in_progress', 0),
+			($1, 10004, 'in_progress', 0)
 		ON CONFLICT (user_id, quest_id) DO NOTHING;
 	`
 	_, err = configs.DB.Exec(ctx, initQuery, userID)
@@ -832,7 +834,7 @@ func CompleteSystemQuest(c *gin.Context) {
 	go func(u uuid.UUID) {
 		CheckCoinAchievement(context.Background(), u)
 	}(userID)
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "System quest reward claimed",
