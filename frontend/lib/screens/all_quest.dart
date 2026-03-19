@@ -8,6 +8,7 @@ import 'package:flutter_application_1/widgets/annotation.dart';
 import 'package:flutter_application_1/widgets/tutorial_quest.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User; // 🌟 เพิ่ม Supabase
+import 'package:flutter_application_1/widgets/reward_popup.dart';
 
 class AllQuestScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
@@ -54,11 +55,15 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
       final currentUserId = Supabase.instance.client.auth.currentUser?.id;
       if (currentUserId == null) return;
 
+      // 🌟 แอบเรียก API ให้สร้างเควสระบบ (ถ้ายังไม่มี) ก่อนที่จะดึงข้อมูลมาแสดงผล
+      await ApiService.initSystemQuests();
+
       final response = await Supabase.instance.client
           .from('do_quests')
           .select('''
             status, 
-            completed_date, 
+            completed_date,
+            progress, 
             quests (
               id, 
               name,
@@ -66,6 +71,7 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
               type, 
               due_date, 
               image,
+              target_amount, 
               receive (
                 quantity,
                 items (
@@ -86,6 +92,15 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
 
         String status = row['status'] ?? 'in_progress';
         bool isClaimed = (status == 'completed');
+
+        // 🌟 ดึงค่าความคืบหน้า (Progress) และเป้าหมาย (Target) จาก DB
+        int dbProgress = row['progress'] ?? 0;
+        int targetAmount = questData['target_amount'] ?? 1;
+
+        // ถ้าเควสสำเร็จ/รับของไปแล้ว ให้ดันหลอดให้เต็ม 100% เลย
+        if (isClaimed) {
+          dbProgress = targetAmount;
+        }
         
         DateTime? completedDate;
         if (row['completed_date'] != null) {
@@ -147,8 +162,8 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
           "daysLeft": daysLeft,
           "hoursLeft": hoursLeft, 
           "isSystem": isSystem,
-          "progress": isClaimed ? 1 : 0,
-          "totalReq": 1,
+          "progress": dbProgress,    // 🌟 เปลี่ยนจาก (isClaimed ? 1 : 0) เป็นตัวแปร dbProgress
+          "totalReq": targetAmount,  // 🌟 เปลี่ยนจาก 1 เป็นตัวแปร targetAmount
           "status": status, // 🌟 เพิ่มบรรทัดนี้ เพื่อเก็บสถานะ 'in_progress', 'completed', 'failed' ไว้ใช้ตอนกรอง
           "isClaimed": isClaimed,
           "isExpired": isExpired, // 🌟 ส่งค่านี้ไปให้ UI ใช้เช็คแทน
@@ -550,10 +565,42 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
         return QuestCard(
           quest: filteredQuests[index],
           onClaim: () async {
-            // เมื่อกดรับรางวัลหน้า UI (สำหรับเควสระบบ ถ้ามี)
-            setState(() {
-              filteredQuests[index]['isClaimed'] = true;
-            });
+            // โชว์ Loading แบบเดียวกับหน้า Detail
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (BuildContext context) {
+                return const Center(child: CircularProgressIndicator());
+              },
+            );
+
+            // ยิง API 
+            final rewards = await ApiService.completeSystemQuest(filteredQuests[index]['id']);
+
+            if (mounted) Navigator.pop(context); // ปิด Loading
+
+            if (rewards != null && mounted) {
+              // 🌟 แปลงของรางวัลและโชว์ Popup ได้เลย (แบบเดียวกับเควสปกติ)
+              List<RewardData> popupRewards = rewards.map<RewardData>((rw) {
+                return RewardData(
+                  type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM',
+                  amount: rw['added'],
+                  itemName: rw['name'],
+                  itemImage: rw['image'],
+                );
+              }).toList();
+
+              await RewardPopup.show(context, rewards: popupRewards);
+
+              // รีเฟรชหน้า AllQuestScreen เพื่ออัปเดตสถานะ
+              _fetchQuestsFromDB();
+            } else {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('เกิดข้อผิดพลาด หรือรับรางวัลไปแล้ว'), backgroundColor: Colors.red),
+                );
+              }
+            }
           },
           onViewDetails: () {
             Navigator.push(
@@ -743,7 +790,7 @@ class QuestCard extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // 🌟 เช็คว่าเป็นเควสประวัติ (ทำเสร็จแล้วหรือเฟล) และเป็นเควสประเภท "ทันที" หรือไม่
+                    // 🌟 1. เช็คว่าเป็นเควสประวัติ (ทำเสร็จแล้วหรือเฟล) และเป็นเควสประเภท "ทันที" หรือไม่
                     if ((isClaimed || isFailed) && quest['type'] == 'ทันที') ...[
                       // โชว์ข้อความ "สำเร็จ" หรือ "ไม่สำเร็จ" ตัวใหญ่ตรงกลางแทนปุ่ม
                       Text(
@@ -755,21 +802,16 @@ class QuestCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      // 🌟 ดึงข้อมูล string จาก description มาคำนวณชั่วโมงและนาที
+                      // ดึงข้อมูล string จาก description มาคำนวณชั่วโมงและนาที
                       Text(
                         (() {
-                          // เช็คว่ามีข้อความ "กิจกรรมจับเวลา:" หรือไม่
                           if (quest['description'] != null && quest['description'].contains("กิจกรรมจับเวลา:")) {
-                            // ใช้ RegExp ดึงเฉพาะ "ตัวเลข" ออกมาจากข้อความ
                             final match = RegExp(r'\d+').firstMatch(quest['description']);
                             if (match != null) {
                               int totalMinutes = int.parse(match.group(0)!);
-                              
-                              // คำนวณชั่วโมงและนาที
                               if (totalMinutes >= 60) {
-                                int h = totalMinutes ~/ 60; // หารเอาส่วน (ชั่วโมง)
-                                int m = totalMinutes % 60;  // เศษที่เหลือ (นาที)
-                                
+                                int h = totalMinutes ~/ 60;
+                                int m = totalMinutes % 60;  
                                 return m > 0 
                                     ? "เวลาที่ตั้ง: $h ชั่วโมง $m นาที" 
                                     : "เวลาที่ตั้ง: $h ชั่วโมง";
@@ -778,7 +820,6 @@ class QuestCard extends StatelessWidget {
                               }
                             }
                           }
-                          // Fallback กรณีหาข้อความไม่เจอ
                           return "เวลาที่ตั้ง: ${quest['daysLeft'] > 0 ? '${quest['daysLeft']} วัน ' : ''}${quest['hoursLeft']} ชม.";
                         })(), 
                         style: const TextStyle(
@@ -789,7 +830,19 @@ class QuestCard extends StatelessWidget {
                         textAlign: TextAlign.center,
                       ),
                     ] 
-                    // 🌟 ถ้าเป็นเควสปกติ หรือยังทำไม่เสร็จ ก็โชว์ปุ่มและระบบเดิม
+                    // 🌟 2. เพิ่มเงื่อนไขสำหรับ "เควสระบบที่อยู่ในประวัติ (ทำสำเร็จแล้ว)"
+                    else if (isClaimed && isSystem) ...[
+                      // โชว์แค่คำว่า "สำเร็จ" ใหญ่ๆ ตรงกลาง ซ่อนปุ่มและหลอด
+                      const Text(
+                        "สำเร็จ",
+                        style: TextStyle(
+                          color: Color(0xFF34C759), // สีเขียว
+                          fontSize: 16, // ปรับให้ใหญ่ขึ้นนิดนึงให้ดูเต็มพื้นที่
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ]
+                    // 🌟 3. ถ้าเป็นเควสปกติ หรือเควสระบบที่ "กำลังทำอยู่" ให้โชว์ปุ่มและหลอดตามปกติ
                     else ...[
                       if (isClaimed)
                         _buildActionButton(
@@ -816,6 +869,7 @@ class QuestCard extends StatelessWidget {
                         
                       const SizedBox(height: 12),
                       
+                      // หลอดความคืบหน้า (ซ่อนถ้าเป็นเควสระบบที่เคลมแล้ว แต่โค้ดเราดักไว้ข้างบนแล้ว)
                       if (isSystem) ...[
                         _buildProgressBar(
                           isClaimed || isComplete,
@@ -908,25 +962,48 @@ class QuestCard extends StatelessWidget {
   }
 
   Widget _buildProgressBar(bool isDone, int progress, int totalReq) {
+    // 🌟 คำนวณเปอร์เซ็นต์ (หารกันแล้วล็อกค่าไว้ไม่ให้เกิน 1.0 หรือ 100%)
+    double percent = totalReq > 0 ? (progress / totalReq).clamp(0.0, 1.0) : 0.0;
+    if (isDone) percent = 1.0; // ถ้าสำเร็จแล้ว บังคับเต็ม 100%
+
     return Container(
       height: 14,
       decoration: BoxDecoration(
-        color: isDone ? null : Colors.grey.shade300,
-        gradient: isDone
-            ? const LinearGradient(
-                colors: [Color(0xFF59ABEC), Color(0xFF85D755)],
-              )
-            : null,
+        color: Colors.grey.shade300, // สีเทาพื้นหลัง (ส่วนที่ยังไม่เต็ม)
         borderRadius: BorderRadius.circular(10),
       ),
-      alignment: Alignment.center,
-      child: Text(
-        isDone ? "$totalReq/$totalReq" : "$progress/$totalReq",
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          color: isDone ? Colors.white : Colors.black54,
-        ),
+      // ใช้ Stack เพื่อเอาหลอดสีไปวางซ้อนทับบนสีเทา และเอาตัวหนังสือวางทับอีกที
+      child: Stack(
+        children: [
+          // 🌟 1. แถบสีที่จะความกว้างเพิ่มขึ้นตาม percent
+          FractionallySizedBox(
+            alignment: Alignment.centerLeft, // เริ่มเติมสีจากซ้ายไปขวา
+            widthFactor: percent, // ความกว้าง (0.0 ถึง 1.0)
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF59ABEC), Color(0xFF85D755)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+          
+          // 🌟 2. ตัวอักษรบอกจำนวน
+          Center(
+            child: Text(
+              isDone ? "$totalReq/$totalReq" : "$progress/$totalReq",
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                // เปลี่ยนสีตัวหนังสือเป็นขาวถ้าหลอดสีวิ่งมาเกินครึ่งทางแล้ว จะได้อ่านง่าย
+                color: percent > 0.5 ? Colors.white : Colors.black87, 
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

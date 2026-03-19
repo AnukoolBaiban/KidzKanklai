@@ -240,8 +240,11 @@ func AddTestCoins(c *gin.Context) {
 		itemName = "Coin"
 	}
 
-	// 🌟 3. เรียกฟังก์ชันเช็ค Achievement ทำงานอยู่เบื้องหลัง
-	go CheckCoinAchievement(userID, totalCoins)
+	// 🌟 3. ตรวจสอบ Achievement ยอดเหรียญ หลังจากแจกรางวัลเสร็จแล้ว
+	// สั่งรันใน Goroutine (go func) เพื่อไม่ให้หน่วงเวลาตอนตอบกลับ API ไปที่หน้าจอแอป
+	go func(u uuid.UUID) {
+		CheckCoinAchievement(context.Background(), u)
+	}(userID)
 
 	// 4. ส่งข้อมูลทั้งหมดกลับไปให้ Flutter (เพิ่ม item_name และ item_image)
 	c.JSON(http.StatusOK, gin.H{
