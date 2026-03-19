@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/widgets/ticket_box.dart';
 
 class ConfirmSavePopup extends StatefulWidget {
   final VoidCallback onConfirm;
@@ -68,7 +69,7 @@ class _ConfirmSavePopupState extends State<ConfirmSavePopup>
     // ✅ Responsive values
     final size = MediaQuery.of(context).size;
     final isSmallScreen = size.width < 360;
-    
+
     final containerWidth = size.width * 0.85;
     final containerHeight = isSmallScreen ? 170.0 : 190.0;
     final buttonHeight = isSmallScreen ? 40.0 : 45.0;
@@ -214,41 +215,35 @@ class _ConfirmSavePopupState extends State<ConfirmSavePopup>
 
                                   // Badge
                                   Positioned(
-                                    right: -5,
-                                    top: -8,
-                                    child: Container(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: isSmallScreen ? 4 : 6,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(10),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(0.2),
-                                            blurRadius: 4,
-                                          ),
-                                        ],
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Image.asset(
-                                            "assets/images/item/Ticket_quest_img.png",
-                                            width: badgeSize,
-                                            height: badgeSize,
-                                          ),
-                                          SizedBox(width: 3),
-                                          Text(
-                                            "-1",
-                                            style: TextStyle(
-                                              fontSize: badgeSize - 2,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.black,
+                                    top: -15,
+                                    right: -6,
+                                    child: TicketBox(
+                                      slant: 12,
+                                      borderRadius: 4,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 15,
+                                          vertical: 4,
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Image.asset(
+                                              'assets/images/item/Ticket_quest_img.png',
+                                              width: 20,
+                                              height: 10,
                                             ),
-                                          ),
-                                        ],
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              "-1",
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ),

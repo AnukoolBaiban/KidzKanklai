@@ -9,8 +9,8 @@ import 'dart:convert';
 import 'package:flutter_application_1/config/app_config.dart';
 import 'package:rive/rive.dart' hide LinearGradient, Image;
 import 'package:flutter_application_1/config/rive_cache.dart';
-import 'package:flutter_application_1/widgets/confirm_exit_popup.dart';
 import 'package:flutter_application_1/widgets/energy_bar.dart';
+import 'package:flutter_application_1/widgets/cost_display.dart';
 
 class LocationUpgradeScreen extends StatefulWidget {
   final api.User? user;
@@ -283,9 +283,13 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
 
                   SizedBox(height: 20),
 
-                  /// Action Section (Cost + Button)
-                  _buildActionSection(),
-
+                  EnergyBar(
+                    energy: 80,
+                    maxEnergy: 100,
+                    ticket: 1,
+                    maxTicket: 5,
+                  ),
+                  
                   SizedBox(height: 20),
 
                   /// Stat Box
@@ -368,7 +372,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
   Widget _buildStatusRewardsBox() {
     // กำหนดค่าที่บวกตามสถานที่
     Map<String, int> displayRewards = {};
-    
+
     switch (widget.locationName) {
       case 'สวนสนุก':
         displayRewards = {
@@ -435,6 +439,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
             final isIncreased = entry.value > 0;
             return _buildStatusRow(entry.key, entry.value, isIncreased);
           }).toList(),
+          _buildActionSection(),
         ],
       ),
     );
@@ -486,61 +491,22 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
 
     return Container(
       padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Color(0xFF9DD0E7), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
       child: Column(
         children: [
           // Cost Display
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (!isPark) ...[
-                Image.asset(
-                  'assets/images/item/Ticket_energy_img.png',
-                  width: 24,
-                  height: 24,
-                ),
-                SizedBox(width: 8),
-                Text(
-                  '-1',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
-                SizedBox(width: 16),
-                Text('และ', style: TextStyle(fontSize: 14, color: Colors.black54)),
-                SizedBox(width: 16),
-              ],
-              Image.asset(
-                'assets/images/item/energy.png',
-                width: 24,
-                height: 24,
-              ),
-              SizedBox(width: 8),
-              Text(
-                '-20',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
+              Center(
+                child: CostDisplayWidget(
+                  energyCost: 20,
+                  ticketCost: 1,
+                  showTicket: !isPark,
                 ),
               ),
             ],
           ),
-
-          SizedBox(height: 16),
+          SizedBox(height: 20),
 
           // Start Button
           Container(
@@ -621,7 +587,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
             ),
           ),
           SizedBox(height: 16),
-          
+
           // ปุ่มเลือกสนามสอบ
           _buildExamButton('สนามสอบง่าย', Color(0xFF4CAF50)),
           SizedBox(height: 12),
@@ -656,10 +622,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
         onPressed: () {
           print('Selected: $text');
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('เลือก $text'),
-              backgroundColor: color,
-            ),
+            SnackBar(content: Text('เลือก $text'), backgroundColor: color),
           );
         },
         style: ElevatedButton.styleFrom(
@@ -677,66 +640,6 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
             color: Colors.white,
           ),
         ),
-      ),
-    );
-  }
-
-  /// Energy/Cost Display
-  Widget _buildCostDisplay() {
-    // สวนสาธารณะ แสดง energy, ที่อื่นแสดง ticket
-    final ispark = widget.locationName == 'สวนสาธารณะ';
-
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Color(0xFF9DD0E7), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Image.asset(
-            ispark
-                ? 'assets/images/item/energy.png'
-                : 'assets/images/item/Ticket_energy_img.png',
-            width: 24,
-            height: 24,
-          ),
-          SizedBox(width: 8),
-          Text(
-            '-20',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
-          SizedBox(width: 12),
-          Text('และ', style: TextStyle(fontSize: 14, color: Colors.black54)),
-          SizedBox(width: 12),
-          Image.asset(
-            'assets/images/item/Ticket_energy_img.png',
-            width: 24,
-            height: 24,
-          ),
-          SizedBox(width: 8),
-          Text(
-            '-1',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
-        ],
       ),
     );
   }

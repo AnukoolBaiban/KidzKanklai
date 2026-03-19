@@ -109,14 +109,14 @@ class _MapScreenState extends State<MapScreen> {
         final w = constraints.maxWidth;
         final h = constraints.maxHeight;
 
-        final building = w * 0.28;
+        final building = w * 0.30;
 
         return Stack(
           children: [
             /// โรงเรียน (บนกลาง)
             Positioned(
-              top: h * 0.05,
-              left: w * 0.38,
+              top: h * 0.02,
+              left: w * 0.55,
               child: _buildLocation(
                 imagePath: 'assets/images/map/school.PNG',
                 label: 'สนามสอบ',
@@ -126,7 +126,7 @@ class _MapScreenState extends State<MapScreen> {
 
             /// หอสมุด (ซ้าย)
             Positioned(
-              top: h * 0.18,
+              top: h * 0.15,
               left: w * 0.08,
               child: _buildLocation(
                 imagePath: 'assets/images/map/library.PNG',
@@ -137,7 +137,7 @@ class _MapScreenState extends State<MapScreen> {
 
             /// โรงยิม (ขวา)
             Positioned(
-              top: h * 0.28,
+              top: h * 0.38,
               right: w * 0.08,
               child: _buildLocation(
                 imagePath: 'assets/images/map/gym.PNG',
@@ -148,8 +148,8 @@ class _MapScreenState extends State<MapScreen> {
 
             /// สวนสาธารณะ (กลางล่าง)
             Positioned(
-              top: h * 0.42,
-              left: w * 0.25,
+              top: h * 0.48,
+              left: w * 0.18,
               child: _buildLocation(
                 imagePath: 'assets/images/map/park.PNG',
                 label: 'สวนสาธารณะ',
@@ -160,7 +160,7 @@ class _MapScreenState extends State<MapScreen> {
             /// สวนสนุก (ล่างสุด)
             Positioned(
               bottom: h * 0.10,
-              left: w * 0.30,
+              left: w * 0.50,
               child: _buildLocation(
                 imagePath: 'assets/images/map/theme_park.PNG',
                 label: 'สวนสนุก',
