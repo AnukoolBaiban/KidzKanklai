@@ -520,26 +520,31 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
 
     // กรองข้อมูลตาม Tab ที่เลือก
     if (_selectedTabIndex == 0) {
-      // "ทั้งหมด" = ทุกหมวดหมู่ เฉพาะที่กำลังทำอยู่ (in_progress)
-      filteredQuests = _allQuests.where((q) => q['status'] == 'in_progress').toList();
+      // 🌟 "ทั้งหมด" = โชว์เควสที่กำลังทำอยู่ (ทุกหมวด) + รวมเควสระบบที่สำเร็จแล้วด้วย
+      filteredQuests = _allQuests.where((q) {
+        bool isDoing = q['status'] == 'in_progress';
+        bool isSystemDone = q['category'] == 'ระบบ' && q['status'] == 'completed';
+        
+        return isDoing || isSystemDone; // เอาทั้งคู่มาแสดงผล
+      }).toList();
     } else if (_selectedTabIndex == 1) {
-      // "ระบบ" = หมวดระบบ เฉพาะที่กำลังทำอยู่
-      filteredQuests = _allQuests.where((q) => q['category'] == 'ระบบ' && q['status'] == 'in_progress').toList();
+      // 🌟 "ระบบ" = แสดงเควสหมวดระบบ "ทั้งหมด" (ทั้งที่กำลังทำและสำเร็จแล้ว)
+      filteredQuests = _allQuests.where((q) => q['category'] == 'ระบบ').toList();
     } else if (_selectedTabIndex == 2) {
       // "ส่วนตัว" = หมวดส่วนตัว เฉพาะที่กำลังทำอยู่
       filteredQuests = _allQuests.where((q) => q['category'] == 'ส่วนตัว' && q['status'] == 'in_progress').toList();
     } else if (_selectedTabIndex == 3) {
-      // "ประวัติ" = ทำสำเร็จแล้ว (completed) หรือ หมดเวลา (failed) และไม่เกิน 3 เดือน
+      // 🌟 "ประวัติ" = ทำสำเร็จแล้ว หรือ หมดเวลา (และต้องไม่ใช่หมวดระบบ) ไม่เกิน 3 เดือน
       filteredQuests = _allQuests.where((q) {
-        bool isDoneOrFailed = (q['status'] == 'completed' || q['status'] == 'failed');
+        // เช็คสถานะ และเพิ่มเงื่อนไขไม่เอาเควส 'ระบบ' เข้ามาโชว์ในนี้
+        bool isDoneOrFailed = (q['status'] == 'completed' || q['status'] == 'failed') && q['category'] != 'ระบบ';
         
-        // หมายเหตุ: ถ้าเป็น failed อาจจะไม่มี completedDate ก็ให้โชว์ไปเลย หรือจะเช็คจาก dueDate แทนก็ได้
         if (isDoneOrFailed) {
           if (q['completedDate'] != null) {
             DateTime compDate = q['completedDate'];
             return compDate.isAfter(threeMonthsAgo);
           }
-          return true; // ถ้าไม่มีวันที่สำเร็จ (เช่น fail ไปเฉยๆ) ก็อนุญาตให้แสดงในประวัติ
+          return true; 
         }
         return false;
       }).toList();
