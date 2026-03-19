@@ -53,6 +53,7 @@ type DoQuest struct {
 	QuestID       int64      `json:"quest_id"`
 	Status        *string    `json:"status"`
 	CompletedDate *time.Time `json:"completed_date"`
+	Progress      *int       `json:"progress"` // 🌟 เพิ่มบรรทัดนี้
 }
 
 // Table: collect (User <-> Item - Inventory)

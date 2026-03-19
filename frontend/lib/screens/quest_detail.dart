@@ -117,11 +117,15 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
     );
   }
 
-  // 🌟 ฟังก์ชันแปลงเวลาเป็นรูปแบบ วว/ดด/ปป (พ.ศ.)
+  // 🌟 ฟังก์ชันแปลงเวลาเป็นรูปแบบ วว/ดด/ปป (พ.ศ.) พร้อมแปลงเป็น UTC+7
   String _formatDate(String? dateStr) {
     if (dateStr == null) return "--/--/--";
     try {
-      DateTime dt = DateTime.parse(dateStr);
+      DateTime parsedDate = DateTime.parse(dateStr);
+      
+      // 🌟 แปลงเวลาฐานเป็น UTC ก่อน แล้วบวก 7 ชั่วโมงให้กลายเป็นเวลาไทย
+      DateTime dt = parsedDate.toUtc().add(const Duration(hours: 7));
+      
       int thaiYear = (dt.year + 543) % 100; // เอาแค่ 2 หลักท้าย เช่น 68
       String dd = dt.day.toString().padLeft(2, '0');
       String mm = dt.month.toString().padLeft(2, '0');

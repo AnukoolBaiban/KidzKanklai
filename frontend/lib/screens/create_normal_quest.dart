@@ -81,10 +81,19 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
   }
 
   Future<void> _selectDate() async {
+    // 🌟 1. คำนวณ "วันพรุ่งนี้" โดยเอาเวลาปัจจุบันมาบวกไป 1 วัน
+    final DateTime tomorrow = DateTime.now().add(const Duration(days: 1));
+    
+    // 🌟 2. เช็คค่าเริ่มต้น ถ้ายังไม่ได้เลือกเวลา หรือเวลาที่เลือกไว้น้อยกว่าวันพรุ่งนี้ ให้ใช้พรุ่งนี้เป็นจุดเริ่มต้น
+    DateTime initial = _selectedDate ?? tomorrow;
+    if (initial.isBefore(tomorrow)) {
+      initial = tomorrow;
+    }
+
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate ?? DateTime.now(),
-      firstDate: DateTime.now(),
+      initialDate: initial, 
+      firstDate: tomorrow,  // 🌟 3. บังคับให้ปฏิทินเริ่มต้นคลิกได้ตั้งแต่วันพรุ่งนี้เป็นต้นไป (คลิกวันนี้ไม่ได้)
       lastDate: DateTime(2100),
       builder: (context, child) {
         return Theme(

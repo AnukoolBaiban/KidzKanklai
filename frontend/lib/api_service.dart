@@ -502,4 +502,38 @@ class ApiService {
     // คืนค่า null กรณีเกิด Error หรือส่งไปแล้วแต่ถูกเตะกลับเพราะยังไม่หมดเวลา
     return null;
   }
+
+  // --- ฟังก์ชันสร้างเควสระบบเริ่มต้นให้ผู้ใช้ ---
+  static Future<void> initSystemQuests() async {
+    try {
+      await http.post(
+        Uri.parse('$baseUrl/quests/system/init'),
+        headers: _headers,
+      );
+    } catch (e) {
+      print("Init System Quests Error: $e");
+    }
+  }
+
+  // รับรางวัลเควสระบบ
+  static Future<List<dynamic>?> completeSystemQuest(int questId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/quests/system/complete'),
+        headers: _headers,
+        body: jsonEncode({'quest_id': questId}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['rewards']; 
+      } else {
+        print("Failed to complete system quest: ${response.body}");
+        return null;
+      }
+    } catch (e) {
+      print("Complete System Quest Error: $e");
+      return null;
+    }
+  }
 }

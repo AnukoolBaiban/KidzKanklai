@@ -12,6 +12,7 @@ import (
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // ------------------------------------------------------------------------
@@ -182,6 +183,9 @@ func CreateNormalQuest(c *gin.Context) {
 		}
 	}
 
+	// 🌟 ทริกเกอร์เควสระบบ: บวกความคืบหน้าเควส ID 10001 (สร้างเควสทั่วไป)
+	IncrementSystemQuestProgress(ctx, tx, userID, 10001)
+
 	// ยืนยัน Transaction (บันทึกเควส + หักตั๋วเสร็จสมบูรณ์)
 	if err := tx.Commit(ctx); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction commit failed"})
@@ -336,6 +340,10 @@ func CompleteNormalQuest(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction commit failed"})
 		return
 	}
+
+	go func(u uuid.UUID) {
+		CheckCoinAchievement(context.Background(), u)
+	}(userID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -650,10 +658,202 @@ func CompleteInstantQuest(c *gin.Context) {
 		responseRewards = append(responseRewards, map[string]interface{}{"name": rw.Name, "added": rw.Quantity, "image": rw.Image})
 	}
 
+	// 🌟 ทริกเกอร์เควสระบบ: บวกความคืบหน้าเควส ID 10002 และ 10003 (สำเร็จเควสทันที)
+	IncrementSystemQuestProgress(ctx, tx, userID, 10002)
+	IncrementSystemQuestProgress(ctx, tx, userID, 10003)
+
 	tx.Commit(ctx)
+
+	go func(u uuid.UUID) {
+		CheckCoinAchievement(context.Background(), u)
+	}(userID)
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "Instant quest completed",
 		"rewards": responseRewards,
 	})
 }
+
+// POST /quests/system/init
+func InitSystemQuests(c *gin.Context) {
+	userIdVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	userIDStr := fmt.Sprintf("%v", userIdVal)
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	ctx := context.Background()
+
+	// 🌟 ใช้ ON CONFLICT DO NOTHING: 
+	// ถ้ายังไม่มีเควสระบบ จะทำการสร้างให้ (progress=0)
+	// ถ้ามีอยู่แล้ว คำสั่งนี้จะไม่ทำอะไรเลย (ไม่ไปทับ progress เดิมที่กำลังทำอยู่)
+	initQuery := `
+		INSERT INTO public.do_quests (user_id, quest_id, status, progress)
+		VALUES 
+			($1, 10001, 'in_progress', 0),
+			($1, 10002, 'in_progress', 0),
+			($1, 10003, 'in_progress', 0)
+		ON CONFLICT (user_id, quest_id) DO NOTHING;
+	`
+	_, err = configs.DB.Exec(ctx, initQuery, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to init system quests"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// ------------------------------------------------------------------------
+// 6. API: รับรางวัลเควสระบบ (CompleteSystemQuest)
+// ------------------------------------------------------------------------
+// POST /quests/system/complete
+func CompleteSystemQuest(c *gin.Context) {
+	userIdVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	userIDStr := fmt.Sprintf("%v", userIdVal)
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	var input CompleteQuestInput // ใช้ Struct เดียวกับเควสปกติได้เลย (รับแค่ quest_id)
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		return
+	}
+
+	ctx := context.Background()
+	tx, err := configs.DB.Begin(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction failed"})
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// 🌟 1. ดึงสถานะ, ความคืบหน้า และเป้าหมาย ออกมาตรวจสอบก่อนแจกของ
+	var currentStatus string
+	var progress, targetAmount int
+	checkQuery := `
+		SELECT dq.status, dq.progress, q.target_amount
+		FROM public.do_quests dq
+		JOIN public.quests q ON dq.quest_id = q.id
+		WHERE dq.user_id = $1 AND dq.quest_id = $2 AND q.type = 'ระบบ'
+		FOR UPDATE
+	`
+	err = tx.QueryRow(ctx, checkQuery, userID, input.QuestID).Scan(&currentStatus, &progress, &targetAmount)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "System quest not found"})
+		return
+	}
+
+	// 1.1 เช็คว่าเคยกดรับไปแล้วหรือยัง
+	if currentStatus == "completed" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Reward already claimed for this week"})
+		return
+	}
+
+	// 1.2 เช็คว่าทำถึงเป้าหรือยัง (ป้องกันการยิง API โกงเอาของรางวัล)
+	if progress < targetAmount {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Quest requirements not met yet"})
+		return
+	}
+
+	// 🌟 2. อัปเดตสถานะเป็น completed (แปลว่ารับรางวัลแล้ว)
+	updateQuestQuery := `UPDATE public.do_quests SET status = 'completed', completed_date = NOW() WHERE user_id = $1 AND quest_id = $2`
+	_, err = tx.Exec(ctx, updateQuestQuery, userID, input.QuestID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update status"})
+		return
+	}
+
+	// 🌟 3. แจกของรางวัล (ดึง Logic แจกของเหมือนเดิมมาใช้)
+	rewardQuery := `
+		SELECT r.item_id, r.quantity, i.name, i.image 
+		FROM public.receive r
+		JOIN public.items i ON r.item_id = i.id
+		WHERE r.quest_id = $1
+	`
+	rows, err := tx.Query(ctx, rewardQuery, input.QuestID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch rewards"})
+		return
+	}
+	
+	type tempReward struct {
+		ItemID   int64
+		Quantity int
+		Name     string
+		Image    string
+	}
+	var pendingRewards []tempReward
+
+	for rows.Next() {
+		var itemID int64
+		var qty int
+		var namePtr, imagePtr *string
+		if err := rows.Scan(&itemID, &qty, &namePtr, &imagePtr); err == nil {
+			name := "Unknown"
+			if namePtr != nil { name = *namePtr }
+			imageStr := "assets/images/item/default_item.png"
+			if imagePtr != nil { imageStr = *imagePtr }
+			pendingRewards = append(pendingRewards, tempReward{ItemID: itemID, Quantity: qty, Name: name, Image: imageStr})
+		}
+	}
+	rows.Close()
+
+	var responseRewards []map[string]interface{}
+	for _, rw := range pendingRewards {
+		if rw.ItemID == 22 { // สมมติว่า 22 คือ EXP
+			tx.Exec(ctx, `UPDATE public.characters SET experience = experience + $1 WHERE user_id = $2`, rw.Quantity, userID)
+		} else {
+			upsertQuery := `
+				INSERT INTO public.collect (user_id, item_id, quantity, acquired_date) VALUES ($1, $2, $3, NOW())
+				ON CONFLICT (user_id, item_id) DO UPDATE SET quantity = public.collect.quantity + EXCLUDED.quantity, acquired_date = NOW();
+			`
+			tx.Exec(ctx, upsertQuery, userID, rw.ItemID, rw.Quantity)
+		}
+		responseRewards = append(responseRewards, map[string]interface{}{"name": rw.Name, "added": rw.Quantity, "image": rw.Image})
+	}
+
+	tx.Commit(ctx)
+
+	go func(u uuid.UUID) {
+		CheckCoinAchievement(context.Background(), u)
+	}(userID)
+	
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "System quest reward claimed",
+		"rewards": responseRewards,
+	})
+}
+
+// ------------------------------------------------------------------------
+// 🌟 Helper Function: อัปเดตความคืบหน้าเควสระบบ (Progress)
+// ------------------------------------------------------------------------
+func IncrementSystemQuestProgress(ctx context.Context, tx pgx.Tx, userID uuid.UUID, questID int64) error {
+	// อัปเดต Progress + 1 เฉพาะเควสที่สถานะยังเป็น in_progress (ถ้ากดรับรางวัลไปแล้วจะได้ไม่บวกเพิ่ม)
+	query := `
+		UPDATE public.do_quests 
+		SET progress = progress + 1 
+		WHERE user_id = $1 AND quest_id = $2 AND status = 'in_progress';
+	`
+	_, err := tx.Exec(ctx, query, userID, questID)
+	if err != nil {
+		fmt.Printf("❌ Failed to increment progress for quest %d: %v\n", questID, err)
+	}
+	return err
+}
+

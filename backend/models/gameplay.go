@@ -12,6 +12,7 @@ type Quest struct {
 	DueDate   *time.Time `json:"due_date"`
 	Type      *string    `json:"type"`
 	ClubID    *int64     `json:"club_id"` // FK
+	TargetAmount *int       `json:"target_amount"` // 🌟 เพิ่มบรรทัดนี้
 }
 
 // Table: exams

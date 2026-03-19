@@ -10,22 +10,22 @@ import (
 
 // CheckCoinAchievement จะถูกเรียกเมื่อผู้เล่นได้รับ Coin เพิ่ม
 // currentCoins คือจำนวนเงินทั้งหมดที่ผู้เล่นมี "หลังจาก" บวกเพิ่มแล้ว
-func CheckCoinAchievement(userID uuid.UUID, currentCoins int) {
-	// ⚠️ กำหนด ID ของ Achievement "มี Coin ครบ 15,000" ให้ตรงกับในตาราง achievements ของคุณ
+func CheckCoinAchievement(ctx context.Context, userID uuid.UUID) {
 	const achievementID = 1 
 	const targetCoins = 15000
 
-	// ถ้าเหรียญยังไม่ถึงเป้าหมาย ให้จบการทำงานทันที
-	if currentCoins < targetCoins {
+	// คิวรี่หาจำนวน Coin ปัจจุบัน (ItemID 20)
+	var currentCoins int
+	coinQuery := `SELECT quantity FROM public.collect WHERE user_id = $1 AND item_id = 20`
+	err := configs.DB.QueryRow(ctx, coinQuery, userID).Scan(&currentCoins)
+	
+	// ถ้าหาไม่เจอ หรือเหรียญไม่ถึง ให้จบการทำงาน
+	if err != nil || currentCoins < targetCoins {
 		return
 	}
 
-	ctx := context.Background()
-
-	// คำสั่ง SQL ทำ Upsert ลงตาราง attain
-	// ถ้ายังไม่มีข้อมูล: ให้ Insert สถานะ 'completed'
-	// ถ้ามีข้อมูลอยู่แล้ว: ให้อัปเดตสถานะเป็น 'completed' (เฉพาะกรณีที่ยังไม่เคย completed มาก่อน)
-	query := `
+	// ถ้าเหรียญถึงเป้า ให้บันทึก/อัปเดตลงตาราง attain
+	attainQuery := `
 		INSERT INTO public.attain (user_id, achievement_id, status, completed_date, reward_claimed)
 		VALUES ($1, $2, 'completed', NOW(), false)
 		ON CONFLICT (user_id, achievement_id) 
@@ -34,17 +34,13 @@ func CheckCoinAchievement(userID uuid.UUID, currentCoins int) {
 			completed_date = NOW()
 		WHERE public.attain.status != 'completed';
 	`
-
-	// สั่ง Execute Query
-	tag, err := configs.DB.Exec(ctx, query, userID, achievementID)
+	tag, err := configs.DB.Exec(ctx, attainQuery, userID, achievementID)
 	if err != nil {
 		fmt.Printf("❌ [CheckCoinAchievement] Failed to update achievement for user %s: %v\n", userID, err)
 		return
 	}
 
-	// เช็คว่ามีการแทรกหรืออัปเดตข้อมูลจริงหรือไม่ (ป้องกันการเด้งซ้ำถ้าเคยได้ไปแล้ว)
 	if tag.RowsAffected() > 0 {
 		fmt.Printf("🎉 User %s just unlocked Achievement ID: %d (15,000 Coins)!\n", userID, achievementID)
-		// อนาคตสามารถเพิ่มโค้ดส่ง Notification แจ้งเตือนผู้เล่นได้ตรงนี้
 	}
 }
