@@ -440,4 +440,66 @@ class ApiService {
     
     return false; // ยอมแพ้ไม่สำเร็จ หรือเกิด Error
   }
+
+  // --- ฟังก์ชันเริ่มภารกิจทันที (Start Instant Quest) ---
+  // คืนค่าเป็น Map ที่มี quest_id และ due_date กลับไปให้ UI ใช้ตั้งเวลานับถอยหลัง
+  static Future<Map<String, dynamic>?> startInstantQuest({
+    required String name,
+    required int durationMinutes,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/quests/instant/start'),
+        headers: _headers,
+        body: jsonEncode({
+          "name": name,
+          "duration_minutes": durationMinutes,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          return data; // คืนค่าข้อมูลทั้งหมดกลับไป (เช่น data['quest_id'], data['due_date'])
+        }
+      } else {
+        // อ่านข้อความ Error จาก Backend
+        final errorData = jsonDecode(response.body);
+        print("Start Instant Quest Failed: ${response.statusCode} - ${errorData['error']}");
+      }
+    } catch (e) {
+      print("Start Instant Quest Error: $e");
+    }
+    return null; // คืนค่า null กรณีเกิด Error หรือตั๋วไม่พอ
+  }
+
+  // --- ฟังก์ชันส่งเควสทันทีและรับรางวัล (Complete Instant Quest) ---
+  // คืนค่าเป็น List ของรางวัลคล้ายๆ completeNormalQuest
+  static Future<List<dynamic>?> completeInstantQuest(int questId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/quests/instant/complete'),
+        headers: _headers,
+        body: jsonEncode({
+          "quest_id": questId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          // ถ้าสำเร็จ คืนค่าก้อนของรางวัลกลับไปให้หน้า UI โชว์
+          return data['rewards'] ?? [];
+        }
+      } else {
+        // อ่านข้อความ Error จาก Backend มาโชว์ใน Console (เช่น กรณีกดส่งก่อนเวลาหมด)
+        final errorData = jsonDecode(response.body);
+        print("Complete Instant Quest Failed: ${response.statusCode} - ${errorData['error']}");
+      }
+    } catch (e) {
+      print("Complete Instant Quest Error: $e");
+    }
+    // คืนค่า null กรณีเกิด Error หรือส่งไปแล้วแต่ถูกเตะกลับเพราะยังไม่หมดเวลา
+    return null;
+  }
 }
