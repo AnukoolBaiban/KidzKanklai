@@ -5,6 +5,8 @@ import '../api_service.dart';
 import '../screens/lobby.dart';
 import '../widgets/confirm_giveup_popup.dart';
 import '../widgets/reward_popup.dart';
+// 🌟 1. นำเข้าไฟล์ ConfirmCompletePopup
+import '../widgets/confirm_complete_popup.dart'; // แก้ไข path ให้ตรงกับที่เก็บไฟล์
 
 class QuestDetailScreen extends StatefulWidget {
   final User? user;
@@ -591,59 +593,65 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
     );
   }
 
-  void _openRewardPopup() async {
+  void _openRewardPopup() {
     if (widget.questId == null) return;
 
-    // แสดง Loading ระหว่างรอ API
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return const Center(child: CircularProgressIndicator());
+    // 🌟 1. เรียกโชว์ Popup ถามเพื่อยืนยันก่อน
+    ConfirmCompletePopup.show(
+      context,
+      onConfirm: () async {
+        Navigator.pop(context); // ปิด Popup ยืนยัน
+
+        // แสดง Loading ระหว่างรอ API
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return const Center(child: CircularProgressIndicator());
+          },
+        );
+
+        // 🌟 2. ยิง API (ใช้ completeNormalQuest สำหรับเควสทั่วไป)
+        final apiRewards = await ApiService.completeNormalQuest(widget.questId!);
+
+        // ปิด Loading
+        if (mounted) {
+          Navigator.pop(context);
+        }
+
+        // 🌟 3. ถ้า API ทำงานสำเร็จ
+        if (apiRewards != null && apiRewards.isNotEmpty && mounted) {
+          
+          List<RewardData> popupRewards = apiRewards.map<RewardData>((rw) {
+            return RewardData(
+              type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM',
+              amount: rw['added'],
+              itemName: rw['name'],
+              itemImage: rw['image'], 
+            );
+          }).toList();
+
+          // 🌟 4. ใช้ await หยุดรอจนกว่าผู้ใช้จะกดปิด Popup รับของรางวัล
+          await RewardPopup.show(context, rewards: popupRewards);
+
+          // 🌟 5. เมื่อ Popup รางวัลปิดลงแล้ว ให้เด้งกลับหน้า All Quest พร้อมส่งค่า true ไปรีเฟรช
+          if (mounted) {
+            Navigator.pop(context, true); 
+          }
+
+        } else {
+          // ❌ กรณีส่งล้มเหลว
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('เกิดข้อผิดพลาด หรือภารกิจนี้ถูกส่งไปแล้ว'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
       },
     );
-
-    // ยิง API (ใช้ฟังก์ชันที่เราเพิ่งสร้างใน ApiService)
-    final apiRewards = await ApiService.completeNormalQuest(widget.questId!);
-
-    // ปิด Loading
-    if (mounted) {
-      Navigator.pop(context);
-    }
-
-    // ถ้า API ทำงานสำเร็จ และส่งของรางวัลกลับมา
-    if (apiRewards != null && apiRewards.isNotEmpty && mounted) {
-      
-      // 🌟 แปลงข้อมูล JSON จาก API ให้กลายเป็น RewardData List ของคุณ
-      List<RewardData> popupRewards = apiRewards.map<RewardData>((rw) {
-        return RewardData(
-          type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM', // ระบุประเภทคร่าวๆ
-          amount: rw['added'],
-          itemName: rw['name'],
-          itemImage: rw['image'], // ส่งรูปจาก Database ไปเลย (ถ้ามี)
-        );
-      }).toList();
-
-      // 🌟 เรียกใช้ RewardPopup ที่คุณมีอยู่
-      RewardPopup.show(
-        context,
-        rewards: popupRewards,
-        onClose: () {
-          Navigator.pop(context); // พอผู้ใช้กดปิด Popup ก็จะเด้งกลับไปหน้าก่อนหน้า (หน้ารวมเควส)
-        },
-      );
-
-    } else {
-      // ❌ กรณีส่งล้มเหลว (อาจจะเพราะเควสส่งไปแล้ว หรือไม่มีเน็ต)
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('เกิดข้อผิดพลาด หรือภารกิจนี้ถูกส่งไปแล้ว'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
   }
 }
 

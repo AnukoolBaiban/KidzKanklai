@@ -60,6 +60,8 @@ func main() {
 	auth.POST("/quests/create", handlers.CreateNormalQuest)
 	auth.POST("/quests/complete", handlers.CompleteNormalQuest)
 	auth.POST("/quests/cancel", handlers.CancelQuest)
+	auth.POST("/quests/instant/start", handlers.StartInstantQuest)
+	auth.POST("/quests/instant/complete", handlers.CompleteInstantQuest)
 
 	r.Run(":8080")
 }

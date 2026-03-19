@@ -61,7 +61,8 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
             completed_date, 
             quests (
               id, 
-              name, 
+              name,
+              detail,
               type, 
               due_date, 
               image,
@@ -139,6 +140,7 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
         loadedQuests.add({
           "id": questData['id'],
           "title": questData['name'] ?? 'ไม่มีชื่อ',
+          "description": questData['detail'] ?? 'ไม่มีรายละเอียด',
           "type": type,
           "category": category,
           "rewards": rewardsList, 
@@ -741,76 +743,121 @@ class QuestCard extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // 🌟 1. แก้ปุ่มจาก "สำเร็จ" (ที่กดไม่ได้) เป็นปุ่ม "รายละเอียด"
-                    if (isClaimed)
-                      _buildActionButton(
-                        text: 'รายละเอียด', 
-                        onPressed: onViewDetails,
-                        bgColor: const Color(0xFF536DFE),
-                      )
-                    else if (isSystem && isComplete)
-                      _buildActionButton(
-                        text: 'รับรางวัล',
-                        onPressed: onClaim,
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF85D755), Color(0xFF34C759)],
-                        ),
-                      )
-                    else
-                      _buildActionButton(
-                        text: isSystem ? 'รับรางวัล' : 'รายละเอียด',
-                        onPressed: isSystem ? null : onViewDetails,
-                        bgColor: isSystem
-                            ? Colors.grey
-                            : const Color(0xFF536DFE),
-                      ),
-                      
-                    const SizedBox(height: 12),
-                    
-                    if (isSystem) ...[
-                      _buildProgressBar(
-                        isClaimed || isComplete,
-                        progress,
-                        totalReq,
-                      ),
-                      const SizedBox(height: 4),
-                    ],
-
-                    // 🌟 2. เงื่อนไขเวลาแบบใหม่ (<3 วันโชว์, <1 วันโชว์เป็นชั่วโมง, เป็น 0 โชว์น้อยกว่า 1 ชั่วโมง)
-                    if (isClaimed)
-                      const Text(
-                        "สำเร็จ",
-                        style: TextStyle(
-                          color: Color(0xFF34C759), // สีเขียว
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      )
-                    // 🌟 เพิ่มเงื่อนไขเช็คว่า ถ้ายอมแพ้ (failed) ให้ขึ้นว่า "ไม่สำเร็จ" ทันที ไม่สนเวลาที่เหลือ
-                    else if (quest['status'] == 'failed' || quest['isExpired'] == true) 
-                      const Text(
-                        "ไม่สำเร็จ",
-                        style: TextStyle(
-                          color: Color.fromARGB(255, 255, 0, 0), // สีแดง
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      )
-                    else if (quest['daysLeft'] != null && quest['daysLeft'] < 3)
+                    // 🌟 เช็คว่าเป็นเควสประวัติ (ทำเสร็จแล้วหรือเฟล) และเป็นเควสประเภท "ทันที" หรือไม่
+                    if ((isClaimed || isFailed) && quest['type'] == 'ทันที') ...[
+                      // โชว์ข้อความ "สำเร็จ" หรือ "ไม่สำเร็จ" ตัวใหญ่ตรงกลางแทนปุ่ม
                       Text(
-                        quest['daysLeft'] < 1 
-                            ? (quest['hoursLeft'] <= 0 
-                                ? "เหลือน้อยกว่า 1 ชั่วโมง" 
-                                : "เหลืออีก ${quest['hoursLeft']} ชั่วโมง")
-                            : "เหลืออีก ${quest['daysLeft']} วัน",
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontSize: 10,
+                        isClaimed ? "สำเร็จ" : "ไม่สำเร็จ",
+                        style: TextStyle(
+                          color: isClaimed ? const Color(0xFF34C759) : const Color(0xFFE74A4A),
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
-                      )
-                    else
-                      const SizedBox(), // ไม่แสดงอะไรถ้าเวลาเหลือตั้งแต่ 3 วันขึ้นไป
+                      ),
+                      const SizedBox(height: 8),
+                      // 🌟 ดึงข้อมูล string จาก description มาคำนวณชั่วโมงและนาที
+                      Text(
+                        (() {
+                          // เช็คว่ามีข้อความ "กิจกรรมจับเวลา:" หรือไม่
+                          if (quest['description'] != null && quest['description'].contains("กิจกรรมจับเวลา:")) {
+                            // ใช้ RegExp ดึงเฉพาะ "ตัวเลข" ออกมาจากข้อความ
+                            final match = RegExp(r'\d+').firstMatch(quest['description']);
+                            if (match != null) {
+                              int totalMinutes = int.parse(match.group(0)!);
+                              
+                              // คำนวณชั่วโมงและนาที
+                              if (totalMinutes >= 60) {
+                                int h = totalMinutes ~/ 60; // หารเอาส่วน (ชั่วโมง)
+                                int m = totalMinutes % 60;  // เศษที่เหลือ (นาที)
+                                
+                                return m > 0 
+                                    ? "เวลาที่ตั้ง: $h ชั่วโมง $m นาที" 
+                                    : "เวลาที่ตั้ง: $h ชั่วโมง";
+                              } else {
+                                return "เวลาที่ตั้ง: $totalMinutes นาที";
+                              }
+                            }
+                          }
+                          // Fallback กรณีหาข้อความไม่เจอ
+                          return "เวลาที่ตั้ง: ${quest['daysLeft'] > 0 ? '${quest['daysLeft']} วัน ' : ''}${quest['hoursLeft']} ชม.";
+                        })(), 
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ] 
+                    // 🌟 ถ้าเป็นเควสปกติ หรือยังทำไม่เสร็จ ก็โชว์ปุ่มและระบบเดิม
+                    else ...[
+                      if (isClaimed)
+                        _buildActionButton(
+                          text: 'รายละเอียด', 
+                          onPressed: onViewDetails,
+                          bgColor: const Color(0xFF536DFE),
+                        )
+                      else if (isSystem && isComplete)
+                        _buildActionButton(
+                          text: 'รับรางวัล',
+                          onPressed: onClaim,
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF85D755), Color(0xFF34C759)],
+                          ),
+                        )
+                      else
+                        _buildActionButton(
+                          text: isSystem ? 'รับรางวัล' : 'รายละเอียด',
+                          onPressed: isSystem ? null : onViewDetails,
+                          bgColor: isSystem
+                              ? Colors.grey
+                              : const Color(0xFF536DFE),
+                        ),
+                        
+                      const SizedBox(height: 12),
+                      
+                      if (isSystem) ...[
+                        _buildProgressBar(
+                          isClaimed || isComplete,
+                          progress,
+                          totalReq,
+                        ),
+                        const SizedBox(height: 4),
+                      ],
+
+                      // โชว์เวลาด้านล่างปุ่มแบบเดิม
+                      if (isClaimed)
+                        const Text(
+                          "สำเร็จ",
+                          style: TextStyle(
+                            color: Color(0xFF34C759),
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      else if (isFailed) 
+                        const Text(
+                          "ไม่สำเร็จ",
+                          style: TextStyle(
+                            color: Color.fromARGB(255, 255, 0, 0),
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      else if (quest['daysLeft'] != null && quest['daysLeft'] < 3)
+                        Text(
+                          quest['daysLeft'] < 1 
+                              ? (quest['hoursLeft'] <= 0 
+                                  ? "เหลือน้อยกว่า 1 ชั่วโมง" 
+                                  : "เหลืออีก ${quest['hoursLeft']} ชั่วโมง")
+                              : "เหลืออีก ${quest['daysLeft']} วัน",
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                    ],
                   ],
                 ),
               ),

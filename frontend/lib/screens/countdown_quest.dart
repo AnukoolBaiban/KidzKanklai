@@ -8,6 +8,7 @@ import 'package:flutter_application_1/widgets/ticket_box.dart';
 import 'package:flutter_application_1/widgets/confirm_giveup_popup.dart';
 import 'package:flutter_application_1/widgets/mission_fail_popup.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_application_1/widgets/reward_popup.dart';
 
 class CountdownQuestScreen extends StatefulWidget {
   final User? user;
@@ -28,11 +29,15 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
   int _charCount = 0;
 
   bool _isRunning = false;
+  bool _isLoadingAPI = false; // 🌟 เพิ่ม: เช็คสถานะตอนยิง API โหลด
   Timer? _timer;
-  int _selectedMinutes = 0;
-  int _selectedSeconds = 0;
-  int _selectedActualSeconds = 0;
+  int _selectedMinutes = 0; // ใน UI คือ "ชั่วโมง"
+  int _selectedSeconds = 0; // ใน UI คือ "นาที"
+  int _selectedActualSeconds = 0; // วินาที
   int _elapsedTotalSeconds = 0;
+
+  int? _currentQuestId; // 🌟 เพิ่ม: เก็บ ID ของเควสที่เพิ่งสร้าง
+  DateTime? _targetEndTime; // 🌟 เพิ่ม: เก็บเวลาสิ้นสุดที่ Server ตอบกลับมา
 
   late AnimationController _blinkController;
   late Animation<double> _blinkAnimation;
@@ -65,44 +70,112 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
   }
 
   // ==========================================
-  // Timer Logic & Formatting
-  // จัดการระบบนับเวลาถอยหลัง การคำนวณชั่วโมง/นาที/วินาที และการขึ้น UI แจ้งเตือนเมื่อกดยกเลิก
+  // API & Timer Logic
   // ==========================================
-  void _startTimer() {
-    if (_selectedMinutes == 0 &&
-        _selectedSeconds == 0 &&
-        _selectedActualSeconds == 0)
+
+  // 🌟 1. ฟังก์ชันเริ่มเควส (ยิง API Start)
+  Future<void> _startQuest() async {
+    if (_detailController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กรุณาตั้งชื่อกิจกรรม'), backgroundColor: Colors.red),
+      );
       return;
-    setState(() {
-      _isRunning = true;
-      _elapsedTotalSeconds = 0;
-    });
-    _resumeTimer();
+    }
+
+    // คำนวณเวลาทั้งหมดเป็น "นาที" (_selectedMinutes ใน UI ของคุณคือ ชั่วโมง)
+    int durationInMinutes = (_selectedMinutes * 60) + _selectedSeconds;
+    if (durationInMinutes <= 0) return;
+
+    setState(() => _isLoadingAPI = true);
+
+    // ยิง API
+    final result = await ApiService.startInstantQuest(
+      name: _detailController.text.trim(),
+      durationMinutes: durationInMinutes,
+    );
+
+    if (result != null && result['success'] == true) {
+      _currentQuestId = result['quest_id'];
+      // แปลงเวลา due_date ที่ได้จาก Server ให้เป็น Local Time ของเครื่อง
+      _targetEndTime = DateTime.parse(result['due_date']).toLocal();
+
+      setState(() {
+        _isRunning = true;
+        _isLoadingAPI = false;
+        _elapsedTotalSeconds = 0;
+      });
+      _resumeTimer();
+    } else {
+      setState(() => _isLoadingAPI = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('เกิดข้อผิดพลาด หรือตั๋วไม่พอ'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
+  // 🌟 2. ฟังก์ชันนับถอยหลัง (อิงจากเวลา Server)
   void _resumeTimer() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
+      if (!mounted || _targetEndTime == null) {
         timer.cancel();
         return;
       }
-      setState(() {
-        _elapsedTotalSeconds++;
-        if (_selectedActualSeconds > 0) {
-          _selectedActualSeconds--;
-        } else if (_selectedSeconds > 0) {
-          _selectedSeconds--;
-          _selectedActualSeconds = 59;
-        } else if (_selectedMinutes > 0) {
-          _selectedMinutes--;
-          _selectedSeconds = 59;
-          _selectedActualSeconds = 59;
-        } else {
-          _stopTimer();
-        }
-      });
+
+      final now = DateTime.now();
+      final remaining = _targetEndTime!.difference(now);
+
+      if (remaining.isNegative || remaining.inSeconds <= 0) {
+        // 🌟 หมดเวลาแล้ว! ให้เคลียร์เวลา
+        _stopTimer(reset: true);
+        
+        // 🌟 เพิ่มหน่วงเวลา 1 วินาทีก่อนยิง API ให้ชัวร์ว่าฝั่ง Server เวลาเดินไปถึงแล้วจริงๆ
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) {
+            _completeQuest();
+          }
+        });
+      } else {
+        setState(() {
+          _elapsedTotalSeconds++;
+          _selectedMinutes = remaining.inHours; // ชั่วโมง
+          _selectedSeconds = remaining.inMinutes % 60; // นาที
+          _selectedActualSeconds = remaining.inSeconds % 60; // วินาที
+        });
+      }
     });
+  }
+
+  // 🌟 3. ฟังก์ชันจบเควส (ยิง API Complete)
+  Future<void> _completeQuest() async {
+    if (_currentQuestId == null) return;
+
+    setState(() => _isLoadingAPI = true);
+    final rewards = await ApiService.completeInstantQuest(_currentQuestId!);
+    setState(() => _isLoadingAPI = false);
+
+    if (rewards != null && mounted) {
+      // แปลงของรางวัลและโชว์ Popup
+      List<RewardData> popupRewards = rewards.map<RewardData>((rw) {
+        return RewardData(
+          type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM',
+          amount: rw['added'],
+          itemName: rw['name'],
+          itemImage: rw['image'],
+        );
+      }).toList();
+
+      // 🌟 1. ใช้ await เพื่อหยุดรอจนกว่าผู้ใช้จะกด "ปิด" หน้าต่างรับของรางวัล
+      await RewardPopup.show(context, rewards: popupRewards);
+
+      // 🌟 2. เมื่อ Popup ถูกปิดแล้ว ให้ Pop หน้าต่างนับเวลา (หน้านี้) ทิ้ง 
+      // ระบบจะเด้งกลับไปที่หน้า All Quest ที่อยู่ข้างใต้ และรีเฟรชข้อมูลให้เองอัตโนมัติ
+      if (mounted) {
+        Navigator.pop(context, true); 
+      }
+    }
   }
 
   void _stopTimer({bool reset = false}) {
@@ -127,24 +200,31 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
         : '00.${minutes.toString().padLeft(2, '0')}.${seconds.toString().padLeft(2, '0')}';
   }
 
+  // 🌟 4. ฟังก์ชันกดยอมแพ้ (ยิง API Cancel)
   void _handleBackInterrupt() {
     if (_isRunning) {
-      _timer?.cancel();
       ConfirmGiveUpPopup.show(
         context,
-        onConfirm: () {
-          Navigator.pop(context);
+        onConfirm: () async {
+          Navigator.pop(context); // ปิด Popup ยืนยัน
+          
+          if (_currentQuestId != null) {
+            // ยิง API บอก Backend ว่าขอยอมแพ้
+            await ApiService.cancelQuest(_currentQuestId!); 
+          }
+
           String finalTime = _formattedElapsedTime;
           _stopTimer(reset: true);
+          
           MissionFailPopup.show(
             context,
             elapsedTime: finalTime,
-            onTapContinue: () {},
+            onTapContinue: () {
+               Navigator.pop(context); // กลับหน้าเดิม
+            },
           );
         },
-      ).then((_) {
-        if (_isRunning && mounted) _resumeTimer();
-      });
+      );
     }
   }
 
@@ -280,6 +360,8 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
       onTapDown: (_) => setState(() => _isPressed = true),
       onTapCancel: () => setState(() => _isPressed = false),
       onTap: () async {
+        if (_isLoadingAPI) return; // 🌟 กันคนกดย้อนกลับตอน API กำลังหมุน
+        
         setState(() => _isPressed = false);
         if (_isRunning) {
           _handleBackInterrupt();
@@ -466,8 +548,10 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
   }
 
   // ปุ่มเริ่มจับเวลาถอยหลัง และกล่องไอคอนตั๋วขวาที่ปุ่ม
+  // ปุ่มเริ่มจับเวลาถอยหลัง และกล่องไอคอนตั๋วขวาที่ปุ่ม
   Widget _buildStartButton(Size size, bool isSmallScreen) {
-    bool isTimeSet = _selectedMinutes > 0 || _selectedSeconds > 0;
+    // 🌟 1. เพิ่มการเช็ค _selectedActualSeconds (วินาที) เข้าไปด้วย
+    bool isTimeSet = _selectedMinutes > 0 || _selectedSeconds > 0 || _selectedActualSeconds > 0;
     final buttonWidth = isSmallScreen ? size.width * 0.70 : size.width * 0.60;
     final buttonHeight = isSmallScreen ? 60.0 : 72.0;
     final buttonFontSize = isSmallScreen ? 28.0 : 36.0;
@@ -477,11 +561,12 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
       children: [
         GestureDetector(
           onTap: () {
-            if (!isTimeSet) return;
+            if (!isTimeSet || _isLoadingAPI) return; // 🌟 กันกดรัวๆ
+            
             if (_isRunning) {
               _handleBackInterrupt();
             } else {
-              _startTimer();
+              _startQuest(); // 🌟 เปลี่ยนจาก _startTimer() เป็น _startQuest()
             }
           },
           child: Container(
@@ -511,37 +596,30 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: _isRunning
-                            ? const [
-                                Color(0xFFEA4444),
-                                Color(0xFF992B2B),
-                              ] // Red: Give Up
+                            ? const [Color(0xFFEA4444), Color(0xFF992B2B)] // Red: Give Up
                             : isTimeSet
-                            ? const [
-                                Color(0xFF59ABEC),
-                                Color(0xFF2374B5),
-                              ] // Blue: Ready
-                            : const [
-                                Color(0xFFD9D9D9),
-                                Color(0xFF8A8A8A),
-                              ], // Grey: Disabled
+                            ? const [Color(0xFF59ABEC), Color(0xFF2374B5)] // Blue: Ready
+                            : const [Color(0xFFD9D9D9), Color(0xFF8A8A8A)], // Grey: Disabled
                       ),
                     ),
                   ),
-                  Text(
-                    _isRunning ? "ยอมแพ้" : "เริ่ม",
-                    style: GoogleFonts.kanit(
-                      fontSize: buttonFontSize,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      shadows: const [
-                        Shadow(
-                          offset: Offset(0, 2),
-                          blurRadius: 6,
-                          color: Colors.black38,
+                  // 🌟 โชว์ Loading ถ้ากำลังยิง API
+                  _isLoadingAPI
+                      ? const SizedBox(
+                          width: 30, height: 30,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                        )
+                      : Text(
+                          _isRunning ? "ยอมแพ้" : "เริ่ม",
+                          style: GoogleFonts.kanit(
+                            fontSize: buttonFontSize,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            shadows: const [
+                              Shadow(offset: Offset(0, 2), blurRadius: 6, color: Colors.black38),
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -786,12 +864,13 @@ class _TimePickerPopupWidgetState extends State<_TimePickerPopupWidget> {
   }
 
   bool _showWarning() =>
-      (hours == 8 && minutes > 0) || (hours == 0 && minutes < 10);
+      (hours == 8 && minutes > 0) || (hours == 0 && minutes < 1); // 🌟 แก้จาก < 10 เป็น < 1
+
   String _getWarningMessage() {
     if (hours == 8 && minutes > 0)
       return '* หมายเหตุ: ตั้งเวลาได้สูงสุด 8 ชั่วโมง';
-    if (hours == 0 && minutes < 10)
-      return '* หมายเหตุ: ตั้งเวลาขั้นต่ำ 10 นาที';
+    if (hours == 0 && minutes < 1) // 🌟 แก้จาก < 10 เป็น < 1
+      return '* หมายเหตุ: ตั้งเวลาขั้นต่ำ 1 นาที'; // 🌟 แก้ข้อความแจ้งเตือน
     return '';
   }
 

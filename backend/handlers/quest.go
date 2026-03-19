@@ -409,3 +409,251 @@ func CancelQuest(c *gin.Context) {
 		"message": "Quest cancelled successfully",
 	})
 }
+
+// ------------------------------------------------------------------------
+// 4. API: เริ่มภารกิจทันที (StartInstantQuest)
+// ------------------------------------------------------------------------
+type StartInstantQuestInput struct {
+	Name            string `json:"name" binding:"required"`
+	DurationMinutes int    `json:"duration_minutes" binding:"required"` // เช่น 60 สำหรับ 1 ชั่วโมง
+}
+
+// POST /quests/instant/start
+func StartInstantQuest(c *gin.Context) {
+	userIdVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	userIDStr := fmt.Sprintf("%v", userIdVal)
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	var input StartInstantQuestInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		return
+	}
+
+	ctx := context.Background()
+	tx, err := configs.DB.Begin(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction failed"})
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// 1. ตรวจสอบและหักตั๋ว (Item ID = 17)
+	var ticketQuantity int
+	checkTicketQuery := `SELECT quantity FROM public.collect WHERE user_id = $1 AND item_id = 17 FOR UPDATE`
+	err = tx.QueryRow(ctx, checkTicketQuery, userID).Scan(&ticketQuantity)
+	if err != nil || ticketQuantity <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Not enough QUEST_TICKET to start instant quest"})
+		return
+	}
+
+	// หักตั๋ว 1 ใบ
+	updateTicketQuery := `UPDATE public.collect SET quantity = quantity - 1 WHERE user_id = $1 AND item_id = 17`
+	_, err = tx.Exec(ctx, updateTicketQuery, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to consume ticket"})
+		return
+	}
+
+	// 2. คำนวณเวลาที่เควสจะสำเร็จ (ปัจจุบัน + จำนวนนาที)
+	now := time.Now()
+	dueDate := now.Add(time.Duration(input.DurationMinutes) * time.Minute)
+
+	// 3. สร้างเควสใหม่ประเภท "ทันที"
+	var questID int64
+	questType := "ทันที" 
+	detail := fmt.Sprintf("กิจกรรมจับเวลา: %d นาที", input.DurationMinutes)
+
+	insertQuestQuery := `
+		INSERT INTO public.quests (name, detail, start_date, due_date, type)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id;
+	`
+	err = tx.QueryRow(ctx, insertQuestQuery, input.Name, detail, now, dueDate, questType).Scan(&questID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create instant quest"})
+		return
+	}
+
+	// 4. ผูกเข้ากับผู้ใช้
+	insertDoQuestQuery := `INSERT INTO public.do_quests (user_id, quest_id, status) VALUES ($1, $2, 'in_progress');`
+	_, err = tx.Exec(ctx, insertDoQuestQuery, userID, questID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign quest to user"})
+		return
+	}
+
+	// 5. บันทึกของรางวัล (คำนวณแบบไดนามิกตามระยะเวลา)
+	baseCoin := 2000
+	baseExp := 120
+	energyTicket := 1
+
+	// 🌟 ลอจิกเพิ่มของรางวัล: ถ้าตั้งเวลาเกิน 15 นาที
+	if input.DurationMinutes > 15 {
+		// หารูปแบบรอบโบนัส (ทุกๆ 10 นาที)
+		extraIntervals := (input.DurationMinutes - 15) / 10
+		
+		// บวกโบนัสเข้าไปในฐาน
+		baseCoin += extraIntervals * 20
+		baseExp += extraIntervals * 1
+	}
+
+	insertReceiveQuery := `INSERT INTO public.receive (quest_id, item_id, quantity) VALUES ($1, $2, $3);`
+	rewards := []struct {
+		ItemID   int64
+		Quantity int
+	}{
+		{ItemID: 20, Quantity: baseCoin}, // 💰 COIN (คำนวณใหม่แล้ว)
+		{ItemID: 21, Quantity: energyTicket}, // 🎟️ ENERGY_TICKET
+		{ItemID: 22, Quantity: baseExp},  // 🟢 EXP (ID=22) (คำนวณใหม่แล้ว)
+	}
+
+	for _, reward := range rewards {
+		_, err = tx.Exec(ctx, insertReceiveQuery, questID, reward.ItemID, reward.Quantity)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to insert rewards"})
+			return
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction commit failed"})
+		return
+	}
+
+	// 🌟 ส่ง dueDate กลับไปให้แอป Flutter รู้ว่าต้องนับถอยหลังถึงตอนไหน
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Instant quest started",
+		"quest_id": questID,
+		"due_date": dueDate.Format(time.RFC3339),
+	})
+}
+
+// ------------------------------------------------------------------------
+// 5. API: ส่งภารกิจทันทีเมื่อหมดเวลา (CompleteInstantQuest)
+// ------------------------------------------------------------------------
+// POST /quests/instant/complete
+func CompleteInstantQuest(c *gin.Context) {
+	userIdVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	userIDStr := fmt.Sprintf("%v", userIdVal)
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	var input CompleteQuestInput // ใช้ Struct เดียวกับ CompleteNormalQuest ได้
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		return
+	}
+
+	ctx := context.Background()
+	tx, err := configs.DB.Begin(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction failed"})
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// 1. ดึงสถานะและเวลา Due Date ออกมาตรวจสอบ
+	var currentStatus string
+	var dueDate time.Time
+	checkQuery := `
+		SELECT dq.status, q.due_date 
+		FROM public.do_quests dq
+		JOIN public.quests q ON dq.quest_id = q.id
+		WHERE dq.user_id = $1 AND dq.quest_id = $2 
+		FOR UPDATE
+	`
+	err = tx.QueryRow(ctx, checkQuery, userID, input.QuestID).Scan(&currentStatus, &dueDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Quest not found"})
+		return
+	}
+
+	if currentStatus != "in_progress" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Quest is not in progress"})
+		return
+	}
+
+	// 🌟 2. ตรวจสอบว่าเวลาผ่านไปจนครบกำหนดหรือยัง (สำคัญมาก ป้องกันการโกง)
+	// อนุโลมให้ยิง API ก่อนเวลาหมดได้ 5 วินาที ป้องกันปัญหาเวลาของ Server กับมือถือเดินไม่เท่ากัน
+	if time.Now().Add(5 * time.Second).Before(dueDate) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Countdown is not finished yet"})
+		return
+	}
+
+	// 3. อัปเดตสถานะเป็น completed
+	updateQuestQuery := `UPDATE public.do_quests SET status = 'completed', completed_date = NOW() WHERE user_id = $1 AND quest_id = $2`
+	_, err = tx.Exec(ctx, updateQuestQuery, userID, input.QuestID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update status"})
+		return
+	}
+
+	// 4. แจกของรางวัล (ดึง Logic เดิมจาก CompleteNormalQuest มาใช้ได้เลย)
+	rewardQuery := `
+		SELECT r.item_id, r.quantity, i.name, i.image 
+		FROM public.receive r
+		JOIN public.items i ON r.item_id = i.id
+		WHERE r.quest_id = $1
+	`
+	rows, _ := tx.Query(ctx, rewardQuery, input.QuestID)
+	
+	type tempReward struct {
+		ItemID   int64
+		Quantity int
+		Name     string
+		Image    string
+	}
+	var pendingRewards []tempReward
+
+	for rows.Next() {
+		var itemID int64
+		var qty int
+		var namePtr, imagePtr *string
+		if err := rows.Scan(&itemID, &qty, &namePtr, &imagePtr); err == nil {
+			name := "Unknown"
+			if namePtr != nil { name = *namePtr }
+			imageStr := "assets/images/item/default_item.png"
+			if imagePtr != nil { imageStr = *imagePtr }
+			pendingRewards = append(pendingRewards, tempReward{ItemID: itemID, Quantity: qty, Name: name, Image: imageStr})
+		}
+	}
+	rows.Close()
+
+	var responseRewards []map[string]interface{}
+	for _, rw := range pendingRewards {
+		if rw.ItemID == 22 {
+			tx.Exec(ctx, `UPDATE public.characters SET experience = experience + $1 WHERE user_id = $2`, rw.Quantity, userID)
+		} else {
+			upsertQuery := `
+				INSERT INTO public.collect (user_id, item_id, quantity, acquired_date) VALUES ($1, $2, $3, NOW())
+				ON CONFLICT (user_id, item_id) DO UPDATE SET quantity = public.collect.quantity + EXCLUDED.quantity, acquired_date = NOW();
+			`
+			tx.Exec(ctx, upsertQuery, userID, rw.ItemID, rw.Quantity)
+		}
+		responseRewards = append(responseRewards, map[string]interface{}{"name": rw.Name, "added": rw.Quantity, "image": rw.Image})
+	}
+
+	tx.Commit(ctx)
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Instant quest completed",
+		"rewards": responseRewards,
+	})
+}
