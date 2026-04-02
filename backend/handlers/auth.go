@@ -140,8 +140,8 @@ func Me(c *gin.Context) {
 	query := `
 		SELECT 
 			u.id::text, u.email, COALESCE(u.name, ''), COALESCE(u.detail, ''),
-			c.level, c.experience, 
-			c.intelligence, c.strength, c.creative
+			COALESCE(c.level, 1), COALESCE(c.experience, 0), 
+			COALESCE(c.intelligence, 0), COALESCE(c.strength, 0), COALESCE(c.creative, 0)
 		FROM public.user_profiles u
 		LEFT JOIN public.characters c ON u.id = c.user_id
 		WHERE u.id = $1
@@ -187,6 +187,18 @@ func Me(c *gin.Context) {
 	// 3. Construct Response
 	// Note: Dart side expects snake_case keys for some reason (based on User.fromJson)
 	c.JSON(http.StatusOK, gin.H{
+		"id":              id,
+		"email":           email,
+		"username":        username,
+		"bio":             bio,
+		"level":           level,
+		"exp":             exp,
+		"stat_intellect":  intelligence,
+		"stat_strength":   strength,
+		"stat_creativity": creative,
+		"coins":           0, // Default placeholders
+		"tickets":         0,
+		"vouchers":        0,
 		"equipped_skin":   equipped["Skin"],
 		"equipped_hair":   equipped["Hair"],
 		"equipped_face":   equipped["Face"],
