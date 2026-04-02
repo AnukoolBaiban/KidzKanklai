@@ -7,7 +7,7 @@ class AppConfig {
   // ----------------------------------------------------------
 
   // [1] สำหรับการขึ้น Production (ดึง API จาก Render)
-  static const String baseUrl = 'https://your-backend-name.onrender.com'; // <--- เปลี่ยนตรงนี้เป็น URL จริงของคุณ
+  static const String baseUrl = 'https://kidzkanklai.onrender.com'; // <--- เปลี่ยนตรงนี้เป็น URL จริงของคุณ
 
   // [2] สำหรับ Chrome Web (บนคอมเครื่องเดียวกัน): ใช้ localhost
   // static const String baseUrl = 'http://localhost:8080';
