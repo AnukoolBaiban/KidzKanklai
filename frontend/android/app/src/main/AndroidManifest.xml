@@ -1,8 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     package="com.example.flutter_application_1">
+
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
-        android:label="flutter_application_1"
+        android:label="3K"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         tools:replace="android:label, android:icon">
