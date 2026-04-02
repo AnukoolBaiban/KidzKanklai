@@ -74,7 +74,11 @@ class EnergyBar extends StatelessWidget {
                   widthFactor: progress,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Color(0xFF7ED957),
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF85D755), Color(0xFF8EFF4C)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
                     ),
                   ),
                 ),

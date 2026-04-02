@@ -7,18 +7,20 @@ import 'dart:convert';
 import 'package:flutter_application_1/config/app_config.dart';
 import 'package:rive/rive.dart' hide LinearGradient, Image;
 import 'package:flutter_application_1/config/rive_cache.dart';
-import 'package:flutter_application_1/widgets/energy_bar.dart';
-import 'package:flutter_application_1/widgets/cost_display.dart';
+import 'package:flutter_application_1/widgets/chance_display.dart';
 import 'package:flutter_application_1/screens/result_stat.dart';
-import 'package:flutter_application_1/screens/exam.dart';
+import 'package:flutter_application_1/screens/result_exam.dart';
+import 'package:flutter_application_1/widgets/ticket_box.dart';
 
-class LocationUpgradeScreen extends StatefulWidget {
+enum StatType { level, intelligence, strength, creativity }
+
+class ExamScreen extends StatefulWidget {
   final api.User? user;
   final String locationName;
   final String locationImage;
   final Map<String, int> statusRewards;
 
-  const LocationUpgradeScreen({
+  const ExamScreen({
     Key? key,
     required this.user,
     required this.locationName,
@@ -27,10 +29,10 @@ class LocationUpgradeScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<LocationUpgradeScreen> createState() => _LocationUpgradeScreenState();
+  State<ExamScreen> createState() => _ExamScreenState();
 }
 
-class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
+class _ExamScreenState extends State<ExamScreen> {
   bool _isPressed = false;
   final SupabaseClient _supabase = Supabase.instance.client;
 
@@ -43,9 +45,9 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
   int _nextLevelExp = 40;
   double _expPercent = 0.0;
 
-  String _intStat = "10";
-  String _strStat = "10";
-  String _creStat = "10";
+  int _intStat = 10;
+  int _strStat = 10;
+  int _creStat = 10;
 
   SMINumber? _poseInput;
   SMINumber? _hairInput;
@@ -55,6 +57,42 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
   StateMachineController? _controller;
   api.User? _user;
   bool _isRiveLoaded = false;
+
+  // ค่า Requirements สำหรับแต่ละอาคาร
+  Map<String, Map<StatType, int>> _examRequirements = {
+    'ทดสอบวิทยาศาสตร์': {
+      StatType.level: 6,
+      StatType.intelligence: 10,
+      StatType.strength: 20,
+      StatType.creativity: 9,
+    },
+    'ทดสอบคณิตศาสตร์': {
+      StatType.level: 10,
+      StatType.intelligence: 15,
+      StatType.strength: 10,
+      StatType.creativity: 12,
+    },
+    'ทดสอบอังกฤษ': {
+      StatType.level: 5,
+      StatType.intelligence: 8,
+      StatType.strength: 4,
+      StatType.creativity: 6,
+    },
+  };
+  String _getStatName(StatType type) {
+    switch (type) {
+      case StatType.level:
+        return 'เลเวล';
+      case StatType.intelligence:
+        return 'ความฉลาด';
+      case StatType.strength:
+        return 'ความแข็งแรง';
+      case StatType.creativity:
+        return 'ความคิดสร้างสรรค์';
+    }
+  }
+
+  String? _selectedExam; // เก็บข้อสอบที่เลือก
 
   // Background paths สำหรับแต่ละสถานที่
   String get _backgroundPath {
@@ -143,9 +181,9 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
 
       if (charData != null) {
         setState(() {
-          _intStat = charData['intelligence'].toString();
-          _strStat = charData['strength'].toString();
-          _creStat = charData['creative'].toString();
+          _intStat = charData['intelligence'] ?? 10;
+          _strStat = charData['strength'] ?? 10;
+          _creStat = charData['creative'] ?? 10;
         });
 
         final dbLevel = charData['level'] as int? ?? 1;
@@ -245,9 +283,47 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
     }
   }
 
+  // ฟังก์ชันตรวจสอบว่าค่าสถานะเพียงพอหรือไม่
+  bool _meetsRequirement(StatType type, int required) {
+    switch (type) {
+      case StatType.level:
+        return _level >= required;
+      case StatType.intelligence:
+        return _intStat >= required;
+      case StatType.strength:
+        return _strStat >= required;
+      case StatType.creativity:
+        return _creStat >= required;
+    }
+  }
+
+  // ฟังก์ชันตรวจสอบว่าผ่านทุก requirement หรือไม่
+  bool _meetsAllRequirements(String examName) {
+    final requirements = _examRequirements[examName];
+    if (requirements == null) return true;
+
+    return requirements.entries.every(
+      (entry) => _meetsRequirement(entry.key, entry.value),
+    );
+  }
+
+  // คำนวณเปอร์เซ็นต์ความพร้อม
+  double _getReadinessPercentage(String examName) {
+    final requirements = _examRequirements[examName];
+    if (requirements == null) return 100.0;
+
+    int metCount = requirements.entries
+        .where((entry) => _meetsRequirement(entry.key, entry.value))
+        .length;
+
+    return (metCount / requirements.length) * 100;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
     final topPadding = MediaQuery.of(context).padding.top;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     final topBarHeight = 75.0 + topPadding;
 
@@ -276,19 +352,20 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
               padding: EdgeInsets.fromLTRB(24, 100, 24, 24),
               child: Column(
                 children: [
-                  /// Status Rewards Box
-                  _buildStatusRewardsBox(),
+                  /// Exam Buildings or Requirements Box
+                  if (widget.locationName == 'สนามสอบ')
+                    _buildExamMap()
+                  else
+                    _buildRequirementsBox(widget.locationName),
 
-                  if (widget.locationName != 'สนามสอบ') ...[
+                  SizedBox(height: 20),
+
+                  /// Requirements Box (แสดงเมื่อเลือกข้อสอบในแผนที่)
+                  if (widget.locationName == 'สนามสอบ' && _selectedExam != null)
+                    _buildRequirementsBox(_selectedExam!),
+
+                  if (widget.locationName == 'สนามสอบ' && _selectedExam != null)
                     SizedBox(height: 20),
-                    EnergyBar(
-                      energy: 80,
-                      maxEnergy: 100,
-                      ticket: 1,
-                      maxTicket: 5,
-                    ),
-                    SizedBox(height: 20),
-                  ],
 
                   /// Stat Box
                   _buildStatBox(),
@@ -306,6 +383,319 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
           _buildBlueHeader(topBarHeight),
         ],
       ),
+    );
+  }
+
+  /// 🆕 Requirements Box
+  /// 🆕 Requirements Box
+  Widget _buildRequirementsBox(String rawExamName) {
+    // แปลงชื่อให้ตรงกับ _examRequirements เสมอ
+    String examName = rawExamName;
+    if (rawExamName.contains('วิทย์')) examName = 'ทดสอบวิทยาศาสตร์';
+    if (rawExamName.contains('คณิต')) examName = 'ทดสอบคณิตศาสตร์';
+    if (rawExamName.contains('อังกฤษ')) examName = 'ทดสอบอังกฤษ';
+
+    final requirements = _examRequirements[examName] ?? {};
+    final readiness = _getReadinessPercentage(examName);
+    final canStart = _meetsAllRequirements(examName);
+
+    final statOrder = [
+      StatType.level,
+      StatType.intelligence,
+      StatType.strength,
+      StatType.creativity,
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.95),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Color(0xFF9DD0E7), width: 2),
+      ),
+      child: Column(
+        children: [
+          /// Header
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF2374B5), Color.fromARGB(255, 127, 179, 202)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(14),
+                topRight: Radius.circular(14),
+              ),
+            ),
+            child: Center(
+              child: Text(
+                'ค่าสถานะที่ต้องการ',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              children: [
+                /// 🔥 4 ช่องเสมอ
+                ...statOrder.map((type) {
+                  return _buildRequirementRow(
+                    type: type,
+                    required: requirements[type] ?? -1,
+                  );
+                }).toList(),
+
+                SizedBox(height: 16),
+
+                /// ของรางวัล
+                Text(
+                  'ของรางวัล',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+                SizedBox(height: 8),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildRewardItem('assets/images/item/EXP.png', '+59', 1.0),
+                    SizedBox(width: 10),
+                    _buildRewardItem('assets/images/item/Gasha.png', 'x1', 1.0),
+                  ],
+                ),
+
+                SizedBox(height: 16),
+
+                Column(
+                  children: [
+                    ChanceDisplay(chancePercent: readiness.toInt()),
+                    SizedBox(height: 8),
+                    _buildExamStartButton(canStart, examName),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRewardItem(String imagePath, String text, double scale) {
+    return Container(
+      width: 60,
+      padding: EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Item Image
+          Image.asset(
+            imagePath,
+            width: 40 * scale,
+            height: 40 * scale,
+            fit: BoxFit.contain,
+          ),
+          SizedBox(height: 4 * scale),
+          // Amount below image
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12 * scale,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 🆕 Requirement Row
+  Widget _buildRequirementRow({required StatType type, required int required}) {
+    bool isMet = required < 0 ? true : _meetsRequirement(type, required);
+
+    int currentValue;
+    switch (type) {
+      case StatType.level:
+        currentValue = _level;
+        break;
+      case StatType.intelligence:
+        currentValue = _intStat;
+        break;
+      case StatType.strength:
+        currentValue = _strStat;
+        break;
+      case StatType.creativity:
+        currentValue = _creStat;
+        break;
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: 5),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Color(0xFFE0E0E0), width: 1.5),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              _getStatName(type),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: Color(0xFF000000),
+              ),
+            ),
+            required > 0
+                ? Text.rich(
+                    TextSpan(
+                      text: '> ',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Colors.black,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: '$required',
+                          style: TextStyle(
+                            color: isMet ? Colors.green : Colors.red,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : Text(
+                    '-',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Colors.black,
+                    ),
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 🆕 Exam Start Button
+  Widget _buildExamStartButton(bool canStart, String examName) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: 180,
+          height: 48,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF556AEB), Color(0xFF59ABEC)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            borderRadius: BorderRadius.circular(25),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0xFF556AEB).withOpacity(0.4),
+                blurRadius: 8,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ElevatedButton(
+            onPressed: () {
+              // Navigate to exam
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ResultExamScreen(
+                    statusRewards: {
+                      'ความฉลาด': 5,
+                      'ความแข็งแรง': 2,
+                      'ความคิดสร้างสรรค์': 3,
+                    },
+                    isPassed: true,
+                  ),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              disabledBackgroundColor: Colors.transparent,
+              padding: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(25),
+              ),
+            ),
+            child: Text(
+              'เริ่มสอบ',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
+        // ตั๋วใหญ่ขึ้นและอยู่ขอบๆ
+        Positioned(
+          top: -12,
+          right: -10,
+          child: TicketBox(
+            slant: 12,
+            borderRadius: 4,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    'assets/images/item/Ticket_exam_img.png',
+                    width: 20,
+                    height: 10,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    "-1",
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -351,17 +741,13 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
               bottom: 0,
               child: Center(child: _buildBackButton()),
             ),
-            Positioned.fill(
-              child: Align(
-                alignment: Alignment.center,
-                child: Text(
-                  widget.locationName,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+            Center(
+              child: Text(
+                widget.locationName,
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -399,8 +785,6 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
       case 'สวนสาธารณะ':
         displayRewards = {'พลังงาน': 20};
         break;
-      case 'สนามสอบ':
-        return _buildExamMap();
       default:
         displayRewards = widget.statusRewards;
     }
@@ -421,8 +805,9 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ///EADER (Gradient)
+          ///HEADER (Gradient)
           Container(
             width: double.infinity,
             padding: EdgeInsets.symmetric(
@@ -431,7 +816,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
             ),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFF2374B5), Color.fromARGB(255, 127, 179, 202)],
+                colors: [Color(0xFF2374B5), Color(0xFF9DD0E7)],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
@@ -441,7 +826,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
               ),
             ),
             child: Text(
-              'ค่าสถานะที่ให้เมื่อทำกิจกรรมสำเร็จ',
+              'ค่าสถานะที่ต้องการ',
               style: TextStyle(
                 fontSize: 16 * scale,
                 fontWeight: FontWeight.bold,
@@ -450,7 +835,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
             ),
           ),
 
-          /// 🔷 CONTENT
+          /// CONTENT
           Padding(
             padding: EdgeInsets.all(16 * scale),
             child: Column(
@@ -492,7 +877,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF000000),
+                color: Color(0xFF002A50),
               ),
             ),
             Text(
@@ -515,68 +900,96 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
 
     return Container(
       padding: EdgeInsets.all(20),
-      child: Column(
+      child: Stack(
+        // 🔥 ต้องมี Stack
         children: [
-          // Cost Display
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Column(
             children: [
-              Center(
-                child: CostDisplayWidget(
-                  energyCost: 20,
-                  ticketCost: 1,
-                  showTicket: true,
-                  showEnergy: !isPark,
+              /// Cost Display
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Center(
+                    child: ChanceDisplay(
+                      energyCost: 20,
+                      ticketCost: 1,
+                      showTicket: true,
+                      showEnergy: !isPark,
+                    ),
+                  ),
+                ],
+              ),
+
+              SizedBox(height: 20),
+
+              /// ปุ่ม Start
+              Container(
+                width: double.infinity,
+                height: 50,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF556AEB), Color(0xFF59ABEC)],
+                  ),
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ResultStatScreen(
+                          statusRewards: widget.statusRewards,
+                        ),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                  ),
+                  child: Text(
+                    'เริ่มสอบ',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
 
-          SizedBox(height: 20),
-
-          // ✅ ปุ่ม Start (แก้ตรงนี้)
-          Container(
-            width: 180,
-          height: 48,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF556AEB), Color(0xFF59ABEC)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: [
-                BoxShadow(
-                  color: Color(0xFF4A8FE7).withOpacity(0.4),
-                  blurRadius: 8,
-                  offset: Offset(0, 4),
+          /// 🔥 Badge (ถูกต้องแล้ว)
+          Positioned(
+            top: 0,
+            right: 0,
+            child: TicketBox(
+              slant: 12,
+              borderRadius: 4,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 15,
+                  vertical: 4,
                 ),
-              ],
-            ),
-            child: ElevatedButton(
-              onPressed: () {
-                // 🔥 ไปหน้า Result
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        ResultStatScreen(statusRewards: widget.statusRewards),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                shadowColor: Colors.transparent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25),
-                ),
-              ),
-              child: Text(
-                'เริ่มทำกิจกรรม',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      'assets/images/item/Ticket_exam_img.png',
+                      width: 20,
+                      height: 10,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      "-1",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -642,19 +1055,19 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                           _buildStatRowWithIcon(
                             'assets/images/profile/stat-int-img.png',
                             "ความฉลาด",
-                            _intStat,
+                            _intStat.toString(),
                           ),
                           const SizedBox(height: 8),
                           _buildStatRowWithIcon(
                             'assets/images/profile/stat-str-img.png',
                             "ความแข็งแรง",
-                            _strStat,
+                            _strStat.toString(),
                           ),
                           const SizedBox(height: 8),
                           _buildStatRowWithIcon(
                             'assets/images/profile/stat-cre-img.png',
                             "ความคิดสร้างสรรค์",
-                            _creStat,
+                            _creStat.toString(),
                           ),
                         ],
                       ),
@@ -670,45 +1083,39 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
   }
 
   Widget _buildExamMap() {
-    return SizedBox(
-      height: 380,
-      width: double.infinity,
-      child: Stack(
-        clipBehavior: Clip.none,
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Color(0xFF9DD0E7), width: 2),
+      ),
+      child: Column(
         children: [
-          // อาคารบนซ้าย (วิทย์)
-          Positioned(
-            top: 40,
-            left: 0,
-            child: _buildExamBuilding(
-              label: 'ตึกสอบวิทยาศาสตร์',
-              image: 'assets/images/map/sci_building.png',
-              stat: {'ความฉลาด': 1, 'ความแข็งแรง': 0, 'ความคิดสร้างสรรค์': 0},
-              width: 140,
-            ),
-          ),
-          // อาคารบนขวา (คณิต)
-          Positioned(
-            top: 0,
-            right: 0,
-            child: _buildExamBuilding(
-              label: 'ตึกสอบคณิตศาสตร์',
-              image: 'assets/images/map/math_building.png',
-              stat: {'ความฉลาด': 2, 'ความแข็งแรง': 0, 'ความคิดสร้างสรรค์': 0},
-              width: 130,
-            ),
+          // อาคารบน (วิทย์ / คณิต)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildExamBuilding(
+                label: 'ทดสอบวิทยาศาสตร์',
+                image: 'assets/images/map/sci_building.png',
+                stat: {'ความฉลาด': 1, 'ความแข็งแรง': 0, 'ความคิดสร้างสรรค์': 0},
+              ),
+              _buildExamBuilding(
+                label: 'ทดสอบคณิตศาสตร์',
+                image: 'assets/images/map/math_building.png',
+                stat: {'ความฉลาด': 2, 'ความแข็งแรง': 0, 'ความคิดสร้างสรรค์': 0},
+              ),
+            ],
           ),
 
+          SizedBox(height: 20),
+
           // อาคารล่าง (อังกฤษ)
-          Positioned(
-            top: 170,
-            right: 30,
-            child: _buildExamBuilding(
-              label: 'ตึกสอบอังกฤษ',
-              image: 'assets/images/map/eng_building.png',
-              stat: {'ความฉลาด': 1, 'ความแข็งแรง': 0, 'ความคิดสร้างสรรค์': 1},
-              width: 160,
-            ),
+          _buildExamBuilding(
+            label: 'ทดสอบอังกฤษ',
+            image: 'assets/images/map/eng_building.png',
+            stat: {'ความฉลาด': 1, 'ความแข็งแรง': 0, 'ความคิดสร้างสรรค์': 1},
           ),
         ],
       ),
@@ -719,50 +1126,53 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
     required String label,
     required String image,
     required Map<String, int> stat,
-    double width = 120,
   }) {
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) =>
-                ExamScreen(
-                  user: _user,
-                  locationName: label,
-                  locationImage: image,
-                  statusRewards: stat,
-                ),
-          ),
-        );
+        setState(() {
+          _selectedExam = label;
+        });
       },
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            width: 120,
+            height: 120,
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(20),
+              border: _selectedExam == label
+                  ? Border.all(color: Color(0xFF2374B5), width: 3)
+                  : null,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black26,
+                  color: Colors.black.withOpacity(0.1),
                   blurRadius: 4,
                   offset: Offset(0, 2),
                 ),
               ],
             ),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.asset(
+                image,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(Icons.home, size: 50);
+                },
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          Image.asset(
-            image,
-            width: width,
-            fit: BoxFit.contain,
+
+          const SizedBox(height: 6),
+
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: _selectedExam == label ? Color(0xFF2374B5) : Colors.black,
+            ),
           ),
         ],
       ),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// Widget แสดง Cost แบบมีหางชี้ (Speech Bubble)
-class CostDisplayWidget extends StatelessWidget {
+class ChanceDisplay extends StatelessWidget {
   final int energyCost;
   final int ticketCost;
   final bool showTicket;
@@ -9,8 +9,9 @@ class CostDisplayWidget extends StatelessWidget {
   final Color borderColor;
   final double borderWidth;
   final bool showEnergy;
+  final int chancePercent;
 
-  const CostDisplayWidget({
+  const ChanceDisplay({
     Key? key,
     this.energyCost = 20,
     this.ticketCost = 1,
@@ -19,56 +20,45 @@ class CostDisplayWidget extends StatelessWidget {
     this.backgroundColor = Colors.white,
     this.borderColor = Colors.black,
     this.borderWidth = 1.0,
+    this.chancePercent = 50, // 🔥 default
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
       painter: SpeechBubblePainter(
-        backgroundColor: backgroundColor,
+        backgroundColor: _getChanceColor(),
         borderColor: borderColor,
         borderWidth: borderWidth,
       ),
       child: Container(
-        padding: EdgeInsets.fromLTRB(12, 8, 12, 16),
+        padding: EdgeInsets.fromLTRB(20, 10, 20, 22),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Energy Box
-            if (showEnergy)
-              _buildCostItem(
-                icon: 'assets/images/item/energy.png',
-                value: '-$energyCost',
-                fallbackIcon: Icons.flash_on,
-                fallbackColor: Colors.yellow,
+            Text(
+              'โอกาสผ่าน $chancePercent%',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
-
-            if (showTicket) ...[
-              if (showEnergy) ...[
-                SizedBox(width: 8),
-                Text(
-                  'และ',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                SizedBox(width: 8),
-              ],
-
-              _buildCostItem(
-                icon: 'assets/images/item/Ticket_energy_img.png',
-                value: '-$ticketCost',
-                fallbackIcon: Icons.confirmation_number,
-                fallbackColor: Colors.green,
-              ),
-            ],
+            ),
           ],
         ),
       ),
     );
   }
+
+  Color _getChanceColor() {
+  if (chancePercent < 40) {
+    return Color(0xFFE94444); // 🔴 ต่ำ
+  } else if (chancePercent < 70) {
+    return Color(0xFFFFC300); // 🟡 กลาง
+  } else {
+    return Color(0xFF48BA05); // 🟢 สูง
+  }
+}
 
   Widget _buildCostItem({
     required String icon,
@@ -77,23 +67,23 @@ class CostDisplayWidget extends StatelessWidget {
     required Color fallbackColor,
   }) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Image.asset(
             icon,
-            width: 20,
-            height: 20,
+            width: 24,
+            height: 24,
             errorBuilder: (context, error, stackTrace) {
-              return Icon(fallbackIcon, color: fallbackColor, size: 20);
+              return Icon(fallbackIcon, color: fallbackColor, size: 24);
             },
           ),
-          SizedBox(width: 4),
+          SizedBox(width: 6),
           Text(
             value,
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
               color: Colors.black,
             ),
@@ -118,9 +108,9 @@ class SpeechBubblePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final radius = 12.0;
-    final tailHeight = 8.0;
-    final tailWidth = 14.0;
+    final radius = 16.0;
+    final tailHeight = 12.0;
+    final tailWidth = 20.0;
 
     final bubbleHeight = size.height - tailHeight;
     final tailStartX = size.width / 2 - tailWidth / 2;
