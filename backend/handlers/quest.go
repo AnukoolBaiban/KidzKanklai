@@ -41,20 +41,14 @@ func CreateNormalQuest(c *gin.Context) {
 		return
 	}
 
-	// 🌟 1. โหลดโซนเวลาประเทศไทย (UTC+7)
 	loc, err := time.LoadLocation("Asia/Bangkok")
 	if err != nil {
-		// กันเหนียว กรณีเครื่องเซิร์ฟเวอร์ไม่มีข้อมูล Timezone 
 		loc = time.FixedZone("UTC+7", 7*3600) 
 	}
 
 	var dueDate time.Time
-
-	// 🌟 2. ลองแปลงแบบมีเวลาก่อน (เผื่ออนาคตแอปส่งเวลามาด้วย)
 	dueDate, err = time.Parse(time.RFC3339, dueDateStr)
 	if err != nil {
-		// 🌟 3. ถ้าแอปส่งมาแค่วันที่ (เช่น "2026-03-18") 
-		// คำสั่งนี้จะล็อกให้เป็น 00:00:00 ของเวลาไทยทันที!
 		dueDate, err = time.ParseInLocation("2006-01-02", dueDateStr, loc)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Due Date format. Use YYYY-MM-DD"})
@@ -68,56 +62,53 @@ func CreateNormalQuest(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction failed"})
 		return
 	}
-	defer tx.Rollback(ctx) // ถ้าพังระหว่างทาง จะ Rollback ทุกอย่าง
+	defer tx.Rollback(ctx)
 
-	// 🌟 1.0 ตรวจสอบและหักตั๋ว (Item ID = 17) ก่อนทำอย่างอื่น 🌟
+	// 🌟 1.0 ตรวจสอบตั๋ว (สร้างตัวแปร hasTicket มาเก็บสถานะว่ามีตั๋วหรือไม่)
 	var ticketQuantity int
+	hasTicket := true // ตั้งค่าเริ่มต้นว่ามีตั๋ว
+
 	checkTicketQuery := `
 		SELECT quantity 
 		FROM public.collect 
 		WHERE user_id = $1 AND item_id = 17 
 		FOR UPDATE
 	`
-	// ค้นหาตั๋วในกระเป๋า
 	err = tx.QueryRow(ctx, checkTicketQuery, userID).Scan(&ticketQuantity)
 	if err != nil || ticketQuantity <= 0 {
-		// ไม่มีตั๋วในตาราง หรือ มีแต่ค่า <= 0
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Not enough QUEST_TICKET to create a quest"})
-		return
+		// 🌟 ถ้าไม่มีตั๋วหรือน้อยกว่า 0 ให้เปลี่ยนสถานะ แต่ "ไม่ Return Error กลับไป" เพื่อให้สร้างเควสต่อได้
+		hasTicket = false
 	}
 
-	// หักตั๋ว 1 ใบ
-	updateTicketQuery := `
-		UPDATE public.collect 
-		SET quantity = quantity - 1 
-		WHERE user_id = $1 AND item_id = 17
-	`
-	_, err = tx.Exec(ctx, updateTicketQuery, userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to consume QUEST_TICKET"})
-		return
+	// 🌟 ถ้ามีตั๋ว ถึงจะทำการหักตั๋ว
+	if hasTicket {
+		updateTicketQuery := `
+			UPDATE public.collect 
+			SET quantity = quantity - 1 
+			WHERE user_id = $1 AND item_id = 17
+		`
+		_, err = tx.Exec(ctx, updateTicketQuery, userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to consume QUEST_TICKET"})
+			return
+		}
 	}
 
-	// 🌟 จัดการอัปโหลดรูปภาพขึ้น Cloudinary (หลังจากเช็คตั๋วผ่านแล้ว) 🌟
 	var imageUrlPtr *string
 	file, _, err := c.Request.FormFile("image") 
 	
 	if err == nil { 
 		defer file.Close()
-
 		cloudinaryURL := os.Getenv("CLOUDINARY_URL")
 		if cloudinaryURL == "" {
-			fmt.Println("❌ Error: CLOUDINARY_URL is missing in .env file")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Server configuration error"})
 			return
 		}
-
 		cld, err := cloudinary.NewFromURL(cloudinaryURL)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize Cloudinary"})
 			return
 		}
-
 		resp, err := cld.Upload.Upload(ctx, file, uploader.UploadParams{
 			Folder: "KidzKanKlai/quests", 
 		})
@@ -125,7 +116,6 @@ func CreateNormalQuest(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image"})
 			return
 		}
-		
 		url := resp.SecureURL 
 		imageUrlPtr = &url
 	}
@@ -138,7 +128,6 @@ func CreateNormalQuest(c *gin.Context) {
 	var questID int64
 	questType := "ทั่วไป" 
 
-	// 1.1 Insert ลงตาราง quests
 	insertQuestQuery := `
 		INSERT INTO public.quests (name, detail, image, start_date, due_date, type)
 		VALUES ($1, $2, $3, NOW(), $4, $5)
@@ -150,7 +139,6 @@ func CreateNormalQuest(c *gin.Context) {
 		return
 	}
 
-	// 1.2 ผูกภารกิจนี้ให้คนที่สร้าง
 	insertDoQuestQuery := `
 		INSERT INTO public.do_quests (user_id, quest_id, status)
 		VALUES ($1, $2, 'in_progress');
@@ -161,33 +149,33 @@ func CreateNormalQuest(c *gin.Context) {
 		return
 	}
 
-	// 1.3 บันทึกของรางวัลทั้งหมดลงตาราง receive 
-	insertReceiveQuery := `
-		INSERT INTO public.receive (quest_id, item_id, quantity)
-		VALUES ($1, $2, $3);
-	`
-	rewards := []struct {
-		ItemID   int64
-		Quantity int
-	}{
-		{ItemID: 20, Quantity: 1500}, // 💰 COIN
-		{ItemID: 21, Quantity: 1},    // 🎟️ ENERGY_TICKET
-		{ItemID: 22, Quantity: 100},  // 🟢 EXP (ID=22)
-	}
+	// 🌟 1.3 บันทึกของรางวัล (เฉพาะคนที่มีตั๋วเท่านั้นถึงจะได้ของรางวัล!)
+	if hasTicket {
+		insertReceiveQuery := `
+			INSERT INTO public.receive (quest_id, item_id, quantity)
+			VALUES ($1, $2, $3);
+		`
+		rewards := []struct {
+			ItemID   int64
+			Quantity int
+		}{
+			{ItemID: 20, Quantity: 1500}, // 💰 COIN
+			{ItemID: 21, Quantity: 1},    // 🎟️ ENERGY_TICKET
+			{ItemID: 22, Quantity: 100},  // 🟢 EXP (ID=22)
+		}
 
-	for _, reward := range rewards {
-		_, err = tx.Exec(ctx, insertReceiveQuery, questID, reward.ItemID, reward.Quantity)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to insert rewards"})
-			return
+		for _, reward := range rewards {
+			_, err = tx.Exec(ctx, insertReceiveQuery, questID, reward.ItemID, reward.Quantity)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to insert rewards"})
+				return
+			}
 		}
 	}
 
-	// 🌟 ทริกเกอร์เควสระบบ: บวกความคืบหน้าเควส ID 10001 (สร้างเควสทั่วไป)
 	IncrementSystemQuestProgress(ctx, tx, userID, 10001)
 	IncrementSystemQuestProgress(ctx, tx, userID, 10004)
 
-	// ยืนยัน Transaction (บันทึกเควส + หักตั๋วเสร็จสมบูรณ์)
 	if err := tx.Commit(ctx); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction commit failed"})
 		return
@@ -455,28 +443,30 @@ func StartInstantQuest(c *gin.Context) {
 	}
 	defer tx.Rollback(ctx)
 
-	// 1. ตรวจสอบและหักตั๋ว (Item ID = 17)
+	// 🌟 1. ตรวจสอบตั๋ว
 	var ticketQuantity int
+	hasTicket := true
+
 	checkTicketQuery := `SELECT quantity FROM public.collect WHERE user_id = $1 AND item_id = 17 FOR UPDATE`
 	err = tx.QueryRow(ctx, checkTicketQuery, userID).Scan(&ticketQuantity)
 	if err != nil || ticketQuantity <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Not enough QUEST_TICKET to start instant quest"})
-		return
+		// 🌟 ถ้าไม่มีตั๋ว ให้สร้างได้แต่จะไม่ได้ของรางวัล
+		hasTicket = false
 	}
 
-	// หักตั๋ว 1 ใบ
-	updateTicketQuery := `UPDATE public.collect SET quantity = quantity - 1 WHERE user_id = $1 AND item_id = 17`
-	_, err = tx.Exec(ctx, updateTicketQuery, userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to consume ticket"})
-		return
+	// 🌟 ถ้ามีตั๋ว ถึงจะหัก
+	if hasTicket {
+		updateTicketQuery := `UPDATE public.collect SET quantity = quantity - 1 WHERE user_id = $1 AND item_id = 17`
+		_, err = tx.Exec(ctx, updateTicketQuery, userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to consume ticket"})
+			return
+		}
 	}
 
-	// 2. คำนวณเวลาที่เควสจะสำเร็จ (ปัจจุบัน + จำนวนนาที)
 	now := time.Now()
 	dueDate := now.Add(time.Duration(input.DurationMinutes) * time.Minute)
 
-	// 3. สร้างเควสใหม่ประเภท "ทันที"
 	var questID int64
 	questType := "ทันที" 
 	detail := fmt.Sprintf("กิจกรรมจับเวลา: %d นาที", input.DurationMinutes)
@@ -492,7 +482,6 @@ func StartInstantQuest(c *gin.Context) {
 		return
 	}
 
-	// 4. ผูกเข้ากับผู้ใช้
 	insertDoQuestQuery := `INSERT INTO public.do_quests (user_id, quest_id, status) VALUES ($1, $2, 'in_progress');`
 	_, err = tx.Exec(ctx, insertDoQuestQuery, userID, questID)
 	if err != nil {
@@ -500,36 +489,34 @@ func StartInstantQuest(c *gin.Context) {
 		return
 	}
 
-	// 5. บันทึกของรางวัล (คำนวณแบบไดนามิกตามระยะเวลา)
-	baseCoin := 2000
-	baseExp := 120
-	energyTicket := 1
+	// 🌟 5. บันทึกของรางวัล (ทำเฉพาะคนที่มีตั๋ว!)
+	if hasTicket {
+		baseCoin := 2000
+		baseExp := 120
+		energyTicket := 1
 
-	// 🌟 ลอจิกเพิ่มของรางวัล: ถ้าตั้งเวลาเกิน 15 นาที
-	if input.DurationMinutes > 15 {
-		// หารูปแบบรอบโบนัส (ทุกๆ 10 นาที)
-		extraIntervals := (input.DurationMinutes - 15) / 10
-		
-		// บวกโบนัสเข้าไปในฐาน
-		baseCoin += extraIntervals * 20
-		baseExp += extraIntervals * 1
-	}
+		if input.DurationMinutes > 15 {
+			extraIntervals := (input.DurationMinutes - 15) / 10
+			baseCoin += extraIntervals * 20
+			baseExp += extraIntervals * 1
+		}
 
-	insertReceiveQuery := `INSERT INTO public.receive (quest_id, item_id, quantity) VALUES ($1, $2, $3);`
-	rewards := []struct {
-		ItemID   int64
-		Quantity int
-	}{
-		{ItemID: 20, Quantity: baseCoin}, // 💰 COIN (คำนวณใหม่แล้ว)
-		{ItemID: 21, Quantity: energyTicket}, // 🎟️ ENERGY_TICKET
-		{ItemID: 22, Quantity: baseExp},  // 🟢 EXP (ID=22) (คำนวณใหม่แล้ว)
-	}
+		insertReceiveQuery := `INSERT INTO public.receive (quest_id, item_id, quantity) VALUES ($1, $2, $3);`
+		rewards := []struct {
+			ItemID   int64
+			Quantity int
+		}{
+			{ItemID: 20, Quantity: baseCoin},
+			{ItemID: 21, Quantity: energyTicket},
+			{ItemID: 22, Quantity: baseExp},
+		}
 
-	for _, reward := range rewards {
-		_, err = tx.Exec(ctx, insertReceiveQuery, questID, reward.ItemID, reward.Quantity)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to insert rewards"})
-			return
+		for _, reward := range rewards {
+			_, err = tx.Exec(ctx, insertReceiveQuery, questID, reward.ItemID, reward.Quantity)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to insert rewards"})
+				return
+			}
 		}
 	}
 
@@ -538,7 +525,6 @@ func StartInstantQuest(c *gin.Context) {
 		return
 	}
 
-	// 🌟 ส่ง dueDate กลับไปให้แอป Flutter รู้ว่าต้องนับถอยหลังถึงตอนไหน
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "Instant quest started",

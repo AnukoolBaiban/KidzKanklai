@@ -9,6 +9,7 @@ import 'package:flutter_application_1/widgets/confirm_giveup_popup.dart';
 import 'package:flutter_application_1/widgets/mission_fail_popup.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_application_1/widgets/reward_popup.dart';
+import 'package:flutter_application_1/screens/setting.dart';
 
 class CountdownQuestScreen extends StatefulWidget {
   final User? user;
@@ -156,24 +157,49 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
     final rewards = await ApiService.completeInstantQuest(_currentQuestId!);
     setState(() => _isLoadingAPI = false);
 
+    // 🌟 เช็คว่า API ทำงานสำเร็จ (ไม่เป็น null)
     if (rewards != null && mounted) {
-      // แปลงของรางวัลและโชว์ Popup
-      List<RewardData> popupRewards = rewards.map<RewardData>((rw) {
-        return RewardData(
-          type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM',
-          amount: rw['added'],
-          itemName: rw['name'],
-          itemImage: rw['image'],
+      
+      // 🌟 เช็คว่ามีของรางวัลให้แจกจริงๆ หรือไม่ (ป้องกันกรณีสร้างตอนตั๋วหมด)
+      if (rewards.isNotEmpty) {
+        // แปลงของรางวัลและโชว์ Popup
+        List<RewardData> popupRewards = rewards.map<RewardData>((rw) {
+          return RewardData(
+            type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM',
+            amount: rw['added'],
+            itemName: rw['name'],
+            itemImage: rw['image'],
+          );
+        }).toList();
+
+        // 🌟 1. ใช้ await เพื่อหยุดรอจนกว่าผู้ใช้จะกด "ปิด" หน้าต่างรับของรางวัล
+        await RewardPopup.show(context, rewards: popupRewards);
+      } else {
+        // 🌟 กรณีไม่มีของรางวัล โชว์แค่แจ้งเตือนสีเขียวก็พอ
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ทำภารกิจสำเร็จ!'),
+            backgroundColor: Colors.green,
+          ),
         );
-      }).toList();
+        // หน่วงเวลาให้อ่านแจ้งเตือนแป๊บนึง
+        await Future.delayed(const Duration(seconds: 1));
+      }
 
-      // 🌟 1. ใช้ await เพื่อหยุดรอจนกว่าผู้ใช้จะกด "ปิด" หน้าต่างรับของรางวัล
-      await RewardPopup.show(context, rewards: popupRewards);
-
-      // 🌟 2. เมื่อ Popup ถูกปิดแล้ว ให้ Pop หน้าต่างนับเวลา (หน้านี้) ทิ้ง 
-      // ระบบจะเด้งกลับไปที่หน้า All Quest ที่อยู่ข้างใต้ และรีเฟรชข้อมูลให้เองอัตโนมัติ
+      // 🌟 2. เมื่อ Popup ปิดลง หรือแจ้งเตือนจบแล้ว ให้ Pop หน้าต่างนับเวลาทิ้ง 
+      // ระบบจะเด้งกลับไปที่หน้า All Quest และรีเฟรชข้อมูลให้เองอัตโนมัติ
       if (mounted) {
         Navigator.pop(context, true); 
+      }
+    } else {
+      // ❌ กรณี Error จาก API
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('เกิดข้อผิดพลาดในการส่งภารกิจ'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -304,7 +330,15 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
         child: CustomTopBar(
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
-          onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
+          onSettingsTapped: () {
+            // 🌟 เปลี่ยนมาใช้ push แบบ MaterialPageRoute เพื่อแอบส่งค่า hideLogout = true ไปให้หน้า Setting
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const SettingScreen(hideLogout: true),
+              ),
+            );
+          },
         ),
       ),
     );

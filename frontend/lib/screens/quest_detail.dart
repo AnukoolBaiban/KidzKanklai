@@ -623,28 +623,41 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
           Navigator.pop(context);
         }
 
-        // 🌟 3. ถ้า API ทำงานสำเร็จ
-        if (apiRewards != null && apiRewards.isNotEmpty && mounted) {
+        // 🌟 3. ถ้า API ทำงานสำเร็จ (apiRewards ไม่ใช่ null)
+        if (apiRewards != null && mounted) {
           
-          List<RewardData> popupRewards = apiRewards.map<RewardData>((rw) {
-            return RewardData(
-              type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM',
-              amount: rw['added'],
-              itemName: rw['name'],
-              itemImage: rw['image'], 
+          // 🌟 เช็คว่ามีของรางวัลให้โชว์หรือไม่
+          if (apiRewards.isNotEmpty) {
+            List<RewardData> popupRewards = apiRewards.map<RewardData>((rw) {
+              return RewardData(
+                type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM',
+                amount: rw['added'],
+                itemName: rw['name'],
+                itemImage: rw['image'], 
+              );
+            }).toList();
+
+            // ใช้ await หยุดรอจนกว่าผู้ใช้จะกดปิด Popup รับของรางวัล
+            await RewardPopup.show(context, rewards: popupRewards);
+          } else {
+            // 🌟 กรณีที่ทำสำเร็จแต่ไม่มีของรางวัล (เช่น สร้างตอนตั๋วหมด) ให้แจ้งเตือนสีเขียวแทน
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('ทำภารกิจสำเร็จ!'),
+                backgroundColor: Colors.green,
+              ),
             );
-          }).toList();
+            // หน่วงเวลาให้ผู้ใช้อ่าน SnackBar แป๊บนึงก่อนเด้งออก
+            await Future.delayed(const Duration(seconds: 1));
+          }
 
-          // 🌟 4. ใช้ await หยุดรอจนกว่าผู้ใช้จะกดปิด Popup รับของรางวัล
-          await RewardPopup.show(context, rewards: popupRewards);
-
-          // 🌟 5. เมื่อ Popup รางวัลปิดลงแล้ว ให้เด้งกลับหน้า All Quest พร้อมส่งค่า true ไปรีเฟรช
+          // 🌟 5. เด้งกลับหน้า All Quest พร้อมส่งค่า true ไปรีเฟรช
           if (mounted) {
             Navigator.pop(context, true); 
           }
 
         } else {
-          // ❌ กรณีส่งล้มเหลว
+          // ❌ กรณีส่งล้มเหลว (apiRewards เป็น null จริงๆ)
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(

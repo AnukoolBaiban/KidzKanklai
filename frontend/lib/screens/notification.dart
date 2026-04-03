@@ -215,14 +215,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
               onTapUp: (_) {},
               onTapCancel: () => setState(() => _isPressed = false),
               onTap: () async {
-                await Future.delayed(const Duration(milliseconds: 200));
+                // หน่วงเวลาให้เห็น Animation ปุ่มยุบตัวนิดนึง
+                await Future.delayed(const Duration(milliseconds: 150));
                 if (!mounted) return;
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LobbyScreen()),
-                ).then((_) {
-                  setState(() => _isPressed = false);
-                });
+                
+                setState(() => _isPressed = false);
+
+                // 🌟 ใช้คำสั่ง pop เพื่อปิดหน้า Setting ทิ้ง ระบบจะเผยให้เห็นหน้าก่อนหน้าอัตโนมัติ
+                Navigator.pop(context); 
               },
               child: Image.asset(
                 _isPressed

@@ -8,7 +8,8 @@ import 'package:flutter_application_1/widgets/custom_top_bar.dart';
 
 class SettingScreen extends StatefulWidget {
   final api.User? user;
-  const SettingScreen({super.key, this.user});
+  final bool hideLogout; // 🌟 เพิ่มตัวแปรนี้
+  const SettingScreen({super.key, this.user, this.hideLogout = false}); // 🌟 ปรับ constructor
 
   @override
   State<SettingScreen> createState() => _SettingScreenState();
@@ -17,6 +18,7 @@ class SettingScreen extends StatefulWidget {
 class _SettingScreenState extends State<SettingScreen> {
   // State Variables
   bool _isPressed = false;
+  
 
   // [UPDATED] รับค่าจาก AudioManager แทนการ Hardcode
   bool _isMuted = false;
@@ -127,8 +129,8 @@ class _SettingScreenState extends State<SettingScreen> {
                           // ------------------------------------------
                           _buildVolumeSettingsSection(),
 
-                          // ปุ่ม Logout (แสดงเฉพาะตอน Login แล้ว)
-                          if (isLoggedIn) _buildLogoutButton(),
+                          // ปุ่ม Logout (แสดงเฉพาะตอน Login แล้ว และไม่ได้ถูกสั่งซ่อน)
+                          if (isLoggedIn && !widget.hideLogout) _buildLogoutButton(),
                         ],
                       ),
                     ),
@@ -191,17 +193,14 @@ class _SettingScreenState extends State<SettingScreen> {
         onTapDown: (_) => setState(() => _isPressed = true),
         onTapCancel: () => setState(() => _isPressed = false),
         onTap: () async {
+          // หน่วงเวลาให้เห็น Animation ปุ่มยุบตัวนิดนึง
           await Future.delayed(const Duration(milliseconds: 150));
           if (!mounted) return;
+          
+          setState(() => _isPressed = false);
 
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => LobbyScreen(user: widget.user),
-            ),
-          ).then((_) {
-            setState(() => _isPressed = false);
-          });
+          // 🌟 ใช้คำสั่ง pop เพื่อปิดหน้า Setting ทิ้ง ระบบจะเผยให้เห็นหน้าก่อนหน้าอัตโนมัติ
+          Navigator.pop(context); 
         },
         child: Image.asset(
           _isPressed
