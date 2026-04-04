@@ -4,14 +4,12 @@ class EnergyBar extends StatelessWidget {
   final int energy;
   final int maxEnergy;
   final int ticket;
-  final int maxTicket;
 
   const EnergyBar({
     super.key,
     required this.energy,
     required this.maxEnergy,
     required this.ticket,
-    required this.maxTicket,
   });
 
   @override
@@ -98,7 +96,7 @@ class EnergyBar extends StatelessWidget {
 
           /// Ticket counter
           Text(
-            "$ticket/$maxTicket",
+            "$ticket",
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: titleFontSize,

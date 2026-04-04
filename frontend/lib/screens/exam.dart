@@ -640,7 +640,7 @@ class _ExamScreenState extends State<ExamScreen> {
                       'ความแข็งแรง': 2,
                       'ความคิดสร้างสรรค์': 3,
                     },
-                    isPassed: true,
+                    isPassed: false,
                   ),
                 ),
               );
