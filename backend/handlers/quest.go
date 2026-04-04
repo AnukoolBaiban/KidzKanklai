@@ -337,6 +337,10 @@ func CompleteNormalQuest(c *gin.Context) {
 		})
 	}
 
+	// 🌟 ทริกเกอร์เควสแนะนำ: บวก progress เมื่อสำเร็จเควสทั่วไป
+	IncrementSystemQuestProgress(ctx, tx, userID, 20001) // แนะนำ: สำเร็จเควสทั่วไป
+	IncrementSystemQuestProgress(ctx, tx, userID, 20003) // แนะนำ: สำเร็จเควสรูปแบบใดก็ได้
+
 	if err := tx.Commit(ctx); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction commit failed"})
 		return
@@ -349,7 +353,7 @@ func CompleteNormalQuest(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "Quest completed successfully",
-		"rewards": responseRewards, // ส่งของที่ดึงได้กลับไปทั้งหมด
+		"rewards": responseRewards,
 	})
 }
 
@@ -663,6 +667,10 @@ func CompleteInstantQuest(c *gin.Context) {
 	IncrementSystemQuestProgress(ctx, tx, userID, 10002)
 	IncrementSystemQuestProgress(ctx, tx, userID, 10003)
 
+	// 🌟 ทริกเกอร์เควสแนะนำ: บวก progress เมื่อสำเร็จเควสทันที
+	IncrementSystemQuestProgress(ctx, tx, userID, 20002) // แนะนำ: สำเร็จเควสทันที
+	IncrementSystemQuestProgress(ctx, tx, userID, 20003) // แนะนำ: สำเร็จเควสรูปแบบใดก็ได้
+
 	tx.Commit(ctx)
 
 	go func(u uuid.UUID) {
@@ -692,9 +700,148 @@ func InitSystemQuests(c *gin.Context) {
 
 	ctx := context.Background()
 
-	// 🌟 ใช้ ON CONFLICT DO NOTHING: 
+	// ====================================================================
+	// 🌟 STEP 0A: อัปเดต start_date / due_date ในตาราง quests
+	//             สำหรับเควสระบบ (10001–10004)
+	//             เมื่อ start_date อยู่ใน ISO week ที่แล้ว → ตั้งค่าใหม่ให้ตรงกับสัปดาห์ปัจจุบัน
+	//             (ตาราง quests เป็น Global — ไม่ต้องระบุ user_id)
+	// ====================================================================
+	updateSystemDatesQuery := `
+		UPDATE public.quests
+		SET
+			start_date = DATE_TRUNC('week', NOW()),
+			due_date   = DATE_TRUNC('week', NOW()) + INTERVAL '6 days 17 hours'
+		WHERE
+			id IN (10001, 10002, 10003, 10004)
+			AND (
+				-- start_date อยู่ใน ISO week ที่แล้ว หรือเก่ากว่า → อัปเดต
+				EXTRACT(ISOYEAR FROM start_date) < EXTRACT(ISOYEAR FROM NOW())
+				OR (
+					EXTRACT(ISOYEAR FROM start_date) = EXTRACT(ISOYEAR FROM NOW())
+					AND EXTRACT(WEEK  FROM start_date) < EXTRACT(WEEK FROM NOW())
+				)
+			);
+	`
+	_, err = configs.DB.Exec(ctx, updateSystemDatesQuery)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update system quest dates"})
+		return
+	}
+
+	// ====================================================================
+	// 🌟 STEP 0B: อัปเดต start_date / due_date ในตาราง quests
+	//             สำหรับเควสแนะนำ (20001–20003)
+	//             เมื่อ start_date อยู่ใน ISO week ที่แล้ว → ตั้งค่าใหม่
+	// ====================================================================
+	updateRecommendedDatesQuery := `
+		UPDATE public.quests
+		SET
+			start_date = DATE_TRUNC('week', NOW()),
+			due_date   = DATE_TRUNC('week', NOW()) + INTERVAL '6 days 17 hours'
+		WHERE
+			id IN (20001, 20002, 20003)
+			AND (
+				EXTRACT(ISOYEAR FROM start_date) < EXTRACT(ISOYEAR FROM NOW())
+				OR (
+					EXTRACT(ISOYEAR FROM start_date) = EXTRACT(ISOYEAR FROM NOW())
+					AND EXTRACT(WEEK  FROM start_date) < EXTRACT(WEEK FROM NOW())
+				)
+			);
+	`
+	_, err = configs.DB.Exec(ctx, updateRecommendedDatesQuery)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update recommended quest dates"})
+		return
+	}
+
+	// ====================================================================
+	// 🌟 STEP 1: รีเซ็ตรายสัปดาห์ (สำหรับเควสระบบ 10001–10004)
+	// ถ้าเควสระบบที่ completed_date อยู่ในสัปดาห์ที่แล้ว → รีเซ็ตเป็น in_progress ใหม่
+	// ====================================================================
+	resetSystemQuery := `
+		UPDATE public.do_quests
+		SET 
+			status        = 'in_progress',
+			progress      = 0,
+			completed_date = NULL
+		WHERE 
+			user_id  = $1
+			AND quest_id IN (10001, 10002, 10003, 10004)
+			AND status   = 'completed'
+			AND (
+				-- completed_date อยู่ใน ISO week ที่แล้ว (หรือเก่ากว่านั้น)
+				EXTRACT(ISOYEAR FROM completed_date) < EXTRACT(ISOYEAR FROM NOW())
+				OR (
+					EXTRACT(ISOYEAR FROM completed_date) = EXTRACT(ISOYEAR FROM NOW())
+					AND EXTRACT(WEEK  FROM completed_date) < EXTRACT(WEEK FROM NOW())
+				)
+			);
+	`
+	_, err = configs.DB.Exec(ctx, resetSystemQuery, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset system quests"})
+		return
+	}
+
+	// ====================================================================
+	// 🌟 STEP 1.5: ตรวจเช็คว่าเควสระบบ (10001–10004) สำเร็จครบหรือยัง
+	// ถ้ายัง "ไม่ครบ" → ลบภารกิจแนะนำ (20001–20003) ออกจาก do_quests
+	// เพื่อป้องกันกรณีที่ระบบรีเซ็ต แต่ภารกิจแนะนำยังค้างอยู่
+	// ====================================================================
+	removeRecommendedIfIncompleteQuery := `
+		DELETE FROM public.do_quests
+		WHERE
+			user_id  = $1
+			AND quest_id IN (20001, 20002, 20003)
+			AND NOT EXISTS (
+				-- เช็คว่ามีเควสระบบที่ completed ครบ 4 ตัวหรือยัง
+				SELECT 1
+				FROM (
+					SELECT COUNT(*) AS done
+					FROM public.do_quests
+					WHERE user_id = $1
+						AND quest_id IN (10001, 10002, 10003, 10004)
+						AND status = 'completed'
+				) sub
+				WHERE sub.done >= 4
+			);
+	`
+	_, err = configs.DB.Exec(ctx, removeRecommendedIfIncompleteQuery, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate recommended quest eligibility"})
+		return
+	}
+
+	// ====================================================================
+	// 🌟 STEP 2: รีเซ็ตรายสัปดาห์ (สำหรับเควสแนะนำ 20001–20003)
+	// ถ้าเควสแนะนำที่ completed_date อยู่ในสัปดาห์ที่แล้ว → ลบออกจาก do_quests
+	// เพื่อให้ CheckAndInitRecommendedQuest สามารถเลือก variant ใหม่ให้ได้
+	// ====================================================================
+	resetRecommendedQuery := `
+		DELETE FROM public.do_quests
+		WHERE 
+			user_id  = $1
+			AND quest_id IN (20001, 20002, 20003)
+			AND status   = 'completed'
+			AND (
+				EXTRACT(ISOYEAR FROM completed_date) < EXTRACT(ISOYEAR FROM NOW())
+				OR (
+					EXTRACT(ISOYEAR FROM completed_date) = EXTRACT(ISOYEAR FROM NOW())
+					AND EXTRACT(WEEK  FROM completed_date) < EXTRACT(WEEK FROM NOW())
+				)
+			);
+	`
+	_, err = configs.DB.Exec(ctx, resetRecommendedQuery, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset recommended quests"})
+		return
+	}
+
+	// ====================================================================
+	// 🌟 STEP 3: ใช้ ON CONFLICT DO NOTHING:
 	// ถ้ายังไม่มีเควสระบบ จะทำการสร้างให้ (progress=0)
-	// ถ้ามีอยู่แล้ว คำสั่งนี้จะไม่ทำอะไรเลย (ไม่ไปทับ progress เดิมที่กำลังทำอยู่)
+	// ถ้ามีอยู่แล้ว คำสั่งนี้จะไม่ทำอะไรเลย (ไม่ไปทับ progress เดิม)
+	// ====================================================================
 	initQuery := `
 		INSERT INTO public.do_quests (user_id, quest_id, status, progress)
 		VALUES 
@@ -710,8 +857,18 @@ func InitSystemQuests(c *gin.Context) {
 		return
 	}
 
+	// ====================================================================
+	// 🌟 STEP 4: เช็คและเปิดใช้งานภารกิจแนะนำ
+	// (ถ้าทำเควสระบบครบแล้ว และยังไม่มีเควสแนะนำ active อยู่)
+	// ใช้ ON CONFLICT DO NOTHING เหมือนกัน — เรียกซ้ำกี่ครั้งก็ปลอดภัย
+	// ====================================================================
+	go func(u uuid.UUID) {
+		CheckAndInitRecommendedQuest(context.Background(), u)
+	}(userID)
+
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
+
 
 // ------------------------------------------------------------------------
 // 6. API: รับรางวัลเควสระบบ (CompleteSystemQuest)
@@ -751,7 +908,7 @@ func CompleteSystemQuest(c *gin.Context) {
 		SELECT dq.status, dq.progress, q.target_amount
 		FROM public.do_quests dq
 		JOIN public.quests q ON dq.quest_id = q.id
-		WHERE dq.user_id = $1 AND dq.quest_id = $2 AND q.type = 'ระบบ'
+		WHERE dq.user_id = $1 AND dq.quest_id = $2 AND q.type IN ('ระบบ', 'แนะนำ')
 		FOR UPDATE
 	`
 	err = tx.QueryRow(ctx, checkQuery, userID, input.QuestID).Scan(&currentStatus, &progress, &targetAmount)
@@ -835,6 +992,11 @@ func CompleteSystemQuest(c *gin.Context) {
 		CheckCoinAchievement(context.Background(), u)
 	}(userID)
 
+	// 🌟 ตรวจสอบและเปิดใช้งานภารกิจแนะนำ เมื่อผู้เล่นทำเควสระบบครบแล้ว
+	go func(u uuid.UUID) {
+		CheckAndInitRecommendedQuest(context.Background(), u)
+	}(userID)
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "System quest reward claimed",
@@ -857,5 +1019,81 @@ func IncrementSystemQuestProgress(ctx context.Context, tx pgx.Tx, userID uuid.UU
 		fmt.Printf("❌ Failed to increment progress for quest %d: %v\n", questID, err)
 	}
 	return err
+}
+
+// ------------------------------------------------------------------------
+// 🌟 ฟังก์ชันตรวจสอบและเปิดใช้งานภารกิจแนะนำ (CheckAndInitRecommendedQuest)
+// เรียกใน goroutine หลังจาก CompleteSystemQuest สำเร็จ
+// จะ insert do_quests สำหรับ quest 20001/20002/20003 ตามพฤติกรรมผู้เล่น
+// ------------------------------------------------------------------------
+func CheckAndInitRecommendedQuest(ctx context.Context, userID uuid.UUID) {
+	// 1. ตรวจสอบว่าผู้เล่นทำเควสระบบ 10001–10004 ครบทั้งหมดแล้วหรือยัง
+	var completedCount int
+	countQuery := `
+		SELECT COUNT(*) 
+		FROM public.do_quests 
+		WHERE user_id = $1 AND quest_id IN (10001, 10002, 10003, 10004) AND status = 'completed'
+	`
+	err := configs.DB.QueryRow(ctx, countQuery, userID).Scan(&completedCount)
+	if err != nil || completedCount < 4 {
+		return // ยังทำเควสระบบไม่ครบ ยังไม่แสดงภารกิจแนะนำ
+	}
+
+	// 2. ตรวจสอบว่าผู้เล่นได้รับภารกิจแนะนำไปแล้วหรือยัง (ป้องกัน duplicate)
+	var existingCount int
+	existsQuery := `
+		SELECT COUNT(*) 
+		FROM public.do_quests 
+		WHERE user_id = $1 AND quest_id IN (20001, 20002, 20003)
+	`
+	err = configs.DB.QueryRow(ctx, existsQuery, userID).Scan(&existingCount)
+	if err != nil || existingCount > 0 {
+		return // ได้รับภารกิจแนะนำไปแล้ว
+	}
+
+	// 3. นับจำนวนเควสที่ผู้เล่นสำเร็จแต่ละประเภท (ทั่วไป vs ทันที) ไม่รวมเควสระบบ
+	var normalCount, instantCount int
+	statsQuery := `
+		SELECT 
+			COUNT(CASE WHEN q.type = 'ทั่วไป' THEN 1 END),
+			COUNT(CASE WHEN q.type = 'ทันที' THEN 1 END)
+		FROM public.do_quests dq
+		JOIN public.quests q ON dq.quest_id = q.id
+		WHERE dq.user_id = $1 AND dq.status = 'completed' AND q.type IN ('ทั่วไป', 'ทันที')
+	`
+	err = configs.DB.QueryRow(ctx, statsQuery, userID).Scan(&normalCount, &instantCount)
+	if err != nil {
+		fmt.Printf("❌ CheckAndInitRecommendedQuest: Failed to count quests: %v\n", err)
+		return
+	}
+
+	// 4. เลือก variant ตามพฤติกรรม
+	// - instantCount > normalCount → แนะนำให้ทำเควสทั่วไปมากขึ้น (quest 20001)
+	// - normalCount > instantCount → แนะนำให้ทำเควสทันทีมากขึ้น  (quest 20002)
+	// - เท่ากัน                  → สำเร็จรูปแบบใดก็ได้            (quest 20003)
+	var recommendedQuestID int64
+	switch {
+	case instantCount > normalCount:
+		recommendedQuestID = 20001 // แนะนำ: สำเร็จเควสทั่วไป 5 ครั้ง
+	case normalCount > instantCount:
+		recommendedQuestID = 20002 // แนะนำ: สำเร็จเควสทันที 5 ครั้ง
+	default:
+		recommendedQuestID = 20003 // แนะนำ: สำเร็จเควสรูปแบบใดก็ได้ 5 ครั้ง
+	}
+
+	// 5. บันทึกภารกิจแนะนำลง do_quests
+	insertQuery := `
+		INSERT INTO public.do_quests (user_id, quest_id, status, progress)
+		VALUES ($1, $2, 'in_progress', 0)
+		ON CONFLICT (user_id, quest_id) DO NOTHING;
+	`
+	_, err = configs.DB.Exec(ctx, insertQuery, userID, recommendedQuestID)
+	if err != nil {
+		fmt.Printf("❌ CheckAndInitRecommendedQuest: Failed to insert quest %d: %v\n", recommendedQuestID, err)
+		return
+	}
+
+	fmt.Printf("✅ Recommended quest %d assigned to user %s (normal=%d, instant=%d)\n",
+		recommendedQuestID, userID, normalCount, instantCount)
 }
 

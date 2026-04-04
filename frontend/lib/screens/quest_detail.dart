@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User; // 🌟 นำเข้า Supabase
 import '../widgets/custom_top_bar.dart';
 import '../api_service.dart';
-import '../screens/lobby.dart';
+
 import '../widgets/confirm_giveup_popup.dart';
 import '../widgets/reward_popup.dart';
 // 🌟 1. นำเข้าไฟล์ ConfirmCompletePopup
@@ -407,10 +407,7 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
       onTap: () async {
         await Future.delayed(const Duration(milliseconds: 150));
         if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => LobbyScreen(user: widget.user)),
-          ).then((_) => setState(() => _isPressed = false));
+          Navigator.pop(context, true); // 🌟 กลับไปหน้า All Quest (ส่ง true เผื่อให้หน้านั้นรีเฟรชได้ถ้าต้องการ)
         }
       },
       child: Image.asset(

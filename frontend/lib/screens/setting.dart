@@ -479,7 +479,7 @@ class _SettingScreenState extends State<SettingScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  "ปิดเสียงทั้งหมด",
+                  "ปิดเสียงเกม",
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w500,
