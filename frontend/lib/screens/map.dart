@@ -79,8 +79,7 @@ class _MapScreenState extends State<MapScreen> {
                   child: EnergyBar(
                     energy: 80,
                     maxEnergy: 100,
-                    ticket: 1,
-                    maxTicket: 5,
+                    ticket: 10,
                   ),
                 ),
 
@@ -113,12 +112,12 @@ class _MapScreenState extends State<MapScreen> {
           children: [
             /// โรงเรียน (บนกลาง)
             Positioned(
-              top: h * 0.02,
-              left: w * 0.55,
+              top: h * 0.01,
+              left: w * 0.50,
               child: _buildLocation(
                 imagePath: 'assets/images/map/school.PNG',
                 label: 'สนามสอบ',
-                width: building,
+                width: building * 1.3,
               ),
             ),
 
@@ -129,7 +128,7 @@ class _MapScreenState extends State<MapScreen> {
               child: _buildLocation(
                 imagePath: 'assets/images/map/library.PNG',
                 label: 'หอสมุด',
-                width: building,
+                width: building * 1.2,
               ),
             ),
 
@@ -140,29 +139,29 @@ class _MapScreenState extends State<MapScreen> {
               child: _buildLocation(
                 imagePath: 'assets/images/map/gym.PNG',
                 label: 'โรงยิม',
-                width: building,
+                width: building * 1.2,
               ),
             ),
 
             /// สวนสาธารณะ (กลางล่าง)
             Positioned(
               top: h * 0.48,
-              left: w * 0.18,
+              left: w * 0.13,
               child: _buildLocation(
                 imagePath: 'assets/images/map/park.PNG',
                 label: 'สวนสาธารณะ',
-                width: building * 1.1,
+                width: building * 1.3,
               ),
             ),
 
             /// สวนสนุก (ล่างสุด)
             Positioned(
-              bottom: h * 0.10,
+              bottom: h * 0.05,
               left: w * 0.50,
               child: _buildLocation(
                 imagePath: 'assets/images/map/theme_park.PNG',
                 label: 'สวนสนุก',
-                width: building * 1.2,
+                width: building * 1.5,
               ),
             ),
           ],

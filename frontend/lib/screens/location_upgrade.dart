@@ -284,8 +284,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                     EnergyBar(
                       energy: 80,
                       maxEnergy: 100,
-                      ticket: 1,
-                      maxTicket: 5,
+                      ticket: 10,
                     ),
                     SizedBox(height: 20),
                   ],
@@ -442,6 +441,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
             ),
             child: Text(
               'ค่าสถานะที่ให้เมื่อทำกิจกรรมสำเร็จ',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16 * scale,
                 fontWeight: FontWeight.bold,

@@ -24,6 +24,7 @@ import 'screens/loading.dart';
 import 'screens/me.dart';
 import 'screens/fashion.dart';
 import 'screens/create_normal_quest.dart';
+import 'screens/create_club_quest.dart';
 import 'screens/quest_detail.dart';
 import 'config/rive_cache.dart';
 import 'config/user_pose_provider.dart';
@@ -126,6 +127,29 @@ class KidzKanklaiApp extends StatelessWidget {
         '/lootbox': (context) => const LootboxScreen(),
         '/map': (context) => const MapScreen(),
         '/club': (context) => const ClubScreen(),
+        '/createclubquest': (context) => CreateClubQuestScreen(
+          onSubmit: (data) {
+            // บันทึกข้อมูลภารกิจ
+            print('Quest Name: ${data['name']}');
+            print('Quest Detail: ${data['detail']}');
+            print('Due Date: ${data['date']}');
+            print('Has Image: ${data['hasImage']}');
+
+            // TODO: บันทึกลง database
+            // await questService.createQuest(data);
+
+            // กลับหน้าเดิม
+            Navigator.pop(context);
+
+            // แสดงข้อความสำเร็จ
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('สร้างภารกิจสำเร็จ!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          },
+        ),
         '/startgame': (context) => const StartGameScreen(),
         '/load': (context) => const LoadingScreen(),
       },
