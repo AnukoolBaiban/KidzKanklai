@@ -172,6 +172,23 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
     }
   }
 
+  // 🌟 ฟังก์ชันเช็คว่ามีการแก้ไขข้อมูลหรือกรอกข้อมูลอะไรไปบ้างหรือยัง
+  bool _hasUnsavedChanges() {
+    bool nameChanged = _nameController.text.trim().isNotEmpty;
+    bool detailChanged = _detailController.text.trim().isNotEmpty;
+    bool dateChanged = _selectedDate != null;
+    bool imageChanged = _selectedImage != null;
+
+    // กรณีเป็นโหมด Edit (มี initialData) ให้เทียบกับค่าเดิม
+    if (widget.initialData != null) {
+      nameChanged = _nameController.text != (widget.initialData!['name'] ?? '');
+      detailChanged = _detailController.text != (widget.initialData!['detail'] ?? '');
+      dateChanged = _selectedDate != widget.initialData!['date'];
+    }
+
+    return nameChanged || detailChanged || dateChanged || imageChanged;
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -179,9 +196,13 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
     final topBarHeight = 75.0 + topPadding;
     final headerHeight = 80.0;
 
-    // ignore: deprecated_member_use
     return WillPopScope(
       onWillPop: () async {
+        // 🌟 ถ้ายกเลิกโดยยังไม่ได้กรอกอะไรเลย ให้ออกได้ทันที 
+        if (!_hasUnsavedChanges()) {
+          return true;
+        }
+
         // เมื่อกดปุ่ม back → แสดง ConfirmExitPopup
         await ConfirmExitPopup.show(
           context,
@@ -193,6 +214,7 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
         return false; // ไม่ให้กลับทันที
       },
       child: Scaffold(
+        resizeToAvoidBottomInset: false, // 🌟 ป้องกันพื้นหลังเด้งขึ้นเมื่อแป้นพิมพ์โผล่
         body: Stack(
         children: [
           _buildBackground(),
@@ -305,6 +327,12 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
         await Future.delayed(const Duration(milliseconds: 200));
         if (!mounted) return;
         setState(() => _isPressed = false);
+
+        // 🌟 ถ้ายกเลิกโดยยังไม่ได้กรอกอะไรเลย ให้ออกได้ทันที
+        if (!_hasUnsavedChanges()) {
+          Navigator.pop(context);
+          return;
+        }
 
         ConfirmExitPopup.show(
           context,
