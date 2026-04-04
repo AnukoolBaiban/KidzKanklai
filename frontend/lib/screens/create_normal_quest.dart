@@ -216,8 +216,8 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
       child: Scaffold(
         resizeToAvoidBottomInset: false, // 🌟 ป้องกันพื้นหลังเด้งขึ้นเมื่อแป้นพิมพ์โผล่
         body: Stack(
-        children: [
-          _buildBackground(),
+          children: [
+            _buildBackground(),
 
           Padding(
             padding: EdgeInsets.only(
@@ -366,26 +366,27 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
         ),
         child: Stack(
           children: [
-            Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildBackButton(),
-                  const SizedBox(width: 60),
-                  const Text(
-                    "ภารกิจทั่วไป",
-                    style: TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                const SizedBox(width: 80),
-                ],
+            /// ปุ่ม Back (ชิดซ้าย)
+            Positioned(
+              left: 15,
+              top: 0,
+              bottom: 0,
+              child: Center(child: _buildBackButton()),
+            ),
+
+            /// Title (อยู่กลางจริง)
+            const Center(
+              child: Text(
+                "ภารกิจทั่วไป",
+                style: TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             ),
-            // Annotation button stays at bottom right
+
+            /// Annotation button
             const Positioned(bottom: 8, right: 15, child: AnnotationButton()),
           ],
         ),

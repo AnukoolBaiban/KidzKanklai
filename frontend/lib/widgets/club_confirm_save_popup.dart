@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/widgets/ticket_box.dart';
 
-class ConfirmSavePopup extends StatefulWidget {
+class ClubConfirmSavePopup extends StatefulWidget {
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
 
-  const ConfirmSavePopup({
+  const ClubConfirmSavePopup({
     Key? key,
     required this.onConfirm,
     required this.onCancel,
@@ -19,7 +19,7 @@ class ConfirmSavePopup extends StatefulWidget {
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.black.withOpacity(0.6),
-      builder: (context) => ConfirmSavePopup(
+      builder: (context) => ClubConfirmSavePopup(
         onConfirm: onConfirm,
         onCancel: () => Navigator.pop(context),
       ),
@@ -27,10 +27,10 @@ class ConfirmSavePopup extends StatefulWidget {
   }
 
   @override
-  State<ConfirmSavePopup> createState() => _ConfirmSavePopupState();
+  State<ClubConfirmSavePopup> createState() => _ClubConfirmSavePopupState();
 }
 
-class _ConfirmSavePopupState extends State<ConfirmSavePopup>
+class _ClubConfirmSavePopupState extends State<ClubConfirmSavePopup>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;

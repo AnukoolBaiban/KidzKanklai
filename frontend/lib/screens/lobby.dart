@@ -180,7 +180,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                         Navigator.pushNamed(context, '/map');
                         break;
                       case 3:
-                        Navigator.pushNamed(context, '/club');
+                        Navigator.pushNamed(context, '/createclubquest');
                         break;
                     }
                   },
