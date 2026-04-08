@@ -112,7 +112,7 @@ class _AchievementScreenState extends State<AchievementScreen> {
           name: row['name'] ?? 'ไม่มีชื่อ',
           description: row['description'] ?? 'ไม่มีรายละเอียด',
           imagePath: row['image'],
-          isUnlocked: true,
+          isUnlocked: isDone,
           isCompleted: isDone, // 🌟 ส่งสถานะทำเสร็จไปให้ UI
           // 🌟 จุดแดงจะขึ้นก็ต่อเมื่อ "ทำเสร็จแล้ว" และ "ยังไม่ได้รับรางวัล" เท่านั้น
           hasNotification: isDone && !hasClaimedReward, 
@@ -521,7 +521,7 @@ class _AchievementScreenState extends State<AchievementScreen> {
           // 🌟 2. ถ้าเคยกด Claimed ไปแล้ว ให้โชว์กล่องมีติ๊กถูกแทน
           if (achievement.isClaimed)
             Stack(
-              clipBehavior: Clip.none,
+              alignment: Alignment.center,
               children: [
                 Container(
                   width: 70,
@@ -553,14 +553,17 @@ class _AchievementScreenState extends State<AchievementScreen> {
                     ],
                   ),
                 ),
-                Positioned(
-                  top: 45,
-                  right: -10,
-                  child: Image.asset(
-                    'assets/images/icon/check.png',
-                    width: 28,
-                    height: 28,
-                    fit: BoxFit.contain,
+                Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.check_circle,
+                    color: Colors.white,
+                    size: 32,
                   ),
                 ),
               ],

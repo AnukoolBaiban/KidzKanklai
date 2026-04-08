@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:flutter_application_1/api_service.dart';
 
 import 'package:flutter_application_1/widgets/bottom_navigation_bar.dart';
@@ -20,6 +21,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   int _selectedIndex = 1; // Default to Lobby (Room)
   User? _user; // Local user state
   bool _isLoading = true;
+  bool _hasUnclaimedAchievement = false;
 
   @override
   void initState() {
@@ -28,6 +30,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     _loadUserData();
     // สั่งเช็คของรางวัลทันทีที่เปิดหน้านี้
     _checkDailyLoginRewards();
+    _checkUnclaimedAchievements();
     // _giveMeCoins(); // สำหรับเทสเพิ่มเหรียญ
   }
 
@@ -42,6 +45,29 @@ class _LobbyScreenState extends State<LobbyScreen> {
         }
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _checkUnclaimedAchievements() async {
+    try {
+      final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+      if (currentUserId == null) return;
+      
+      final attainResponse = await Supabase.instance.client
+          .from('attain')
+          .select('status, reward_claimed')
+          .eq('user_id', currentUserId)
+          .eq('status', 'completed')
+          .eq('reward_claimed', false)
+          .limit(1);
+
+      if (mounted) {
+        setState(() {
+          _hasUnclaimedAchievement = attainResponse.isNotEmpty;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking unclaimed achievements: $e');
     }
   }
 
@@ -90,6 +116,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     MenuItem(
       imagePath: "assets/images/icon/iconAchievement.png",
       label: 'ความสำเร็จ',
+      hasNotification: _hasUnclaimedAchievement,
       onTap: () {
         Navigator.pushNamed(context, '/achievement');
       },
