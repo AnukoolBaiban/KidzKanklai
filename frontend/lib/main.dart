@@ -24,7 +24,9 @@ import 'screens/loading.dart';
 import 'screens/me.dart';
 import 'screens/fashion.dart';
 import 'screens/create_normal_quest.dart';
-import 'screens/create_club_quest.dart';
+import 'screens/club_quest/create_club_quest.dart';
+import 'screens/club_quest/club_quest_detail_member.dart';
+import 'screens/club_quest/club_quest_detail_leader.dart';
 import 'screens/quest_detail.dart';
 import 'config/rive_cache.dart';
 import 'config/user_pose_provider.dart';
@@ -150,6 +152,7 @@ class KidzKanklaiApp extends StatelessWidget {
             );
           },
         ),
+        '/clubquestdetail': (context) => const ClubQuestDetailLeaderScreen(),
         '/startgame': (context) => const StartGameScreen(),
         '/load': (context) => const LoadingScreen(),
       },
