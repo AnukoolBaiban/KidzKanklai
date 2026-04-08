@@ -15,7 +15,7 @@ class User {
   final int coins;
   final int tickets;
   final int vouchers;
-  final String bio;
+  final String detail;
   final int soundBGM;
   final int soundSFX;
   final String equippedSkin;
@@ -34,7 +34,7 @@ class User {
     required this.coins,
     required this.tickets,
     required this.vouchers,
-    required this.bio,
+    required this.detail,
     required this.soundBGM,
     required this.soundSFX,
     required this.equippedSkin,
@@ -69,7 +69,7 @@ class User {
       coins: _parseInt(json['coins']),
       tickets: _parseInt(json['tickets']),
       vouchers: _parseInt(json['vouchers']),
-      bio: json['bio'] ?? '',
+      detail: json['detail'] ?? '',
       soundBGM: _parseInt(json['sound_bgm']),
       soundSFX: _parseInt(json['sound_sfx']),
       equippedSkin: json['equipped_skin'] ?? '',

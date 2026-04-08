@@ -107,7 +107,7 @@ func Me(c *gin.Context) {
 		id       string // UUID
 		email    string
 		username string
-		bio      string
+		detail   string
 		level    int
 		exp      int
 		// coins         int -- Removed unused
@@ -133,7 +133,7 @@ func Me(c *gin.Context) {
 	)
 	// Initialize variables to avoid null issues
 	username = ""
-	bio = ""
+	detail = ""
 	email = ""
 
 	// Query main data
@@ -148,7 +148,7 @@ func Me(c *gin.Context) {
 	`
 	// Note: u.id is uuid, casting to text for scan
 	err := configs.DB.QueryRow(ctx, query, userId).Scan(
-		&id, &email, &username, &bio,
+		&id, &email, &username, &detail,
 		&level, &exp,
 		&intelligence, &strength, &creative,
 	)
@@ -190,7 +190,7 @@ func Me(c *gin.Context) {
 		"id":              id,
 		"email":           email,
 		"username":        username,
-		"bio":             bio,
+		"detail":          detail,
 		"level":           level,
 		"exp":             exp,
 		"stat_intellect":  intelligence,

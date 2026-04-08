@@ -158,10 +158,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
               ),
 
               // Bottom Navigation
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 20,
+              Padding(
+                padding: const EdgeInsets.only(bottom: 20.0),
                 child: CustomBottomNavigationBar(
                   selectedIndex: _selectedIndex,
                   onItemTapped: (index) {

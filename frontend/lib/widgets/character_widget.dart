@@ -219,7 +219,6 @@ class _CharacterWidgetState extends State<CharacterWidget>
               fit: BoxFit.contain,
               antialiasing: false,
               onInit: _onRiveInit,
-              stateMachines: const ['State Machine 1'],
             )
           else
             RiveAnimation.asset(

@@ -274,8 +274,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         endpoint = "/profile/name";
         body = {"name": value}; // Go struct: UpdateNameInput { Name }
       } else if (column == 'user_detail') {
-        endpoint = "/profile/bio";
-        body = {"bio": value};  // Go struct: UpdateBioInput { Bio }
+        endpoint = "/profile/detail";
+        body = {"detail": value};  // Go struct: UpdateDetailInput { Detail }
       } else {
         return false;
       }

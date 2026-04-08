@@ -41,8 +41,8 @@ func main() {
 	// Endpoint สำหรับแก้ชื่อ
 	auth.PUT("/profile/name", handlers.UpdateUserProfileName)
 
-	// Endpoint สำหรับแก้ Bio
-	auth.PUT("/profile/bio", handlers.UpdateUserProfileBio)
+	// Endpoint สำหรับแก้ Detail
+	auth.PUT("/profile/detail", handlers.UpdateUserProfileDetail)
 
 	// --- Fashion System ---
 	auth.GET("/inventory", handlers.GetInventory)
