@@ -18,10 +18,21 @@ class LobbyScreen extends StatefulWidget {
 }
 
 class _LobbyScreenState extends State<LobbyScreen> {
+  Key _topBarKey = UniqueKey();
   int _selectedIndex = 1; // Default to Lobby (Room)
   User? _user; // Local user state
   bool _isLoading = true;
   bool _hasUnclaimedAchievement = false;
+
+  void _onReturnFromOtherPage() {
+    if (mounted) {
+      setState(() {
+        _topBarKey = UniqueKey();
+      });
+      _loadUserData();
+      _checkUnclaimedAchievements();
+    }
+  }
 
   @override
   void initState() {
@@ -118,21 +129,21 @@ class _LobbyScreenState extends State<LobbyScreen> {
       label: 'ความสำเร็จ',
       hasNotification: _hasUnclaimedAchievement,
       onTap: () {
-        Navigator.pushNamed(context, '/achievement');
+        Navigator.pushNamed(context, '/achievement').then((_) => _onReturnFromOtherPage());
       },
     ),
     MenuItem(
       imagePath: "assets/images/icon/iconQuest.png",
       label: 'ภารกิจ',
       onTap: () {
-        Navigator.pushNamed(context, '/allquest');
+        Navigator.pushNamed(context, '/allquest').then((_) => _onReturnFromOtherPage());
       },
     ),
     MenuItem(
       imagePath: "assets/images/item/Gasha.png",
       label: 'กล่องสุ่ม',
       onTap: () {
-        Navigator.pushNamed(context, '/gasha');
+        Navigator.pushNamed(context, '/gasha').then((_) => _onReturnFromOtherPage());
       },
     ),
   ];
@@ -152,11 +163,12 @@ class _LobbyScreenState extends State<LobbyScreen> {
             children: [
               // Top Bar - ใช้ CustomTopBar
               CustomTopBar(
+                key: _topBarKey,
                 onNotificationTapped: () {
-                  Navigator.pushNamed(context, '/notification');
+                  Navigator.pushNamed(context, '/notification').then((_) => _onReturnFromOtherPage());
                 },
                 onSettingsTapped: () {
-                  Navigator.pushNamed(context, '/setting');
+                  Navigator.pushNamed(context, '/setting').then((_) => _onReturnFromOtherPage());
                 },
               ),
 
@@ -198,21 +210,21 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
                     switch (index) {
                       case 0:
-                        Navigator.pushNamed(context, '/fashion');
+                        Navigator.pushNamed(context, '/fashion').then((_) => _onReturnFromOtherPage());
                         break;
                       case 1:
-                        Navigator.pushNamed(context, '/lobby');
+                        Navigator.pushNamed(context, '/lobby').then((_) => _onReturnFromOtherPage());
                         break;
                       case 2:
-                        Navigator.pushNamed(context, '/map');
+                        Navigator.pushNamed(context, '/map').then((_) => _onReturnFromOtherPage());
                         break;
                       case 3:
-                        Navigator.pushNamed(context, '/createclubquest');
+                        Navigator.pushNamed(context, '/createclubquest').then((_) => _onReturnFromOtherPage());
                         break;
                     }
                   },
                   onAvatarTapped: () {
-                    Navigator.pushNamed(context, '/profile');
+                    Navigator.pushNamed(context, '/profile').then((_) => _onReturnFromOtherPage());
                   },
                 ),
               ),

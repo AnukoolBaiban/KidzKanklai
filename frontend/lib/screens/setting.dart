@@ -16,6 +16,7 @@ class SettingScreen extends StatefulWidget {
 }
 
 class _SettingScreenState extends State<SettingScreen> {
+  Key _topBarKey = UniqueKey();
   // State Variables
   bool _isPressed = false;
   
@@ -163,12 +164,11 @@ class _SettingScreenState extends State<SettingScreen> {
             color: Colors.black.withOpacity(0.4),
             alignment: Alignment.bottomCenter,
             child: CustomTopBar(
+              key: _topBarKey,
               onNotificationTapped: () {
-                Navigator.pushNamed(context, '/notification');
+                Navigator.pushReplacementNamed(context, '/notification');
               },
-              onSettingsTapped: () {
-                Navigator.pushNamed(context, '/setting');
-              },
+              onSettingsTapped: () {},
             ),
           ),
 
@@ -200,7 +200,7 @@ class _SettingScreenState extends State<SettingScreen> {
           setState(() => _isPressed = false);
 
           // 🌟 ใช้คำสั่ง pop เพื่อปิดหน้า Setting ทิ้ง ระบบจะเผยให้เห็นหน้าก่อนหน้าอัตโนมัติ
-          Navigator.pop(context); 
+          Navigator.pop(context, true); 
         },
         child: Image.asset(
           _isPressed
