@@ -1,6 +1,7 @@
 import 'dart:async'; // 🌟 1. เพิ่ม import นี้สำหรับการทำ Stream
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../api_service.dart';
 
 class CustomTopBar extends StatefulWidget {
   final VoidCallback? onNotificationTapped;
@@ -35,6 +36,19 @@ class _CustomTopBarState extends State<CustomTopBar> {
   void initState() {
     super.initState();
     _setupRealtimeInventory(); // 🌟 3. เรียกใช้ฟังก์ชันแบบ Real-time
+    _triggerBackendNotificationCheck(); // กระตุ้น Backend ให้ประมวลผลเควสอัตโนมัติ
+  }
+
+  void _triggerBackendNotificationCheck() {
+    // โทรไปเรียก API ทิ้งไว้เบื้องหลัง เพื่อให้ Backend อัปเดตสถานะของเควสที่หมดเวลาหรือใกล้หมดเวลา
+    // และนำผลลัพธ์มาเช็คสถานะการอ่านได้เลย ทันทีแบบไม่ต้องรอ Stream ทำงาน
+    ApiService.getNotifications().then((notifications) {
+      if (!mounted) return;
+      bool hasUnread = notifications.any((n) => !n.isRead);
+      setState(() {
+        _hasUnreadNotifications = hasUnread;
+      });
+    }).catchError((_) {});
   }
 
   @override

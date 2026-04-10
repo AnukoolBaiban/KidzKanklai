@@ -27,6 +27,7 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
   bool _isPressed = false;
   int _selectedTabIndex = 0;
   final List<String> _tabs = ["ทั้งหมด", "ระบบ", "ส่วนตัว", "ประวัติ"];
+  Key _topBarKey = UniqueKey(); // 🌟 สำหรับรีเฟรชแถบด้านบน
 
   // 🌟 ลบ Mock Data ออก และสร้างตัวแปรรับข้อมูลจริงจาก DB
   List<Map<String, dynamic>> _allQuests = [];
@@ -304,9 +305,22 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
         color: Colors.black.withOpacity(0.4),
         alignment: Alignment.bottomCenter,
         child: CustomTopBar(
+          key: _topBarKey,
           onNotificationTapped: () =>
-              Navigator.pushNamed(context, '/notification'),
-          onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
+              Navigator.pushNamed(context, '/notification').then((_) {
+            if (mounted) {
+              setState(() {
+                _topBarKey = UniqueKey();
+              });
+            }
+          }),
+          onSettingsTapped: () => Navigator.pushNamed(context, '/setting').then((_) {
+            if (mounted) {
+              setState(() {
+                _topBarKey = UniqueKey();
+              });
+            }
+          }),
         ),
       ),
     );

@@ -54,6 +54,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
   Widget build(BuildContext context) {
     final notif = widget.notification;
     final isAchievement = notif.type == 'achievement';
+    final isFail = notif.type.startsWith('quest_fail');
 
     return Scaffold(
       body: Stack(
@@ -93,36 +94,38 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
                               const SizedBox(height: 40),
 
                               // Icon
-                              Container(
-                                width: 100,
-                                height: 100,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: isAchievement
-                                      ? const Color(0xFFFFF9C4)
-                                      : const Color(0xFFE3F2FD),
-                                  border: Border.all(
-                                    color: isAchievement
-                                        ? const Color(0xFFFFD700)
-                                        : const Color(0xFF90CAF9),
-                                    width: 3,
-                                  ),
-                                ),
+                              SizedBox(
+                                width: 120,
+                                height: 120,
                                 child: Padding(
                                   padding: const EdgeInsets.all(16),
-                                  child: Image.asset(
-                                    notif.iconPath,
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (_, __, ___) => Icon(
-                                      isAchievement
-                                          ? Icons.emoji_events
-                                          : Icons.notifications,
-                                      size: 48,
-                                      color: isAchievement
-                                          ? const Color(0xFFFFA000)
-                                          : const Color(0xFF2374B5),
-                                    ),
-                                  ),
+                                  child: notif.iconPath.startsWith('http')
+                                      ? Image.network(
+                                          notif.iconPath,
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (_, __, ___) => Icon(
+                                            isAchievement
+                                                ? Icons.emoji_events
+                                                : Icons.notifications,
+                                            size: 48,
+                                            color: isAchievement
+                                                ? const Color(0xFFFFA000)
+                                                : const Color(0xFF2374B5),
+                                          ),
+                                        )
+                                      : Image.asset(
+                                          notif.iconPath,
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (_, __, ___) => Icon(
+                                            isAchievement
+                                                ? Icons.emoji_events
+                                                : Icons.notifications,
+                                            size: 48,
+                                            color: isAchievement
+                                                ? const Color(0xFFFFA000)
+                                                : const Color(0xFF2374B5),
+                                          ),
+                                        ),
                                 ),
                               ),
 
@@ -139,6 +142,28 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
                                   ),
                                   child: const Text(
                                     '🏆 ความสำเร็จ',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
+
+                              if (isFail) ...[
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE53935),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text(
+                                    '❌ ภารกิจล้มเหลว',
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold,
@@ -221,56 +246,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
 
                               const SizedBox(height: 8),
 
-                              if (!isAchievement) ...[
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const SizedBox(width: 40),
-                                    Expanded(
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          gradient: const LinearGradient(
-                                            colors: [
-                                              Color(0xFF556AEB),
-                                              Color(0xFF59ABEC),
-                                            ],
-                                            begin: Alignment.topCenter,
-                                            end: Alignment.bottomCenter,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            25,
-                                          ),
-                                        ),
-                                        child: ElevatedButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context, true),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.transparent,
-                                            shadowColor: Colors.transparent,
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: 14,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(25),
-                                            ),
-                                          ),
-                                          child: const Text(
-                                            'ไปทำ',
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 40),
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
-                              ],
+
                             ],
                           ),
                         ),
