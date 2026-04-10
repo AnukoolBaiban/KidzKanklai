@@ -99,47 +99,65 @@ class _SettingScreenState extends State<SettingScreen> {
           // Main Content
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 150, 24, 24),
-            child: Stack(
-              clipBehavior: Clip.none,
+            child: Column(
               children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.82),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: const Color(0xFFAAD7EA),
-                      width: 3,
-                    ),
-                  ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 50),
+                Expanded(
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned.fill(
+                        child: Container(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.82),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: const Color(0xFFAAD7EA),
+                              width: 3,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              const SizedBox(height: 40),
+                              Expanded(
+                                child: SizedBox(
+                                  width: double.infinity,
+                                  child: SingleChildScrollView(
+                                    padding: const EdgeInsets.only(top: 0, bottom: 0),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.start,
+                                      children: [
+                                        // --- [LOGIC] ส่วนที่เปลี่ยนตามสถานะ Login ---
+                                        if (isLoggedIn) ...[
+                                          _buildLoggedInAccountSection(),
+                                          _buildLinkedAccountSection(),
+                                        ] else ...[
+                                          _buildGuestAccountSection(),
+                                        ],
 
-                          // --- [LOGIC] ส่วนที่เปลี่ยนตามสถานะ Login ---
-                          if (isLoggedIn) ...[
-                            _buildLoggedInAccountSection(),
-                            _buildLinkedAccountSection(),
-                          ] else ...[
-                            _buildGuestAccountSection(),
-                          ],
-
-                          // ------------------------------------------
-                          _buildVolumeSettingsSection(),
-
-                          // ปุ่ม Logout (แสดงเฉพาะตอน Login แล้ว และไม่ได้ถูกสั่งซ่อน)
-                          if (isLoggedIn && !widget.hideLogout) _buildLogoutButton(),
-                        ],
+                                        // ------------------------------------------
+                                        _buildVolumeSettingsSection(),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
+
+                      // Header Title
+                      _buildHeaderTitle(),
+                    ],
                   ),
                 ),
 
-                // Header Title
-                _buildHeaderTitle(),
+                // ปุ่ม Logout อยู่ใต้กรอบขาว
+                if (isLoggedIn && !widget.hideLogout) ...[  
+                  const SizedBox(height: 16),
+                  _buildLogoutButton(),
+                ],
               ],
             ),
           ),
@@ -466,7 +484,7 @@ class _SettingScreenState extends State<SettingScreen> {
           const SizedBox(height: 5),
           const SizedBox(height: 5),
 
-          // Mute Toggle
+          // Game Sound Toggle
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 15),
@@ -478,7 +496,7 @@ class _SettingScreenState extends State<SettingScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  "ปิดเสียงเกม",
+                  "เสียงเกม",
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w500,
@@ -487,7 +505,7 @@ class _SettingScreenState extends State<SettingScreen> {
                 ),
                 GestureDetector(
                   onTap: () async {
-                    // [UPDATED] คำนวณสถานะใหม่ และสั่งงาน AudioManager
+                    // คำนวณสถานะใหม่ และสั่งงาน AudioManager
                     final newMuteState = !_isMuted;
                     await _audioManager.toggleMute(newMuteState);
 
@@ -501,9 +519,9 @@ class _SettingScreenState extends State<SettingScreen> {
                     height: 32,
                     padding: const EdgeInsets.all(2),
                     decoration: BoxDecoration(
-                      color: _isMuted
-                          ? Colors.white.withOpacity(0.8)
-                          : const Color(0xFF002A50),
+                      color: !_isMuted
+                          ? const Color(0xFF002A50)
+                          : Colors.white.withOpacity(0.8),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: const Color(0xFF002A50),
@@ -512,7 +530,7 @@ class _SettingScreenState extends State<SettingScreen> {
                     ),
                     child: Stack(
                       children: [
-                        if (_isMuted)
+                        if (!_isMuted)
                           const Positioned(
                             left: 8,
                             top: 2,
@@ -523,13 +541,13 @@ class _SettingScreenState extends State<SettingScreen> {
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black,
+                                  color: Colors.white,
                                 ),
                               ),
                             ),
                           ),
 
-                        if (!_isMuted)
+                        if (_isMuted)
                           const Positioned(
                             right: 8,
                             top: 2,
@@ -540,7 +558,7 @@ class _SettingScreenState extends State<SettingScreen> {
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  color: Colors.black,
                                 ),
                               ),
                             ),
@@ -548,7 +566,7 @@ class _SettingScreenState extends State<SettingScreen> {
 
                         AnimatedAlign(
                           duration: const Duration(milliseconds: 200),
-                          alignment: _isMuted
+                          alignment: !_isMuted
                               ? Alignment.centerRight
                               : Alignment.centerLeft,
                           child: Container(
@@ -679,16 +697,15 @@ class _SettingScreenState extends State<SettingScreen> {
   }
 
   Widget _buildLogoutButton() {
-    return SizedBox(
-      width: double.infinity,
+    return Center(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(40, 0, 40, 30),
+        padding: const EdgeInsets.symmetric(horizontal: 40),
         child: ElevatedButton(
-          onPressed: _handleLogout, // เรียกฟังก์ชัน Logout
+          onPressed: _handleLogout,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFE94444),
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 14),
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 32),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(50),
             ),
