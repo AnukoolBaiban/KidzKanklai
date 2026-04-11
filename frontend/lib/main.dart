@@ -17,7 +17,8 @@ import 'screens/notification.dart';
 import 'screens/achievement.dart';
 import 'screens/lootbox_screen.dart';
 import 'screens/map.dart';
-import 'screens/club_screen.dart';
+import 'screens/club.dart';
+import 'screens/club-create.dart';
 import 'screens/setting.dart';
 import 'screens/startgame.dart';
 import 'screens/loading.dart';
@@ -109,7 +110,8 @@ class KidzKanklaiApp extends StatelessWidget {
         '/achievement': (context) => const AchievementScreen(),
         '/lootbox': (context) => const LootboxScreen(),
         '/map': (context) => const MapScreen(),
-        '/club': (context) => const ClubScreen(),
+        '/club': (context) => const Club(),
+        '/club-create': (context) => const ClubCreateScreen(),
         '/createclubquest': (context) => CreateClubQuestScreen(
           onSubmit: (data) {
             // บันทึกข้อมูลภารกิจ
