@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/api_service.dart';
-import 'package:flutter_application_1/screens/lobby.dart';
+import 'package:flutter_application_1/screens/club_room_head.dart';
 import 'package:flutter_application_1/widgets/custom_top_bar.dart';
-import 'package:flutter_application_1/widgets/quest_info_card.dart';
+import 'package:flutter_application_1/screens/club_quest/club_quest_detail_leader.dart';
 import 'package:flutter_application_1/widgets/confirm_exit_popup.dart';
 import 'package:flutter_application_1/widgets/exit_edit_club_quest_popup.dart';
 import 'package:flutter_application_1/widgets/club_confirm_save_popup.dart';
@@ -313,7 +313,7 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
         color: Colors.black.withOpacity(0.4),
         alignment: Alignment.bottomCenter,
         child: CustomTopBar(
-          user: widget.user,
+          // user: widget.user,
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
           onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
@@ -357,7 +357,7 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
               Navigator.pop(context);
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (_) => LobbyScreen(user: widget.user)),
+                MaterialPageRoute(builder: (_) => ClubQuestDetailLeaderScreen()),
               );
             },
           );
@@ -368,7 +368,7 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
               Navigator.pop(context);
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (_) => LobbyScreen(user: widget.user)),
+                MaterialPageRoute(builder: (_) => ClubRoomHeadScreen()),
               );
             },
           );

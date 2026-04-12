@@ -91,7 +91,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
           imagePath: "assets/images/button/bt-create.png",
           isPressed: _isCreatePressed,
           onTap: () {
-            // TODO: ทำไปหน้าสร้างภารกิจชมรม
+            Navigator.pushNamed(context, '/createclubquest');
             debugPrint("Create mission tapped");
           },
           onPressedChanged: (val) => setState(() => _isCreatePressed = val),

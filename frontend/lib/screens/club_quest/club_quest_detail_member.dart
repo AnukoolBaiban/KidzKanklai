@@ -283,7 +283,7 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
         color: Colors.black.withOpacity(0.4),
         alignment: Alignment.bottomCenter,
         child: CustomTopBar(
-          user: widget.user,
+          // user: widget.user,
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
           onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),

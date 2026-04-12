@@ -28,6 +28,7 @@ import 'screens/create_normal_quest.dart';
 import 'screens/club_quest/create_club_quest.dart';
 import 'screens/club_quest/club_quest_detail_member.dart';
 import 'screens/club_quest/club_quest_detail_leader.dart';
+import 'screens/club_room_head.dart';
 import 'screens/quest_detail.dart';
 import 'config/rive_cache.dart';
 import 'config/user_pose_provider.dart';
@@ -137,38 +138,8 @@ class KidzKanklaiApp extends StatelessWidget {
             );
           },
         ),
-        '/questdetail': (context) => const QuestDetailScreen(),
-        '/countdown': (context) => const CountdownScreen(),
-        '/profile': (context) => const ProfileScreen(),
-        '/notification': (context) => const NotificationScreen(),
-        '/achievement': (context) => const AchievementScreen(),
-        '/lootbox': (context) => const LootboxScreen(),
-        '/map': (context) => const MapScreen(),
-        '/club': (context) => const ClubScreen(),
-        '/createclubquest': (context) => CreateClubQuestScreen(
-          onSubmit: (data) {
-            // บันทึกข้อมูลภารกิจ
-            print('Quest Name: ${data['name']}');
-            print('Quest Detail: ${data['detail']}');
-            print('Due Date: ${data['date']}');
-            print('Has Image: ${data['hasImage']}');
-
-            // TODO: บันทึกลง database
-            // await questService.createQuest(data);
-
-            // กลับหน้าเดิม
-            Navigator.pop(context);
-
-            // แสดงข้อความสำเร็จ
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('สร้างภารกิจสำเร็จ!'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          },
-        ),
         '/clubquestdetail': (context) => const ClubQuestDetailLeaderScreen(),
+        '/clubroom': (context) => const ClubRoomHeadScreen(),
         '/startgame': (context) => const StartGameScreen(),
         '/load': (context) => const LoadingScreen(),
       },
