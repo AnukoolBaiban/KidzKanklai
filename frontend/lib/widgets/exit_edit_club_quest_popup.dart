@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/widgets/ticket_box.dart';
 
-class ClubConfirmSavePopup extends StatefulWidget {
+class ExitEditClubQuestPopup extends StatefulWidget {
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
 
-  const ClubConfirmSavePopup({
+  const ExitEditClubQuestPopup({
     Key? key,
     required this.onConfirm,
     required this.onCancel,
@@ -19,7 +18,7 @@ class ClubConfirmSavePopup extends StatefulWidget {
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.black.withOpacity(0.6),
-      builder: (context) => ClubConfirmSavePopup(
+      builder: (context) => ExitEditClubQuestPopup(
         onConfirm: onConfirm,
         onCancel: () => Navigator.pop(context),
       ),
@@ -27,10 +26,10 @@ class ClubConfirmSavePopup extends StatefulWidget {
   }
 
   @override
-  State<ClubConfirmSavePopup> createState() => _ClubConfirmSavePopupState();
+  State<ExitEditClubQuestPopup> createState() => _ExitEditClubQuestPopupState();
 }
 
-class _ClubConfirmSavePopupState extends State<ClubConfirmSavePopup>
+class _ExitEditClubQuestPopupState extends State<ExitEditClubQuestPopup>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
@@ -66,18 +65,14 @@ class _ClubConfirmSavePopupState extends State<ClubConfirmSavePopup>
 
   @override
   Widget build(BuildContext context) {
-    // ✅ Responsive values
     final size = MediaQuery.of(context).size;
-    final isSmallScreen = size.width < 360;
-
+    
+    // ✅ Responsive with max limits to prevent oversized text on tablets
     final containerWidth = size.width * 0.85;
-    final containerHeight = isSmallScreen ? 170.0 : 190.0;
-    final buttonHeight = isSmallScreen ? 40.0 : 45.0;
-    final titleFontSize = isSmallScreen ? 14.0 : 16.0;
-    final subtitleFontSize = isSmallScreen ? 11.0 : 13.0;
-    final buttonFontSize = isSmallScreen ? 14.0 : 16.0;
-    final topPadding = isSmallScreen ? 15.0 : 20.0;
-    final badgeSize = isSmallScreen ? 12.0 : 14.0;
+    final titleFontSize = (size.width * 0.038).clamp(14.0, 18.0);
+    final subtitleFontSize = (size.width * 0.033).clamp(12.0, 14.0);
+    final buttonFontSize = (size.width * 0.038).clamp(14.0, 16.0);
+    final buttonHeight = (size.width * 0.105).clamp(39.0, 50.0);
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -89,8 +84,7 @@ class _ClubConfirmSavePopupState extends State<ClubConfirmSavePopup>
           child: Container(
             width: containerWidth,
             constraints: BoxConstraints(
-              maxWidth: 400,
-              maxHeight: containerHeight,
+              maxWidth: 380,
             ),
             decoration: BoxDecoration(color: Colors.transparent),
             child: Stack(
@@ -99,8 +93,7 @@ class _ClubConfirmSavePopupState extends State<ClubConfirmSavePopup>
               children: [
                 // Main Container
                 Container(
-                  padding: EdgeInsets.fromLTRB(20, topPadding, 20, 20),
-                  height: containerHeight,
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   width: double.infinity,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -133,26 +126,41 @@ class _ClubConfirmSavePopupState extends State<ClubConfirmSavePopup>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        'ยืนยันการสร้างภารกิจชมรม?',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: titleFontSize,
-                          fontWeight: FontWeight.bold,
+                      // Title with padding to prevent overflow
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          'ยืนยันที่จะออกจากการแก้ไขภารกิจหรือไม่?',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: titleFontSize,
+                            fontWeight: FontWeight.bold,
+                            height: 1.2,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      SizedBox(height: 8),
+                      
+                      SizedBox(height: 6),
+                      
+                      // Subtitle
                       Text(
-                        'ภารกิจของคุณจะถูกบันทึกและแก้ไขได้ในภายหลังแต่จะไม่สามารถลบได้',
+                        'ภารกิจของคุณจะไม่ได้รับการแก้ไขและไม่ถูกบันทึก',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white70,
                           fontSize: subtitleFontSize,
+                          height: 1.2,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      SizedBox(height: 20),
+                      
+                      SizedBox(height: 14),
 
+                      // Buttons
                       Row(
                         children: [
                           // 🔴 ยกเลิก
@@ -161,10 +169,17 @@ class _ClubConfirmSavePopupState extends State<ClubConfirmSavePopup>
                               onTap: widget.onCancel,
                               child: Container(
                                 height: buttonHeight,
-                                margin: EdgeInsets.only(right: 8),
+                                margin: EdgeInsets.only(right: 5),
                                 decoration: BoxDecoration(
                                   color: Color(0xFFEA4444),
                                   borderRadius: BorderRadius.circular(30),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Color(0xFFEA4444).withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: Offset(0, 4),
+                                    ),
+                                  ],
                                 ),
                                 child: Center(
                                   child: Text(
@@ -180,39 +195,41 @@ class _ClubConfirmSavePopupState extends State<ClubConfirmSavePopup>
                             ),
                           ),
 
-                          // 🔵 ยืนยัน with Badge
+                          // 🔵 ยืนยัน
                           Expanded(
                             child: GestureDetector(
                               onTap: widget.onConfirm,
-                              child: Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  Container(
-                                    height: buttonHeight,
-                                    margin: EdgeInsets.only(left: 8),
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topCenter,
-                                        end: Alignment.bottomCenter,
-                                        colors: [
-                                          Color(0xFF556AEB),
-                                          Color(0xFF59ABEC),
-                                        ],
-                                      ),
-                                      borderRadius: BorderRadius.circular(30),
+                              child: Container(
+                                height: buttonHeight,
+                                margin: EdgeInsets.only(left: 5),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Color(0xFF556AEB),
+                                      Color(0xFF59ABEC),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(30),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Color(0xFF59ABEC).withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: Offset(0, 4),
                                     ),
-                                    child: Center(
-                                      child: Text(
-                                        'ยืนยัน',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: buttonFontSize,
-                                        ),
-                                      ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'ยืนยัน',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: buttonFontSize,
                                     ),
                                   ),
-                                ],
+                                ),
                               ),
                             ),
                           ),

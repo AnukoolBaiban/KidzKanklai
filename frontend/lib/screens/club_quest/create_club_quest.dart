@@ -4,8 +4,10 @@ import 'package:flutter_application_1/screens/lobby.dart';
 import 'package:flutter_application_1/widgets/custom_top_bar.dart';
 import 'package:flutter_application_1/widgets/quest_info_card.dart';
 import 'package:flutter_application_1/widgets/confirm_exit_popup.dart';
+import 'package:flutter_application_1/widgets/exit_edit_club_quest_popup.dart';
 import 'package:flutter_application_1/widgets/club_confirm_save_popup.dart';
 import 'package:flutter_application_1/widgets/annotation_normal.dart';
+import 'create_club_quest_quiz.dart';
 
 class QuizQuestion {
   TextEditingController textController = TextEditingController();
@@ -29,12 +31,14 @@ class CreateClubQuestScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
   final Function(Map<String, dynamic>) onSubmit;
   final User? user;
+  final bool isEditing;
 
   const CreateClubQuestScreen({
     Key? key,
     required this.onSubmit,
     this.initialData,
     this.user,
+    this.isEditing = false,
   }) : super(key: key);
 
   @override
@@ -186,14 +190,23 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
     // ignore: deprecated_member_use
     return WillPopScope(
       onWillPop: () async {
-        // เมื่อกดปุ่ม back → แสดง ConfirmExitPopup
-        await ClubConfirmSavePopup.show(
-          context,
-          onConfirm: () {
-            Navigator.pop(context); // ปิด popup
-            Navigator.pop(context); // ออกจากหน้า (ไม่บันทึก)
-          },
-        );
+        if (widget.isEditing) {
+          ExitEditClubQuestPopup.show(
+            context,
+            onConfirm: () {
+              Navigator.pop(context); // ปิด popup
+              Navigator.pop(context); // ออกจากหน้า
+            },
+          );
+        } else {
+          ConfirmExitPopup.show(
+            context,
+            onConfirm: () {
+              Navigator.pop(context); // ปิด popup
+              Navigator.pop(context); // ออกจากหน้า
+            },
+          );
+        }
         return false; // ไม่ให้กลับทันที
       },
       child: Scaffold(
@@ -252,9 +265,6 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
 
                           _buildCameraButton(),
                           SizedBox(height: 24),
-
-                          _buildQuizSection(),
-                          SizedBox(height: 32),
 
                           _buildActionButtons(),
                           SizedBox(height: 20),
@@ -340,17 +350,29 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
 
         setState(() => _isPressed = false);
 
-        ConfirmExitPopup.show(
-          context,
-          onConfirm: () {
-            Navigator.pop(context);
-
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => LobbyScreen(user: widget.user)),
-            );
-          },
-        );
+        if (widget.isEditing) {
+          ExitEditClubQuestPopup.show(
+            context,
+            onConfirm: () {
+              Navigator.pop(context);
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => LobbyScreen(user: widget.user)),
+              );
+            },
+          );
+        } else {
+          ConfirmExitPopup.show(
+            context,
+            onConfirm: () {
+              Navigator.pop(context);
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => LobbyScreen(user: widget.user)),
+              );
+            },
+          );
+        }
       },
       child: Image.asset(
         _isPressed
@@ -388,10 +410,10 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
             ),
 
             /// Title (อยู่กลางจริง)
-            const Positioned.fill(
+            Positioned.fill(
               child: Center(
                 child: Text(
-                  "สร้างภารกิจชมรม",
+                  widget.isEditing ? "แก้ไขภารกิจชมรม" : "สร้างภารกิจชมรม",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 32,
@@ -730,360 +752,12 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
     );
   }
 
-  Widget _buildQuizSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Color(0xFF9DD0E7), width: 1),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: Text(
-            'คำถามตรวจสอบว่าทำภารกิจจริง',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-        ),
-        SizedBox(height: 8),
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Color(0xFF9DD0E7), width: 1),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'คะแนนขั้นต่ำเพื่อผ่านภารกิจ',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              Row(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      if (_minScore > 1) {
-                        setState(() => _minScore--);
-                      }
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Text(
-                        '<',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.black87,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Container(
-                    width: 30,
-                    height: 25,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Color(0xFF9DD0E7), width: 1),
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    child: Text('$_minScore', style: TextStyle(fontSize: 14)),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      if (_minScore < _questions.length) {
-                        setState(() => _minScore++);
-                      }
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Text(
-                        '>',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.black87,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: 8),
-        ...List.generate(_questions.length, (index) {
-          return _buildQuestionCard(index);
-        }),
-        SizedBox(height: 8),
-        Align(
-          alignment: Alignment.center,
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF556AEB), Color(0xFF59ABEC)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: [
-                BoxShadow(
-                  color: Color(0xFF556AEB).withOpacity(0.4),
-                  blurRadius: 8,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            child: ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _questions.add(QuizQuestion());
-                });
-              },
-              icon: Icon(Icons.add, color: Colors.white, size: 18),
-              label: Text(
-                'เพิ่มคำถาม',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                shadowColor: Colors.transparent,
-                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildQuestionCard(int index) {
-    QuizQuestion question = _questions[index];
-    return Container(
-      margin: EdgeInsets.only(bottom: 12),
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Color(0xFF9DD0E7), width: 1),
-        borderRadius: BorderRadius.circular(5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'คำถามที่ ${index + 1}',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              if (_questions.length > 1)
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      question.dispose();
-                      _questions.removeAt(index);
-                      if (_minScore > _questions.length) {
-                        _minScore = _questions.length > 0
-                            ? _questions.length
-                            : 1;
-                      }
-                    });
-                  },
-                  child: Icon(Icons.close, color: Color(0xFF447199), size: 20),
-                ),
-            ],
-          ),
-          SizedBox(height: 8),
-          Container(
-            height: 40,
-            decoration: BoxDecoration(
-              border: Border.all(color: Color(0xFF9DD0E7), width: 1),
-              borderRadius: BorderRadius.circular(5),
-            ),
-            child: TextField(
-              controller: question.textController,
-              decoration: InputDecoration(
-                hintText: 'คำถาม',
-                hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 11,
-                ),
-              ),
-              style: TextStyle(fontSize: 14),
-            ),
-          ),
-          SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'ตัวเลือกคำตอบ',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              Text(
-                'เฉลย',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 8),
-          ...List.generate(4, (optionIndex) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 40,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Color(0xFF9DD0E7), width: 1),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: TextField(
-                        controller: question.optionControllers[optionIndex],
-                        textAlignVertical: TextAlignVertical.center,
-                        decoration: InputDecoration(
-                          isDense: true,
-                          hintText: 'ตัวเลือกที่ ${optionIndex + 1}',
-                          hintStyle: TextStyle(
-                            color: Colors.grey.shade400,
-                            fontSize: 14,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                        ),
-                        style: TextStyle(fontSize: 14),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        question.correctOptionIndex = optionIndex;
-                      });
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white,
-                          border: Border.all(
-                            color: Color(0xFF1976D2),
-                            width: 2,
-                          ),
-                        ),
-                        child: question.correctOptionIndex == optionIndex
-                            ? Icon(
-                                Icons.circle,
-                                size: 16,
-                                color: Color(0xFF2374B5),
-                              )
-                            : null,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
   Widget _buildActionButtons() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Expanded(child: _buildCancelButton()),
-        SizedBox(width: 20),
         Expanded(child: _buildSubmitButtonNew()),
       ],
-    );
-  }
-
-  Widget _buildCancelButton() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Color(0xFFEA4444),
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.red.withOpacity(0.3),
-            blurRadius: 8,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ElevatedButton(
-        onPressed: () {
-          ConfirmExitPopup.show(
-            context,
-            onConfirm: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-            },
-          );
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          padding: EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(25),
-          ),
-        ),
-        child: Text(
-          'ยกเลิก',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      ),
     );
   }
 
@@ -1106,12 +780,23 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
       ),
       child: ElevatedButton(
         onPressed: () {
-          ClubConfirmSavePopup.show(
+          Navigator.push(
             context,
-            onConfirm: () {
-              Navigator.pop(context);
-              _submit();
-            },
+            MaterialPageRoute(
+              builder: (_) => CreateClubQuestQuizScreen(
+                user: widget.user,
+                isEditing: widget.isEditing,
+                initialData: {
+                  'name': _nameController.text,
+                  'detail': _detailController.text,
+                  'date': _selectedDate,
+                  'image': _hasImage,
+                  'questions': widget.initialData?['questions'],
+                  'minScore': widget.initialData?['minScore'],
+                },
+                onSubmit: widget.onSubmit,
+              ),
+            ),
           );
         },
         style: ElevatedButton.styleFrom(
@@ -1123,7 +808,7 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
           ),
         ),
         child: Text(
-          'บันทึก',
+          'ถัดไป',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
