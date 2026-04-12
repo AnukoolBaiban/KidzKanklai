@@ -158,18 +158,21 @@ class _LobbyScreenState extends State<LobbyScreen> {
             fit: BoxFit.cover,
           ),
         ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Top Bar - ใช้ CustomTopBar
-              CustomTopBar(
-                key: _topBarKey,
-                onNotificationTapped: () {
-                  Navigator.pushNamed(context, '/notification').then((_) => _onReturnFromOtherPage());
-                },
-                onSettingsTapped: () {
-                  Navigator.pushNamed(context, '/setting').then((_) => _onReturnFromOtherPage());
-                },
+        child: Column(
+          children: [
+            // Top Bar - ใช้ CustomTopBar (หุ้มด้วยแถบสีดำบางๆ ให้เหมือนหน้าภารกิจ)
+            Container(
+              padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
+              color: Colors.black.withOpacity(0.4),
+              child: CustomTopBar(
+                  key: _topBarKey,
+                  onNotificationTapped: () {
+                    Navigator.pushNamed(context, '/notification').then((_) => _onReturnFromOtherPage());
+                  },
+                  onSettingsTapped: () {
+                    Navigator.pushNamed(context, '/setting').then((_) => _onReturnFromOtherPage());
+                  },
+                ),
               ),
 
               // Main Content
@@ -180,7 +183,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   children: [
                     // Character Widget - อยู่ชั้นล่างสุด
                     Positioned(
-                      bottom: -50, // Adjust position as needed
+                      bottom: -30, // Adjust position as needed
                       child: _isLoading || _user == null
                           ? const SizedBox() // Or CircularProgressIndicator() if you want to see it loading
                           : CharacterWidget(
@@ -197,10 +200,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
               ),
 
               // Bottom Navigation
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 20,
+              SafeArea(
+                top: false,
                 child: CustomBottomNavigationBar(
                   selectedIndex: _selectedIndex,
                   onItemTapped: (index) {
@@ -231,7 +232,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
             ],
           ),
         ),
-      ),
     );
   }
 }

@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_application_1/config/app_config.dart';
+import 'package:flutter_application_1/globals.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 
 // --- Data Models ---
@@ -154,6 +156,16 @@ class ApiService {
   // Use 10.0.2.2 for Android Emulator, localhost for iOS/Web
   static const String baseUrl = '${AppConfig.baseUrl}';
   static String? authToken; // Token for Authentication
+  // --- Token Validation Helper ---
+  static void _checkUnauthorized(int statusCode) {
+    if (statusCode == 401) {
+      print("🚨 Token หมดอายุ หรือไม่ได้รับอนุญาต (401). บังคับ Logout...");
+      Supabase.instance.client.auth.signOut();
+      authToken = null;
+      navigatorKey.currentState?.pushNamedAndRemoveUntil('/login', (route) => false);
+    }
+  }
+
 
   static Map<String, String> get _headers => {
     "Content-Type": "application/json",
@@ -174,6 +186,7 @@ class ApiService {
         Uri.parse('$baseUrl/me'),
         headers: _headers,
       );
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         return User.fromJson(jsonDecode(response.body));
       }
@@ -190,6 +203,7 @@ class ApiService {
         Uri.parse('$baseUrl/inventory'),
         headers: _headers,
       );
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final list =
@@ -209,6 +223,7 @@ class ApiService {
         Uri.parse('$baseUrl/equipped'),
         headers: _headers,
       );
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final list = (data['equipped'] as List?) ?? []; // Handle null equipped
@@ -228,6 +243,7 @@ class ApiService {
         headers: _headers,
         body: jsonEncode({"item_id": int.parse(itemId)}),
       );
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode != 200) {
         print("Equip Failed (${response.statusCode}): ${response.body}");
       }
@@ -246,6 +262,7 @@ class ApiService {
         headers: _headers, // ใช้ _headers ที่มี Authorization Token อยู่แล้ว
       );
 
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true && data['rewards'] != null) {
@@ -267,6 +284,7 @@ class ApiService {
         headers: _headers,
       );
 
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true) {
@@ -295,6 +313,7 @@ class ApiService {
         body: jsonEncode({"achievement_id": achievementId}),
       );
 
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true) {
@@ -320,6 +339,7 @@ class ApiService {
         Uri.parse('$baseUrl/ai/dialogue'),
         headers: _headers,
       );
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return data['dialogue'] as String?;
@@ -369,6 +389,7 @@ class ApiService {
 
       var response = await request.send();
 
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         return true;
       } else {
@@ -392,6 +413,7 @@ class ApiService {
         body: jsonEncode({"quest_id": questId}),
       );
 
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true) {
@@ -421,6 +443,7 @@ class ApiService {
         body: jsonEncode({"quest_id": questId}),
       );
 
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true) {
@@ -453,6 +476,7 @@ class ApiService {
         body: jsonEncode({"name": name, "duration_minutes": durationMinutes}),
       );
 
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true) {
@@ -481,6 +505,7 @@ class ApiService {
         body: jsonEncode({"quest_id": questId}),
       );
 
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true) {
@@ -522,6 +547,7 @@ class ApiService {
         body: jsonEncode({'quest_id': questId}),
       );
 
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return data['rewards'];
@@ -542,6 +568,7 @@ class ApiService {
         Uri.parse('$baseUrl/notifications'),
         headers: _headers,
       );
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final list = (data['notifications'] as List?) ?? [];

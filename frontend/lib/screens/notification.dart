@@ -135,17 +135,18 @@ class _NotificationScreenState extends State<NotificationScreen> {
             ),
           ),
 
-          _buildTopBar(),
+          Column(
+            children: [
+              _buildTopBar(),
+              const SizedBox(height: 10),
 
-          Positioned(
-            top: 150,
-            left: 24,
-            right: 24,
-            bottom: 24,
-            child: Column(
-              children: [
-                Expanded(
-                  child: Stack(
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: Stack(
                     clipBehavior: Clip.none,
                     children: [
                       Positioned.fill(
@@ -229,6 +230,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
               ],
             ),
           ),
+                ), // close Expanded
+              ], // close children of outer Column
+            ), // close outer Column
         ],
       ),
     );
@@ -257,20 +261,13 @@ class _NotificationScreenState extends State<NotificationScreen> {
   }
 
   Widget _buildTopBar() {
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            height: screenHeight * 0.098,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+            padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
             color: Colors.black.withOpacity(0.4),
-            alignment: Alignment.bottomCenter,
             child: CustomTopBar(
               key: _topBarKey,
               onNotificationTapped: () {},
@@ -280,8 +277,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
             ),
           ),
           _buildBackButton(),
-        ],
-      ),
+      ],
     );
   }
 

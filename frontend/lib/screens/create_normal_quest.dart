@@ -214,6 +214,7 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final topPadding = MediaQuery.of(context).padding.top;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
     final topBarHeight = 75.0 + topPadding;
     final headerHeight = 80.0;
 
@@ -241,57 +242,64 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
           children: [
             _buildBackground(),
 
-            Padding(
-              padding: EdgeInsets.only(
-                top: topBarHeight + headerHeight + 10,
-                left: size.width * 0.05,
-                right: size.width * 0.05,
-              ),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 10),
-                    _buildTextField(
-                      controller: _nameController,
-                      hintText: 'ชื่อภารกิจ',
+            Column(
+              children: [
+                _buildTopBar(topPadding),
+                _buildBlueHeader(),
+                
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      top: 10,
+                      bottom: bottomPadding + 20,
+                      left: size.width * 0.05,
+                      right: size.width * 0.05,
                     ),
-                    const SizedBox(height: 24),
-                    _buildSectionTitle('เนื้อหา'),
-                    const SizedBox(height: 8),
-
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.8),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      padding: const EdgeInsets.all(16),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildDatePicker(),
-                          _buildDetailTextField(),
-                          const SizedBox(height: 16),
-                          _buildCameraButton(),
-                          const SizedBox(height: 32),
+                          const SizedBox(height: 10),
+                          _buildTextField(
+                            controller: _nameController,
+                            hintText: 'ชื่อภารกิจ',
+                          ),
+                          const SizedBox(height: 24),
+                          _buildSectionTitle('เนื้อหา'),
+                          const SizedBox(height: 8),
 
-                          // 🌟 โชว์ Loading ถ้ากำลังยิง API อยู่
-                          _isSubmitting
-                              ? const Center(child: CircularProgressIndicator())
-                              : _buildSubmitButton(),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.8),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildDatePicker(),
+                                _buildDetailTextField(),
+                                const SizedBox(height: 16),
+                                _buildCameraButton(),
+                                const SizedBox(height: 32),
 
-                          const SizedBox(height: 20),
+                                // 🌟 โชว์ Loading ถ้ากำลังยิง API อยู่
+                                _isSubmitting
+                                    ? const Center(child: CircularProgressIndicator())
+                                    : _buildSubmitButton(),
+
+                                const SizedBox(height: 20),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-
-            _buildTopBar(topPadding, topBarHeight),
-            _buildBlueHeader(topBarHeight),
 
             if (_showQuestInfo)
               Positioned.fill(
@@ -310,22 +318,15 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
     );
   }
 
-  Widget _buildTopBar(double topPadding, double height) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: height,
+  Widget _buildTopBar(double topPadding) {
+    return Container(
         padding: EdgeInsets.only(top: topPadding),
         color: Colors.black.withOpacity(0.4),
-        alignment: Alignment.bottomCenter,
         child: CustomTopBar(
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
           onSettingsTapped: () => Navigator.pushNamed(context, '/settings'),
         ),
-      ),
     );
   }
 
@@ -378,12 +379,8 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
     );
   }
 
-  Widget _buildBlueHeader(double topOffset) {
-    return Positioned(
-      top: topOffset,
-      left: 0,
-      right: 0,
-      child: Container(
+  Widget _buildBlueHeader() {
+    return Container(
         height: 80,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -418,7 +415,6 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
             const Positioned(bottom: 8, right: 15, child: AnnotationButton()),
           ],
         ),
-      ),
     );
   }
 

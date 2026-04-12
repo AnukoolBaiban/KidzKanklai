@@ -17,7 +17,7 @@ class AchievementScreen extends StatefulWidget {
 }
 
 class _AchievementScreenState extends State<AchievementScreen> {
-  int _selectedIndex = 1;
+  int _selectedIndex = -1;
   int? _expandedAchievementIndex;
   bool _isPressed = false;
   
@@ -145,49 +145,62 @@ class _AchievementScreenState extends State<AchievementScreen> {
           Positioned.fill(
             child: Image.asset('assets/images/background/bg4.png', fit: BoxFit.cover),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 120),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 200),
-                    padding: const EdgeInsets.all(20),
-                    height: MediaQuery.of(context).size.height * 0.65,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          'จำนวนทั้งหมด ${achievements.length} รายการ',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Expanded(
-                          child: _isLoading
-                              ? const Center(child: CircularProgressIndicator())
-                              : achievements.isEmpty
-                                  ? const Center(child: Text("ไม่พบข้อมูลความสำเร็จ"))
-                                  : SingleChildScrollView(
-                                      child: Column(children: _buildAchievementList()),
+          Column(
+            children: [
+              _buildTopBar(),
+              const SizedBox(height: 10),
+
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 120), // 120 เผื่อพื้นที่ด้านล่าง
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Positioned.fill(
+                              child: Container(
+                                padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      'สำเร็จ ${achievements.where((a) => a.isCompleted).length}/${achievements.length}',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
+                                    const SizedBox(height: 10),
+                                    Expanded(
+                                      child: _isLoading
+                                          ? const Center(child: CircularProgressIndicator())
+                                          : achievements.isEmpty
+                                              ? const Center(child: Text("ไม่พบข้อมูลความสำเร็จ"))
+                                              : SingleChildScrollView(
+                                                  child: Column(children: _buildAchievementList()),
+                                                ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            
+                            // Header Title
+                            _buildHeaderTitle(),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  _buildHeaderTitle(),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-          _buildTopBar(),
           Positioned(
             left: 0,
             right: 0,
@@ -240,21 +253,14 @@ class _AchievementScreenState extends State<AchievementScreen> {
     return widgets;
   }
 
-    Widget _buildTopBar() {
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            height: screenHeight * 0.098, // responsive
+  Widget _buildTopBar() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+            padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
             color: Colors.black.withOpacity(0.4),
-            alignment: Alignment.bottomCenter,
             child: CustomTopBar(
               onNotificationTapped: () {
                 Navigator.pushNamed(context, '/notification');
@@ -267,8 +273,7 @@ class _AchievementScreenState extends State<AchievementScreen> {
 
           // เรียก Back Button
           _buildBackButton(),
-        ],
-      ),
+      ],
     );
   }
 
@@ -574,11 +579,7 @@ class _AchievementScreenState extends State<AchievementScreen> {
   }
 
   Widget _buildHeaderTitle() {
-    return Positioned(
-      top: 175,
-      left: 0,
-      right: 0,
-      child: Align(
+    return Align(
         alignment: Alignment.topCenter,
         child: FractionalTranslation(
           translation: const Offset(0, -0.5),
@@ -614,7 +615,6 @@ class _AchievementScreenState extends State<AchievementScreen> {
             ],
           ),
         ),
-      ),
     );
   }
 }

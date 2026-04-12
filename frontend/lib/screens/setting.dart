@@ -93,16 +93,20 @@ class _SettingScreenState extends State<SettingScreen> {
             ),
           ),
 
-          // Top Bar Overlay
-          _buildTopBar(),
+          // จัดวางเป็น Column เพื่อไม่ให้กรอบขาวทับแถบด้านบน
+          Column(
+            children: [
+              _buildTopBar(),
+              const SizedBox(height: 10),
 
-          // Main Content
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 150, 24, 24),
-            child: Column(
-              children: [
-                Expanded(
-                  child: Stack(
+              // Main Content
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: Stack(
                     clipBehavior: Clip.none,
                     children: [
                       Positioned.fill(
@@ -161,26 +165,22 @@ class _SettingScreenState extends State<SettingScreen> {
               ],
             ),
           ),
+          ), // close Expanded child of Column
+          ],
+          ), // close Column
         ],
       ),
     );
   }
 
   Widget _buildTopBar() {
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            height: screenHeight * 0.098, // responsive
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+            padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
             color: Colors.black.withOpacity(0.4),
-            alignment: Alignment.bottomCenter,
             child: CustomTopBar(
               key: _topBarKey,
               onNotificationTapped: () {
@@ -190,10 +190,9 @@ class _SettingScreenState extends State<SettingScreen> {
             ),
           ),
 
-          // เรียก Back Button
-          _buildBackButton(),
-        ],
-      ),
+        // เรียก Back Button
+        _buildBackButton(),
+      ],
     );
   }
 

@@ -239,42 +239,49 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
     final topPadding = MediaQuery.of(context).padding.top;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    final topBarHeight = 75.0 + topPadding;
-    final headerHeight = 80.0;
+    return GestureDetector(
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      child: Scaffold(
+        resizeToAvoidBottomInset: false,
+        body: Stack(
+          children: [
+            _buildBackground(),
 
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          _buildBackground(),
-
-          // Main Content
-          Padding(
-            padding: EdgeInsets.only(
-              top: topBarHeight + headerHeight + 10,
-              bottom: 110 + bottomPadding,
-              left: size.width * 0.05,
-              right: size.width * 0.05,
-            ),
-            child: Column(
-              children: [
-                _buildTabs(),
-                const SizedBox(height: 4),
-                if (_selectedTabIndex == 3) ...[
-                  // 🌟 แสดง Search + Filter เฉพาะแถบประวัติ
-                  _buildSearchAndFilter(),
-                  const SizedBox(height: 6),
-                ],
-                Expanded(child: _buildQuestContent()),
-              ],
-            ),
+          Column(
+            children: [
+              _buildTopBar(topPadding),
+              _buildBlueHeader(),
+              
+              // Main Content
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: 10,
+                    bottom: 110 + bottomPadding,
+                    left: size.width * 0.05,
+                    right: size.width * 0.05,
+                  ),
+                  child: Column(
+                    children: [
+                      _buildTabs(),
+                      const SizedBox(height: 4),
+                      if (_selectedTabIndex == 3) ...[
+                        // 🌟 แสดง Search + Filter เฉพาะแถบประวัติ
+                        _buildSearchAndFilter(),
+                        const SizedBox(height: 6),
+                      ],
+                      Expanded(child: _buildQuestContent()),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
 
-          _buildTopBar(topPadding, topBarHeight),
-          _buildBlueHeader(topBarHeight),
           _buildBottomNavBar(),
         ],
       ),
+    ),
     );
   }
 
@@ -294,16 +301,10 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
     );
   }
 
-  Widget _buildTopBar(double topPadding, double height) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: height,
+  Widget _buildTopBar(double topPadding) {
+    return Container(
         padding: EdgeInsets.only(top: topPadding),
         color: Colors.black.withOpacity(0.4),
-        alignment: Alignment.bottomCenter,
         child: CustomTopBar(
           key: _topBarKey,
           onNotificationTapped: () =>
@@ -322,16 +323,11 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
             }
           }),
         ),
-      ),
     );
   }
 
-  Widget _buildBlueHeader(double topOffset) {
-    return Positioned(
-      top: topOffset,
-      left: 0,
-      right: 0,
-      child: Container(
+  Widget _buildBlueHeader() {
+    return Container(
         height: 80,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -361,7 +357,6 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
             const Positioned(bottom: 8, right: 15, child: AnnotationButton()),
           ],
         ),
-      ),
     );
   }
 
@@ -555,93 +550,86 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
   }
 
   // --- 🌟 Search + Filter Widget ---
-  Widget _buildSearchAndFilter() {
+  Widget _buildSearchAndFilter({bool isOverlay = false}) {
     final bool hasActiveFilters =
         _filterTypes.isNotEmpty || _filterStatuses.isNotEmpty;
 
-    return Row(
-      children: [
-        // ช่องค้นหา
-        Expanded(
-          child: Container(
-            height: 38,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.9),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFF9DD0E7), width: 1.5),
+    return Builder(
+      builder: (barContext) => Container(
+        height: 38,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.9),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFF9DD0E7), width: 1.5),
+        ),
+        child: TextField(
+          controller: _searchController,
+          style: GoogleFonts.kanit(fontSize: 13, color: Colors.black87),
+          textAlignVertical: TextAlignVertical.center,
+          onChanged: (val) {
+            if (!isOverlay) setState(() => _searchText = val.trim().toLowerCase());
+          },
+          decoration: InputDecoration(
+            hintText: 'ค้นหาภารกิจ...',
+            hintStyle: GoogleFonts.kanit(
+              fontSize: 13,
+              color: Colors.grey.shade400,
             ),
-            child: TextField(
-              controller: _searchController,
-              style: GoogleFonts.kanit(fontSize: 13, color: Colors.black87),
-              onChanged: (val) =>
-                  setState(() => _searchText = val.trim().toLowerCase()),
-              decoration: InputDecoration(
-                hintText: 'ค้นหาภารกิจ...',
-                hintStyle: GoogleFonts.kanit(
-                  fontSize: 13,
-                  color: Colors.grey.shade400,
-                ),
-                prefixIcon: const Icon(
-                  Icons.search,
-                  size: 18,
-                  color: Color(0xFF2374B5),
-                ),
-                suffixIcon: _searchText.isNotEmpty
-                    ? GestureDetector(
-                        onTap: () {
+            prefixIcon: const Icon(
+              Icons.search,
+              size: 18,
+              color: Color(0xFF2374B5),
+            ),
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IgnorePointer(
+                  ignoring: _searchText.isEmpty || isOverlay,
+                  child: Opacity(
+                    opacity: _searchText.isNotEmpty ? 1.0 : 0.0,
+                    child: GestureDetector(
+                      onTap: () {
+                        if (!isOverlay) {
                           _searchController.clear();
                           setState(() => _searchText = '');
-                        },
-                        child: const Icon(
+                        }
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8.0),
+                        child: Icon(
                           Icons.close,
                           size: 16,
                           color: Colors.grey,
                         ),
-                      )
-                    : null,
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 10),
-              ),
+                      ),
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    if (!isOverlay) {
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      _showFilterPopup(barContext);
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 12.0),
+                    child: Icon(
+                      Icons.filter_list_rounded,
+                      size: 25,
+                      color: hasActiveFilters
+                          ? const Color(0xFFFF8C00)
+                          : const Color(0xFF2374B5),
+                    ),
+                  ),
+                ),
+              ],
             ),
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.only(bottom: 12, top: 0),
           ),
         ),
-        const SizedBox(width: 8),
-
-        // ปุ่ม Filter (สไตล์เดียวกับปุ่ม +)
-        Builder(
-          builder: (ctx) => GestureDetector(
-            onTap: () => _showFilterPopup(ctx),
-            child: Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: hasActiveFilters
-                      ? [const Color(0xFFFF8C00), const Color(0xFFFFD27F)]
-                      : [const Color(0xFF68E2FA), const Color(0xFF2374B5)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-              ),
-              child: Container(
-                margin: const EdgeInsets.all(2.5),
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
-                ),
-                child: Icon(
-                  Icons.filter_list_rounded,
-                  size: 18,
-                  color: hasActiveFilters
-                      ? const Color(0xFFFF8C00)
-                      : const Color(0xFF2374B5),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -651,7 +639,7 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
 
     showDialog(
       context: context,
-      barrierColor: Colors.black12,
+      barrierColor: Colors.black26,
       useSafeArea: false,
       builder: (BuildContext dialogContext) {
         return StatefulBuilder(
@@ -665,48 +653,18 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
                     child: Container(color: Colors.transparent),
                   ),
                 ),
-                // ปุ่ม Filter (ทับตรงเดิม)
+                // แถบค้นหาที่จะโผล่มาทับด้านหน้า เพื่อไม่ให้โดนสีดำบัง
                 Positioned(
                   left: offset.dx,
                   top: offset.dy,
+                  width: renderBox.size.width,
+                  height: renderBox.size.height,
                   child: GestureDetector(
-                    onTap: () => Navigator.pop(dialogContext),
-                    child: Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors:
-                              (_filterTypes.isNotEmpty ||
-                                  _filterStatuses.isNotEmpty)
-                              ? [
-                                  const Color(0xFFFF8C00),
-                                  const Color(0xFFFFD27F),
-                                ]
-                              : [
-                                  const Color(0xFF68E2FA),
-                                  const Color(0xFF2374B5),
-                                ],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                      ),
-                      child: Container(
-                        margin: const EdgeInsets.all(2.5),
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white,
-                        ),
-                        child: Icon(
-                          Icons.filter_list_rounded,
-                          size: 18,
-                          color:
-                              (_filterTypes.isNotEmpty ||
-                                  _filterStatuses.isNotEmpty)
-                              ? const Color(0xFFFF8C00)
-                              : const Color(0xFF2374B5),
-                        ),
+                    onTap: () => Navigator.pop(dialogContext), // กดแถบก็จะปิดด้วย
+                    child: Material(
+                      color: Colors.transparent,
+                      child: AbsorbPointer(
+                        child: _buildSearchAndFilter(isOverlay: true),
                       ),
                     ),
                   ),

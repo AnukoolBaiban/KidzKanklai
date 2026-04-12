@@ -159,25 +159,28 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
           // Background
           _buildBackground(),
 
-          // Top Bar
-          _buildTopBar(topPadding, topBarHeight),
+          Column(
+            children: [
+              // Top Bar
+              _buildTopBar(topPadding),
 
-          // Main Content
-          Padding(
-            padding: EdgeInsets.only(
-              top: topBarHeight + 10,
-              left: size.width * 0.05,
-              right: size.width * 0.05,
-              bottom: bottomPadding + 100, // เว้นที่ให้ปุ่ม
-            ),
-            child: Column(
-              children: [
-                // Back Button
-                Row(children: [_buildBackButton()]),
+              // Main Content
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: 10,
+                    left: size.width * 0.05,
+                    right: size.width * 0.05,
+                    bottom: bottomPadding + 100, // เว้นที่ให้ปุ่ม
+                  ),
+                  child: Column(
+                    children: [
+                      // Back Button
+                      Row(children: [_buildBackButton()]),
 
-                SizedBox(height: 10),
+                      const SizedBox(height: 10),
 
-                // Content Card
+                      // Content Card
                 Expanded(
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 5),
@@ -352,6 +355,9 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
                 ),
               ],
             ),
+                  ),
+                ),
+            ],
           ),
 
           // Bottom Buttons
@@ -395,22 +401,15 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
     );
   }
 
-  Widget _buildTopBar(double topPadding, double height) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: height,
+  Widget _buildTopBar(double topPadding) {
+    return Container(
         padding: EdgeInsets.only(top: topPadding),
         color: Colors.black.withOpacity(0.4),
-        alignment: Alignment.bottomCenter,
         child: CustomTopBar(
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
           onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
         ),
-      ),
     );
   }
 

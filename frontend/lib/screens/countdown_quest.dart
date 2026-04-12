@@ -304,21 +304,27 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
         body: Stack(
           children: [
             _buildBackground(),
-            _buildMainContentScrollable(
-              size,
-              topBarHeight,
-              headerHeight,
-              bottomPadding,
-              isSmallScreen,
+
+            Column(
+              children: [
+                _buildTopBar(topPadding),
+                _buildBlueHeader(headerHeight, titleFontSize),
+                Expanded(
+                  child: _buildMainContentScrollable(
+                    size,
+                    bottomPadding,
+                    isSmallScreen,
+                  ),
+                ),
+              ],
             ),
+
             Positioned(
               bottom: bottomPadding + 50,
               left: 0,
               right: 0,
               child: Center(child: _buildStartButton(size, isSmallScreen)),
             ),
-            _buildTopBar(topPadding, topBarHeight),
-            _buildBlueHeader(topBarHeight, headerHeight, titleFontSize),
           ],
         ),
       ),
@@ -341,16 +347,10 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
   }
 
   // แถบสีดำบางๆด้านบนสุด แสดงโปรไฟล์ผู้ใช้ เลเวล และเหรียญ
-  Widget _buildTopBar(double topPadding, double height) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: height,
+  Widget _buildTopBar(double topPadding) {
+    return Container(
         padding: EdgeInsets.only(top: topPadding),
         color: Colors.black.withValues(alpha: 0.4),
-        alignment: Alignment.bottomCenter,
         child: CustomTopBar(
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
@@ -364,21 +364,15 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
             );
           },
         ),
-      ),
     );
   }
 
   // กล่องหัวข้อ "ภารกิจทันที" , ปุ่มย้อนกลับ และไอคอนคำถาม (Annotation)
   Widget _buildBlueHeader(
-    double topOffset,
     double height,
     double titleFontSize,
   ) {
-    return Positioned(
-      top: topOffset,
-      left: 0,
-      right: 0,
-      child: Container(
+    return Container(
         height: height,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -408,7 +402,6 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
             const Positioned(bottom: 8, right: 15, child: AnnotationButton()),
           ],
         ),
-      ),
     );
   }
 
@@ -454,8 +447,6 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
   // กล่องตั้งค่าเวลา และช่องกรอกข้อความ
   Widget _buildMainContentScrollable(
     Size size,
-    double topBarHeight,
-    double headerHeight,
     double bottomPadding,
     bool isSmallScreen,
   ) {
@@ -464,8 +455,8 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
 
     return Padding(
       padding: EdgeInsets.only(
-        top: topBarHeight + headerHeight + 20,
-        bottom: bottomPadding + 20,
+        top: 20,
+        bottom: bottomPadding + 140, // เพิ่มพื้นที่สำหรับปุ่มล่างสุด
         left: size.width * 0.05,
         right: size.width * 0.05,
       ),
@@ -473,9 +464,7 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
         physics: const BouncingScrollPhysics(),
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            minHeight:
-                size.height -
-                (topBarHeight + headerHeight + bottomPadding + 40),
+            minHeight: size.height * 0.5,
           ),
           child: Column(
             children: [
