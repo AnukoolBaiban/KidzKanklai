@@ -228,7 +228,7 @@ class _ExamScreenState extends State<ExamScreen> {
         if (input.name == 'HairID') _hairInput = input as SMINumber;
         if (input.name == 'FaceID') _faceInput = input as SMINumber;
         if (input.name == 'SkinID') _skinInput = input as SMINumber;
-        if (input.name == 'ClothID' || input.name == 'BodyID') {
+        if (input.name == 'OutfitID') {
           _clothInput = input as SMINumber;
         }
       }
@@ -270,11 +270,7 @@ class _ExamScreenState extends State<ExamScreen> {
       if (_skinInput != null) _skinInput!.value = _parseId(_user!.equippedSkin);
 
       if (_clothInput != null) {
-        double val = _parseId(_user!.equippedCloth);
-        if (val == 0 && _user!.equippedBody.isNotEmpty) {
-          val = _parseId(_user!.equippedBody);
-        }
-        _clothInput!.value = val;
+        _clothInput!.value = _parseId(_user!.equippedOutfit);
       }
 
       if (_poseInput != null) _poseInput!.value = 2.0;

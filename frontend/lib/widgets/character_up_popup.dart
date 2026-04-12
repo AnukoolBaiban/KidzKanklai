@@ -1,18 +1,21 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../api_service.dart';
+import 'character_widget.dart';
 
-/// Popup สำหรับแสดงวิวัฒนาการตัวละครตอน Level Up
+/// Popup สำหรับแสดงวิวัฒนาการตัวละครตอน Level Up พร้อมเอฟเฟคแบบ Pokemon
 class CharacterUpPopup extends StatefulWidget {
   final int baseLevel;
   final int newLevel;
-  final Widget? characterWidget; // รับ Widget ตัวละครจากภายนอก
+  final User? user; // รับ User มาเพื่อเรนเดอร์โมเดลที่มีชุดต่างๆ
   final VoidCallback onTapContinue;
 
   const CharacterUpPopup({
     super.key,
     required this.baseLevel,
     required this.newLevel,
-    this.characterWidget,
+    this.user,
     required this.onTapContinue,
   });
 
@@ -21,7 +24,7 @@ class CharacterUpPopup extends StatefulWidget {
     BuildContext context, {
     required int baseLevel,
     required int newLevel,
-    Widget? characterWidget,
+    User? user,
     required VoidCallback onTapContinue,
   }) {
     return showDialog(
@@ -31,7 +34,7 @@ class CharacterUpPopup extends StatefulWidget {
       builder: (context) => CharacterUpPopup(
         baseLevel: baseLevel,
         newLevel: newLevel,
-        characterWidget: characterWidget,
+        user: user,
         onTapContinue: onTapContinue,
       ),
     );
@@ -42,30 +45,36 @@ class CharacterUpPopup extends StatefulWidget {
 }
 
 class _CharacterUpPopupState extends State<CharacterUpPopup>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   bool _canClose = false;
 
   // ─── Animations ───────────────────────────────────────────────────────────
-  late final AnimationController _controller = AnimationController(
+  late final AnimationController _popupController = AnimationController(
     duration: const Duration(milliseconds: 400),
     vsync: this,
   )..forward();
 
   late final Animation<double> _scaleAnimation = CurvedAnimation(
-    parent: _controller,
+    parent: _popupController,
     curve: Curves.easeOutBack,
   );
 
   late final Animation<double> _fadeAnimation = CurvedAnimation(
-    parent: _controller,
+    parent: _popupController,
     curve: Curves.easeIn,
   );
+
+  // Pokemon Evolution Animation
+  late final AnimationController _evoController = AnimationController(
+    duration: const Duration(milliseconds: 4500),
+    vsync: this,
+  )..forward();
 
   @override
   void initState() {
     super.initState();
-    // ดีเลย์ 3 วินาทีก่อนแสดงข้อความและอนุญาตให้ปิด
-    Future.delayed(const Duration(seconds: 3), () {
+    // ให้อนุญาตปิดได้หลังจากการวิวัฒนาการจบ (5 วินาที)
+    Future.delayed(const Duration(milliseconds: 5000), () {
       if (mounted) {
         setState(() => _canClose = true);
       }
@@ -74,11 +83,11 @@ class _CharacterUpPopupState extends State<CharacterUpPopup>
 
   @override
   void dispose() {
-    _controller.dispose();
+    _popupController.dispose();
+    _evoController.dispose();
     super.dispose();
   }
 
-  // ─── Main Build ───────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -109,14 +118,13 @@ class _CharacterUpPopupState extends State<CharacterUpPopup>
     );
   }
 
-  // ─── Full-screen Layout ───────────────────────────────────────────────────
   Widget _buildFullScreenContent(bool isSmall) {
     return Column(
       children: [
         // ── ส่วนบน: เลขเลเวล + LEVEL UP! + กล่องเลเวล ──────────────────────
         _buildTopSection(isSmall),
 
-        // ── ส่วนกลาง: พื้นที่ตัวละครและเอฟเฟค ───────────────────────────────
+        // ── ส่วนกลาง: พื้นที่ตัวละครและเอฟเฟควิวัฒนาการ ──────────────────────────
         Expanded(
           child: _buildCharacterArea(isSmall),
         ),
@@ -255,6 +263,21 @@ class _CharacterUpPopupState extends State<CharacterUpPopup>
     );
   }
 
+  // ─── Pokemon Evolution Logic ─────────────────────────────────────────────
+  bool _isShowingNewForm(double progress) {
+    if (progress < 0.2) return false;
+    if (progress > 0.8) return true;
+    double n = (progress - 0.2) / 0.6; // 0.0 to 1.0
+    double freq = 10 + (30 * n); // ความถี่การสลับร่างเพิ่มขึ้นเรื่อยๆ
+    return sin(n * freq * pi) > 0;
+  }
+
+  bool _isWhiteGlow(double progress) {
+    if (progress < 0.1) return false;
+    if (progress > 0.9) return false;
+    return true;
+  }
+
   // ─── พื้นที่ตัวละครและเอฟเฟค ─────────────────────────────────────────────
   Widget _buildCharacterArea(bool isSmall) {
     return Stack(
@@ -278,20 +301,70 @@ class _CharacterUpPopupState extends State<CharacterUpPopup>
           ),
         ),
 
-        // รูปตัวละคร
-        if (widget.characterWidget != null)
-          widget.characterWidget!
-        else
-          // Placeholder เมื่อไม่มี Widget ตัวละคร
-          Container(
-            width: 200,
-            height: 250,
-            alignment: Alignment.center,
-            child: Text(
-              '✨',
-              style: TextStyle(fontSize: isSmall ? 60.0 : 80.0),
-            ),
-          ),
+        // ── ตัวละครที่มีแอนิเมชั่นวิวัฒนาการ ─────────────────────────────────
+        AnimatedBuilder(
+          animation: _evoController,
+          builder: (context, child) {
+            final progress = _evoController.value;
+            final isNew = _isShowingNewForm(progress);
+            final isWhiteGlow = _isWhiteGlow(progress);
+
+            // ใช้ IndexedStack เพื่อให้ Widget ทั้งคู่(ร่างเก่าและใหม่)โหลดทิ้งไว้ 
+            // จะได้ไม่มีอาการโหลด Rive ช้าตอนสลับภาพกระพริบ
+            Widget characterStack = IndexedStack(
+              index: isNew ? 1 : 0,
+              children: [
+                CharacterWidget(
+                  user: widget.user,
+                  overrideLevel: widget.baseLevel, // บังคับเป็นร่างก่อนหน้า
+                  height: isSmall ? 350 : 450,
+                  width: isSmall ? 300 : 400,
+                ),
+                CharacterWidget(
+                  user: widget.user,
+                  overrideLevel: widget.newLevel, // บังคับเป็นร่างใหม่
+                  height: isSmall ? 350 : 450,
+                  width: isSmall ? 300 : 400,
+                ),
+              ],
+            );
+
+            // เมื่อเข้าสู่สถานะเรืองแสง
+            if (isWhiteGlow) {
+              double intensity = 1.0;
+              if (progress > 0.1 && progress < 0.2) {
+                intensity = (progress - 0.1) / 0.1; // ค่อยๆ เป็นสีขาว
+              } else if (progress > 0.8 && progress < 0.9) {
+                intensity = 1.0 - ((progress - 0.8) / 0.1); // จางสีขาวออกกลับเป็นปกติ
+              }
+
+              characterStack = ShaderMask(
+                shaderCallback: (Rect bounds) {
+                  return LinearGradient(
+                    colors: [
+                      Colors.white.withOpacity(max(0, min(1, intensity))),
+                      Colors.white.withOpacity(max(0, min(1, intensity)))
+                    ],
+                  ).createShader(bounds);
+                },
+                blendMode: BlendMode.srcATop,
+                child: characterStack,
+              );
+            }
+
+            // ตอนเผยร่างใหม่เสร็จ มี Bounce ให้ดีใจ
+            double scale = 1.0;
+            if (progress > 0.88 && progress < 0.95) {
+              double pop = (progress - 0.88) / 0.07;
+              scale = 1.0 + (sin(pop * pi) * 0.15); // ตัวละครเด้งขยายใหญ่ชั่วขณะ
+            }
+
+            return Transform.scale(
+              scale: scale,
+              child: characterStack,
+            );
+          },
+        ),
       ],
     );
   }

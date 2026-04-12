@@ -23,10 +23,14 @@ class _LoadingScreenState extends State<LoadingScreen> {
   }
 
   Future<void> _loadResources() async {
-    // 1. Load Rive File
-    await RiveCache().loadAsset('assets/animation/Model2.0.riv');
+    // 1. โหลดโมเดลทั้งหมดไว้ใน RAM เพื่อให้กดเปลี่ยนแล้วแทรกขึ้นมาทันทีไม่เห็นจังหวะโหลดขัดตา
+    await RiveCache().loadAssets([
+      'assets/animation/kid.riv',
+      'assets/animation/teen.riv',
+      'assets/animation/adult.riv',
+    ]);
     
-    // 2. Add other preload logic here if needed (e.g. user data)
+    // โหลดเสร็จแล้วเปลี่ยนหน้าเลย
     
     // 3. Navigate to next screen
     if (mounted) {

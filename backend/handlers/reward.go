@@ -80,7 +80,7 @@ func ClaimLoginTickets(c *gin.Context) {
 		var id int64
 		var name string
 		var image *string // ใช้ Pointer เผื่อตารางในฐานข้อมูลเป็น NULL
-		
+
 		if err := itemRows.Scan(&id, &name, &image); err == nil {
 			imgStr := ""
 			if image != nil {
@@ -140,7 +140,7 @@ func ClaimLoginTickets(c *gin.Context) {
 				`
 				_, err := tx.Exec(ctx, upsertQuery, userId, itemID, newTotal, now)
 				if err == nil {
-					
+
 					// 🌟 ดึงข้อมูลชื่อและรูปภาพจาก Map ที่ค้นหามาได้
 					itemName := "Unknown Item"
 					itemImage := "assets/images/item/default_item.png" // รูปภาพสำรองเผื่อพลาด
@@ -166,9 +166,9 @@ func ClaimLoginTickets(c *gin.Context) {
 	}
 
 	// 🌟 ตอนเรียกใช้ ไม่ต้องพิมพ์ชื่อตั๋วเองแล้ว ใส่แค่ (ID, MaxCap, จำนวนที่แจก, เป็นรายวันใช่ไหม?)
-	upsertTicket(17, 7, 1, true)   // QUEST_TICKET
-	upsertTicket(18, 3, 3, false)  // EXAM_TICKET
-	upsertTicket(19, 3, 3, false)  // CLUB_TICKET
+	upsertTicket(17, 7, 1, true)  // QUEST_TICKET
+	upsertTicket(18, 3, 3, false) // EXAM_TICKET
+	upsertTicket(19, 3, 3, false) // CLUB_TICKET
 
 	// Commit
 	if err := tx.Commit(ctx); err != nil {
@@ -184,85 +184,11 @@ func ClaimLoginTickets(c *gin.Context) {
 	})
 }
 
-// 🌟 API ใหม่: POST /rewards/add-coins (แจก 5000 เหรียญและเช็คความสำเร็จ)
-func AddTestCoins(c *gin.Context) {
-	userIdVal, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
-
-	// แปลงเป็น UUID
-	userIDStr := fmt.Sprintf("%v", userIdVal)
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID format"})
-		return
-	}
-
-	ctx := context.Background()
-
-	coinItemID := 20 // ⚠️ ID ของเหรียญในตาราง items
-	addAmount := 5000
-	var totalCoins int
-
-	// 1. อัปเดตเงินลง Database
-	query := `
-		INSERT INTO public.collect (user_id, item_id, quantity, acquired_date)
-		VALUES ($1, $2, $3, NOW())
-		ON CONFLICT (user_id, item_id)
-		DO UPDATE SET 
-			quantity = public.collect.quantity + EXCLUDED.quantity,
-			acquired_date = NOW()
-		RETURNING quantity;
-	`
-
-	err = configs.DB.QueryRow(ctx, query, userID, coinItemID, addAmount).Scan(&totalCoins)
-	if err != nil {
-		fmt.Println("❌ Failed to add coins:", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add coins to database"})
-		return
-	}
-
-	// 🌟 2. ดึงชื่อและรูปภาพของไอเทมจากตาราง items
-	var itemName string
-	var itemImage *string // ใช้ Pointer เผื่อกรณีที่คอลัมน์ image เป็น NULL
-	
-	itemQuery := `SELECT name, image FROM public.items WHERE id = $1`
-	err = configs.DB.QueryRow(ctx, itemQuery, coinItemID).Scan(&itemName, &itemImage)
-	
-	// ตั้งค่ารูปภาพเริ่มต้นเผื่อหาไม่เจอ
-	finalImage := "assets/images/item/coin.png"
-	if err == nil && itemImage != nil && *itemImage != "" {
-		finalImage = *itemImage
-	}
-	if err == nil && itemName == "" {
-		itemName = "Coin"
-	}
-
-	// 🌟 3. ตรวจสอบ Achievement ยอดเหรียญ หลังจากแจกรางวัลเสร็จแล้ว
-	// สั่งรันใน Goroutine (go func) เพื่อไม่ให้หน่วงเวลาตอนตอบกลับ API ไปที่หน้าจอแอป
-	go func(u uuid.UUID) {
-		CheckCoinAchievement(context.Background(), u)
-	}(userID)
-
-	// 4. ส่งข้อมูลทั้งหมดกลับไปให้ Flutter (เพิ่ม item_name และ item_image)
-	c.JSON(http.StatusOK, gin.H{
-		"success":     true,
-		"message":     "Added 5000 coins successfully",
-		"added_coin":  addAmount,
-		"total_coins": totalCoins,
-		"item_name":   itemName,
-		"item_image":  finalImage, // <--- 🌟 ส่ง Path รูปที่ดึงมาได้กลับไปด้วย
-	})
-}
-
 // 🌟 Struct สำหรับรับค่าจาก Flutter ตอนกดปุ่มรับรางวัล
 type ClaimAchievementInput struct {
 	AchievementID int64 `json:"achievement_id" binding:"required"`
 }
 
-// POST /rewards/claim-achievement (กดรับรางวัลจากหน้า Achievement)
 // POST /rewards/claim-achievement (กดรับรางวัลจากหน้า Achievement)
 func ClaimAchievementReward(c *gin.Context) {
 	userIdVal, exists := c.Get("user_id")
@@ -292,7 +218,7 @@ func ClaimAchievementReward(c *gin.Context) {
 	}
 	defer tx.Rollback(ctx)
 
-	// 1. เช็คสถานะความสำเร็จ 
+	// 1. เช็คสถานะความสำเร็จ
 	var statusPtr *string
 	var rewardClaimedPtr *bool
 
@@ -343,9 +269,9 @@ func ClaimAchievementReward(c *gin.Context) {
 	// ก๊อกที่ 1: วนลูปเพื่อ "อ่านและจด" ข้อมูลลง Memory
 	for rows.Next() {
 		var itemID int64
-		var qtyPtr *int      
-		var namePtr *string  
-		var imagePtr *string 
+		var qtyPtr *int
+		var namePtr *string
+		var imagePtr *string
 
 		if err := rows.Scan(&itemID, &qtyPtr, &namePtr, &imagePtr); err == nil {
 			qty := 0
@@ -370,10 +296,10 @@ func ClaimAchievementReward(c *gin.Context) {
 	rows.Close()
 
 	// -------------------------------------------------------------------
-	
+
 	// ก๊อกที่ 2: วนลูปเพื่อ "แจกของ" ลง Database
 	rewards := make([]RewardResponse, 0)
-	
+
 	for _, item := range pendingRewards {
 		upsertQuery := `
 			INSERT INTO public.collect (user_id, item_id, quantity, acquired_date)
@@ -436,4 +362,3 @@ func isNewWeek(lastDate time.Time, now time.Time) bool {
 	nowYear, nowWeek := now.ISOWeek()
 	return lastYear != nowYear || lastWeek != nowWeek
 }
-

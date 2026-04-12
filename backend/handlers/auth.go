@@ -104,29 +104,13 @@ func Me(c *gin.Context) {
 
 	// 1. Get User Profile & Character Stats
 	var (
-		id       string // UUID
-		email    string
-		username string
-		bio      string
-		level    int
-		exp      int
-		// coins         int -- Removed unused
-		// Note: Coins/Tickets/Vouchers might be in characters or user_profiles?
-		// Schema doesn't show coins in user_profiles or characters.
-		// Assuming for now we rely on logical defaults or columns I missed.
-		// Wait, I checked db.go, I didn't see coins.
-		// Let's check where coins are.
-		// If they aren't in DB, I will return 0 or mock data for now to prevent crash.
-		// Looking at schema in db.go:
-		// user_profiles: id, name, email, detail, ...
-		// characters: level, experience, gender, skin_color, emotion, body_type, intelligence, strength, creative, stamina
-		// NO COINS?
-		// Maybe in a 'currencies' table or I missed it?
-		// User model in Dart expects coins.
-		// For now I will hardcode coins/tickets/vouchers to 0 or check if they are in 'collect' as items?
-		// But usually currency is a column.
-		// I will just return 0 for currencies to satisfy the model.
-
+		id           string // UUID
+		email        string
+		username     string
+		bio          string
+		level        int
+		exp          int
+		bodyType     string
 		intelligence int
 		strength     int
 		creative     int
@@ -135,12 +119,13 @@ func Me(c *gin.Context) {
 	username = ""
 	bio = ""
 	email = ""
+	bodyType = "KID"
 
 	// Query main data
 	query := `
 		SELECT 
 			u.id::text, u.email, COALESCE(u.name, ''), COALESCE(u.detail, ''),
-			c.level, c.experience, 
+			c.level, c.experience, COALESCE(c.body_type, 'KID'),
 			c.intelligence, c.strength, c.creative
 		FROM public.user_profiles u
 		LEFT JOIN public.characters c ON u.id = c.user_id
@@ -149,7 +134,7 @@ func Me(c *gin.Context) {
 	// Note: u.id is uuid, casting to text for scan
 	err := configs.DB.QueryRow(ctx, query, userId).Scan(
 		&id, &email, &username, &bio,
-		&level, &exp,
+		&level, &exp, &bodyType,
 		&intelligence, &strength, &creative,
 	)
 	if err != nil {
@@ -160,7 +145,7 @@ func Me(c *gin.Context) {
 	// 2. Get Equipped Items
 	// We need to map them to: equipped_skin, equipped_hair, equipped_face
 	equipped := map[string]string{
-		"Skin": "", "Hair": "", "Face": "", "Body": "", "Cloth": "", "Shoes": "",
+		"Skin": "", "Hair": "", "Face": "", "Outfit": "",
 	}
 
 	itemQuery := `
@@ -187,11 +172,57 @@ func Me(c *gin.Context) {
 	// 3. Construct Response
 	// Note: Dart side expects snake_case keys for some reason (based on User.fromJson)
 	c.JSON(http.StatusOK, gin.H{
+		"id":              id,
+		"email":           email,
+		"username":        username,
+		"bio":             bio,
+		"level":           level,
+		"exp":             exp,
+		"body_type":       bodyType,
+		"stat_intellect":  intelligence,
+		"stat_strength":   strength,
+		"stat_creativity": creative,
 		"equipped_skin":   equipped["Skin"],
 		"equipped_hair":   equipped["Hair"],
 		"equipped_face":   equipped["Face"],
-		"equipped_body":   equipped["Body"],
-		"equipped_cloth":  equipped["Cloth"],
-		"equipped_shoes":  equipped["Shoes"],
+		"equipped_outfit": equipped["Outfit"],
 	})
+}
+
+// API: Update Body Type (Kid/Teen/Adult)
+type UpdateBodyTypeRequest struct {
+	BodyType string `json:"body_type" binding:"required"`
+}
+
+func UpdateBodyType(c *gin.Context) {
+	userId, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req UpdateBodyTypeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate body type
+	bodyType := strings.ToUpper(req.BodyType)
+	if bodyType != "KID" && bodyType != "TEEN" && bodyType != "ADULT" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid body type"})
+		return
+	}
+
+	ctx := context.Background()
+
+	// Update characters table
+	query := `UPDATE public.characters SET body_type = $1 WHERE user_id = $2`
+	_, err := configs.DB.Exec(ctx, query, bodyType, userId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update body type: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Body type updated successfully", "body_type": bodyType})
 }
