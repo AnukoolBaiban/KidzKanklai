@@ -16,6 +16,7 @@ class SettingScreen extends StatefulWidget {
 }
 
 class _SettingScreenState extends State<SettingScreen> {
+  Key _topBarKey = UniqueKey();
   // State Variables
   bool _isPressed = false;
   
@@ -92,90 +93,106 @@ class _SettingScreenState extends State<SettingScreen> {
             ),
           ),
 
-          // Top Bar Overlay
-          _buildTopBar(),
+          // จัดวางเป็น Column เพื่อไม่ให้กรอบขาวทับแถบด้านบน
+          Column(
+            children: [
+              _buildTopBar(),
+              const SizedBox(height: 10),
 
-          // Main Content
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 150, 24, 24),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.82),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: const Color(0xFFAAD7EA),
-                      width: 3,
-                    ),
-                  ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 50),
+              // Main Content
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned.fill(
+                        child: Container(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.82),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: const Color(0xFFAAD7EA),
+                              width: 3,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              const SizedBox(height: 40),
+                              Expanded(
+                                child: SizedBox(
+                                  width: double.infinity,
+                                  child: SingleChildScrollView(
+                                    padding: const EdgeInsets.only(top: 0, bottom: 0),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.start,
+                                      children: [
+                                        // --- [LOGIC] ส่วนที่เปลี่ยนตามสถานะ Login ---
+                                        if (isLoggedIn) ...[
+                                          _buildLoggedInAccountSection(),
+                                          _buildLinkedAccountSection(),
+                                        ] else ...[
+                                          _buildGuestAccountSection(),
+                                        ],
 
-                          // --- [LOGIC] ส่วนที่เปลี่ยนตามสถานะ Login ---
-                          if (isLoggedIn) ...[
-                            _buildLoggedInAccountSection(),
-                            _buildLinkedAccountSection(),
-                          ] else ...[
-                            _buildGuestAccountSection(),
-                          ],
-
-                          // ------------------------------------------
-                          _buildVolumeSettingsSection(),
-
-                          // ปุ่ม Logout (แสดงเฉพาะตอน Login แล้ว และไม่ได้ถูกสั่งซ่อน)
-                          if (isLoggedIn && !widget.hideLogout) _buildLogoutButton(),
-                        ],
+                                        // ------------------------------------------
+                                        _buildVolumeSettingsSection(),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
+
+                      // Header Title
+                      _buildHeaderTitle(),
+                    ],
                   ),
                 ),
 
-                // Header Title
-                _buildHeaderTitle(),
+                // ปุ่ม Logout อยู่ใต้กรอบขาว
+                if (isLoggedIn && !widget.hideLogout) ...[  
+                  const SizedBox(height: 16),
+                  _buildLogoutButton(),
+                ],
               ],
             ),
           ),
+          ), // close Expanded child of Column
+          ],
+          ), // close Column
         ],
       ),
     );
   }
 
   Widget _buildTopBar() {
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            height: screenHeight * 0.098, // responsive
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+            padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
             color: Colors.black.withOpacity(0.4),
-            alignment: Alignment.bottomCenter,
             child: CustomTopBar(
+              key: _topBarKey,
               onNotificationTapped: () {
-                Navigator.pushNamed(context, '/notification');
+                Navigator.pushReplacementNamed(context, '/notification');
               },
-              onSettingsTapped: () {
-                Navigator.pushNamed(context, '/setting');
-              },
+              onSettingsTapped: () {},
             ),
           ),
 
-          // เรียก Back Button
-          _buildBackButton(),
-        ],
-      ),
+        // เรียก Back Button
+        _buildBackButton(),
+      ],
     );
   }
 
@@ -200,7 +217,7 @@ class _SettingScreenState extends State<SettingScreen> {
           setState(() => _isPressed = false);
 
           // 🌟 ใช้คำสั่ง pop เพื่อปิดหน้า Setting ทิ้ง ระบบจะเผยให้เห็นหน้าก่อนหน้าอัตโนมัติ
-          Navigator.pop(context); 
+          Navigator.pop(context, true); 
         },
         child: Image.asset(
           _isPressed
@@ -466,7 +483,7 @@ class _SettingScreenState extends State<SettingScreen> {
           const SizedBox(height: 5),
           const SizedBox(height: 5),
 
-          // Mute Toggle
+          // Game Sound Toggle
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 15),
@@ -478,7 +495,7 @@ class _SettingScreenState extends State<SettingScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  "ปิดเสียงเกม",
+                  "เสียงเกม",
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w500,
@@ -487,7 +504,7 @@ class _SettingScreenState extends State<SettingScreen> {
                 ),
                 GestureDetector(
                   onTap: () async {
-                    // [UPDATED] คำนวณสถานะใหม่ และสั่งงาน AudioManager
+                    // คำนวณสถานะใหม่ และสั่งงาน AudioManager
                     final newMuteState = !_isMuted;
                     await _audioManager.toggleMute(newMuteState);
 
@@ -501,9 +518,9 @@ class _SettingScreenState extends State<SettingScreen> {
                     height: 32,
                     padding: const EdgeInsets.all(2),
                     decoration: BoxDecoration(
-                      color: _isMuted
-                          ? Colors.white.withOpacity(0.8)
-                          : const Color(0xFF002A50),
+                      color: !_isMuted
+                          ? const Color(0xFF002A50)
+                          : Colors.white.withOpacity(0.8),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: const Color(0xFF002A50),
@@ -512,7 +529,7 @@ class _SettingScreenState extends State<SettingScreen> {
                     ),
                     child: Stack(
                       children: [
-                        if (_isMuted)
+                        if (!_isMuted)
                           const Positioned(
                             left: 8,
                             top: 2,
@@ -523,13 +540,13 @@ class _SettingScreenState extends State<SettingScreen> {
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black,
+                                  color: Colors.white,
                                 ),
                               ),
                             ),
                           ),
 
-                        if (!_isMuted)
+                        if (_isMuted)
                           const Positioned(
                             right: 8,
                             top: 2,
@@ -540,7 +557,7 @@ class _SettingScreenState extends State<SettingScreen> {
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  color: Colors.black,
                                 ),
                               ),
                             ),
@@ -548,7 +565,7 @@ class _SettingScreenState extends State<SettingScreen> {
 
                         AnimatedAlign(
                           duration: const Duration(milliseconds: 200),
-                          alignment: _isMuted
+                          alignment: !_isMuted
                               ? Alignment.centerRight
                               : Alignment.centerLeft,
                           child: Container(
@@ -679,16 +696,15 @@ class _SettingScreenState extends State<SettingScreen> {
   }
 
   Widget _buildLogoutButton() {
-    return SizedBox(
-      width: double.infinity,
+    return Center(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(40, 0, 40, 30),
+        padding: const EdgeInsets.symmetric(horizontal: 40),
         child: ElevatedButton(
-          onPressed: _handleLogout, // เรียกฟังก์ชัน Logout
+          onPressed: _handleLogout,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFE94444),
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 14),
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 32),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(50),
             ),

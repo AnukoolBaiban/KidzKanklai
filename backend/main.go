@@ -70,6 +70,11 @@ func main() {
 
 	auth.POST("/exams/generate-weekly", handlers.GenerateWeeklyExams)
 	auth.POST("/exams/start", handlers.StartExam)
+	// --- Notifications ---
+	auth.GET("/notifications", handlers.GetNotifications)
+	auth.PUT("/notifications/:id/read", handlers.MarkNotificationRead)
+	auth.DELETE("/notifications/:id", handlers.DeleteNotification)
+	auth.DELETE("/notifications", handlers.DeleteAllNotifications)
 
 	r.Run(":8080")
 }

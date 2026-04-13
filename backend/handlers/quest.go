@@ -249,6 +249,16 @@ func CompleteNormalQuest(c *gin.Context) {
 		return
 	}
 
+	// 🌟 ลบการแจ้งเตือนเตือนความจำ (ถ้ามี)
+	deleteWarningsQuery := `
+		DELETE FROM public.get_notifications gn
+		USING public.notifications n
+		WHERE gn.notification_id = n.id 
+		  AND gn.user_id = $1 
+		  AND n.type IN ($2, $3)
+	`
+	tx.Exec(ctx, deleteWarningsQuery, userID, fmt.Sprintf("quest_1d_%d", input.QuestID), fmt.Sprintf("quest_1h_%d", input.QuestID))
+
 	// 🌟 2.3 ไปดึงข้อมูลของรางวัลแบบไดนามิกจากตาราง receive 🌟
 	rewardQuery := `
 		SELECT r.item_id, r.quantity, i.name, i.image 

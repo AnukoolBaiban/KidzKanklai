@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_application_1/config/app_config.dart';
-import 'dart:io'; 
-
+import 'package:flutter_application_1/globals.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:io';
 
 // --- Data Models ---
 
@@ -155,6 +156,16 @@ class ApiService {
   // Use 10.0.2.2 for Android Emulator, localhost for iOS/Web
   static const String baseUrl = '${AppConfig.baseUrl}';
   static String? authToken; // Token for Authentication
+  // --- Token Validation Helper ---
+  static void _checkUnauthorized(int statusCode) {
+    if (statusCode == 401) {
+      print("🚨 Token หมดอายุ หรือไม่ได้รับอนุญาต (401). บังคับ Logout...");
+      Supabase.instance.client.auth.signOut();
+      authToken = null;
+      navigatorKey.currentState?.pushNamedAndRemoveUntil('/login', (route) => false);
+    }
+  }
+
 
   static Map<String, String> get _headers => {
     "Content-Type": "application/json",
@@ -175,6 +186,7 @@ class ApiService {
         Uri.parse('$baseUrl/me'),
         headers: _headers,
       );
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         return User.fromJson(jsonDecode(response.body));
       }
@@ -191,6 +203,7 @@ class ApiService {
         Uri.parse('$baseUrl/inventory'),
         headers: _headers,
       );
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final list =
@@ -210,6 +223,7 @@ class ApiService {
         Uri.parse('$baseUrl/equipped'),
         headers: _headers,
       );
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final list = (data['equipped'] as List?) ?? []; // Handle null equipped
@@ -229,6 +243,7 @@ class ApiService {
         headers: _headers,
         body: jsonEncode({"item_id": int.parse(itemId)}),
       );
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode != 200) {
         print("Equip Failed (${response.statusCode}): ${response.body}");
       }
@@ -247,6 +262,7 @@ class ApiService {
         headers: _headers, // ใช้ _headers ที่มี Authorization Token อยู่แล้ว
       );
 
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true && data['rewards'] != null) {
@@ -268,6 +284,7 @@ class ApiService {
         headers: _headers,
       );
 
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true) {
@@ -296,6 +313,7 @@ class ApiService {
         body: jsonEncode({"achievement_id": achievementId}),
       );
 
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true) {
@@ -321,6 +339,7 @@ class ApiService {
         Uri.parse('$baseUrl/ai/dialogue'),
         headers: _headers,
       );
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return data['dialogue'] as String?;
@@ -357,7 +376,7 @@ class ApiService {
       // ใส่ข้อมูลแบบ Text
       request.fields['name'] = name;
       request.fields['detail'] = detail;
-      
+
       // แปลงวันที่ให้อยู่ในรูปแบบ ISO8601 ที่ Backend ต้องการ (เช่น 2026-10-05T00:00:00.000)
       // 🌟 แก้ให้ตัดเอาเฉพาะส่วนวันที่ (YYYY-MM-DD) ส่งไปให้ Backend
       request.fields['due_date'] = dueDate.toIso8601String().split('T')[0];
@@ -370,10 +389,11 @@ class ApiService {
 
       var response = await request.send();
 
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         return true;
       } else {
-        // อ่านข้อความ Error จาก Backend 
+        // อ่านข้อความ Error จาก Backend
         final responseData = await response.stream.bytesToString();
         print("Create Quest Failed: ${response.statusCode} - $responseData");
         return false;
@@ -383,18 +403,17 @@ class ApiService {
       return false;
     }
   }
-  
+
   // --- ฟังก์ชันรับรางวัลจากเควสทั่วไป ---
   static Future<List<dynamic>?> completeNormalQuest(int questId) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/quests/complete'),
         headers: _headers,
-        body: jsonEncode({
-          "quest_id": questId,
-        }),
+        body: jsonEncode({"quest_id": questId}),
       );
 
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true) {
@@ -404,7 +423,9 @@ class ApiService {
       } else {
         // อ่านข้อความ Error จาก Backend มาโชว์ใน Console
         final errorData = jsonDecode(response.body);
-        print("Complete Quest Failed: ${response.statusCode} - ${errorData['error']}");
+        print(
+          "Complete Quest Failed: ${response.statusCode} - ${errorData['error']}",
+        );
       }
     } catch (e) {
       print("Complete Quest Error: $e");
@@ -419,11 +440,10 @@ class ApiService {
       final response = await http.post(
         Uri.parse('$baseUrl/quests/cancel'),
         headers: _headers,
-        body: jsonEncode({
-          "quest_id": questId,
-        }),
+        body: jsonEncode({"quest_id": questId}),
       );
 
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true) {
@@ -432,12 +452,14 @@ class ApiService {
       } else {
         // อ่านข้อความ Error จาก Backend
         final errorData = jsonDecode(response.body);
-        print("Cancel Quest Failed: ${response.statusCode} - ${errorData['error']}");
+        print(
+          "Cancel Quest Failed: ${response.statusCode} - ${errorData['error']}",
+        );
       }
     } catch (e) {
       print("Cancel Quest Error: $e");
     }
-    
+
     return false; // ยอมแพ้ไม่สำเร็จ หรือเกิด Error
   }
 
@@ -451,12 +473,10 @@ class ApiService {
       final response = await http.post(
         Uri.parse('$baseUrl/quests/instant/start'),
         headers: _headers,
-        body: jsonEncode({
-          "name": name,
-          "duration_minutes": durationMinutes,
-        }),
+        body: jsonEncode({"name": name, "duration_minutes": durationMinutes}),
       );
 
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true) {
@@ -465,7 +485,9 @@ class ApiService {
       } else {
         // อ่านข้อความ Error จาก Backend
         final errorData = jsonDecode(response.body);
-        print("Start Instant Quest Failed: ${response.statusCode} - ${errorData['error']}");
+        print(
+          "Start Instant Quest Failed: ${response.statusCode} - ${errorData['error']}",
+        );
       }
     } catch (e) {
       print("Start Instant Quest Error: $e");
@@ -480,11 +502,10 @@ class ApiService {
       final response = await http.post(
         Uri.parse('$baseUrl/quests/instant/complete'),
         headers: _headers,
-        body: jsonEncode({
-          "quest_id": questId,
-        }),
+        body: jsonEncode({"quest_id": questId}),
       );
 
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true) {
@@ -494,7 +515,9 @@ class ApiService {
       } else {
         // อ่านข้อความ Error จาก Backend มาโชว์ใน Console (เช่น กรณีกดส่งก่อนเวลาหมด)
         final errorData = jsonDecode(response.body);
-        print("Complete Instant Quest Failed: ${response.statusCode} - ${errorData['error']}");
+        print(
+          "Complete Instant Quest Failed: ${response.statusCode} - ${errorData['error']}",
+        );
       }
     } catch (e) {
       print("Complete Instant Quest Error: $e");
@@ -524,9 +547,10 @@ class ApiService {
         body: jsonEncode({'quest_id': questId}),
       );
 
+      ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['rewards']; 
+        return data['rewards'];
       } else {
         print("Failed to complete system quest: ${response.body}");
         return null;
@@ -620,6 +644,192 @@ class ApiService {
     } catch (e) {
       print("Start Exam Error: $e");
       return null;
+  // --- ฟังก์ชันดึง Notification ทั้งหมดของ user ---
+  static Future<List<NotificationModel>> getNotifications() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/notifications'),
+        headers: _headers,
+      );
+      ApiService._checkUnauthorized(response.statusCode);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final list = (data['notifications'] as List?) ?? [];
+        return list.map((e) => NotificationModel.fromJson(e)).toList();
+      } else {
+        print(
+          "Get Notifications Failed: ${response.statusCode} - ${response.body}",
+        );
+      }
+    } catch (e) {
+      print("Get Notifications Error: $e");
+    }
+    return [];
+  }
+
+  // --- ฟังก์ชัน Mark Notification ว่าอ่านแล้ว ---
+  static Future<bool> markNotificationRead(int notificationId) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/notifications/$notificationId/read'),
+        headers: _headers,
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Mark Notification Read Error: $e");
+      return false;
+    }
+  }
+
+  // --- ฟังก์ชันลบ Notification รายการเดียว ---
+  static Future<bool> deleteNotification(int notificationId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/notifications/$notificationId'),
+        headers: _headers,
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Delete Notification Error: $e");
+      return false;
+    }
+  }
+
+  // --- ฟังก์ชันลบ Notification ทั้งหมด ---
+  static Future<bool> deleteAllNotifications() async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/notifications'),
+        headers: _headers,
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Delete All Notifications Error: $e");
+      return false;
+    }
+  }
+}
+
+// --- Notification Model ---
+
+class NotificationModel {
+  final int id;
+  final String title;
+  final String detail;
+  final String type;
+  final String image;
+  final DateTime startDate;
+  final DateTime dueDate;
+  final DateTime? readDate;
+  bool isRead; // map จาก status == 'read'
+
+  NotificationModel({
+    required this.id,
+    required this.title,
+    required this.detail,
+    required this.type,
+    required this.image,
+    required this.startDate,
+    required this.dueDate,
+    this.readDate,
+    this.isRead = false,
+  });
+
+  factory NotificationModel.fromJson(Map<String, dynamic> json) {
+    final status = json['status'] as String? ?? 'unread';
+    DateTime parsedDate;
+    try {
+      parsedDate = DateTime.parse(
+        json['start_date'] as String? ?? '',
+      ).toLocal();
+    } catch (_) {
+      parsedDate = DateTime.now();
+    }
+
+    DateTime parsedDueDate;
+    try {
+      parsedDueDate = DateTime.parse(
+        json['due_date'] as String? ?? '',
+      ).toLocal();
+    } catch (_) {
+      parsedDueDate = parsedDate.add(const Duration(days: 30));
+    }
+
+    DateTime? parsedReadDate;
+    try {
+      final rdStr = json['read_date'] as String?;
+      if (rdStr != null) parsedReadDate = DateTime.parse(rdStr).toLocal();
+    } catch (_) {}
+
+    return NotificationModel(
+      id: json['id'] is int
+          ? json['id']
+          : int.tryParse(json['id'].toString()) ?? 0,
+      title: json['title'] as String? ?? '',
+      detail: json['detail'] as String? ?? '',
+      type: json['type'] as String? ?? '',
+      image: json['image'] as String? ?? '',
+      startDate: parsedDate,
+      dueDate: parsedDueDate,
+      readDate: parsedReadDate,
+      isRead: status == 'read',
+    );
+  }
+
+  /// แปลง timestamp เป็นข้อความภาษาไทยแบบยาว เช่น "การแจ้งเตือนเกิดขึ้นเมื่อ 5 นาทีที่แล้ว"
+  String get relativeTime {
+    final diff = DateTime.now().difference(startDate);
+    if (diff.inMinutes < 1) return 'การแจ้งเตือนเพิ่งเกิดขึ้น';
+    if (diff.inMinutes < 60)
+      return 'การแจ้งเตือนเกิดขึ้นเมื่อ ${diff.inMinutes} นาทีที่แล้ว';
+    if (diff.inHours < 24)
+      return 'การแจ้งเตือนเกิดขึ้นเมื่อ ${diff.inHours} ชั่วโมงที่แล้ว';
+    if (diff.inDays < 30)
+      return 'การแจ้งเตือนเกิดขึ้นเมื่อ ${diff.inDays} วันที่แล้ว';
+    return 'การแจ้งเตือนเกิดขึ้นเมื่อ ${(diff.inDays / 30).floor()} เดือนที่แล้ว';
+  }
+
+  /// แปลง timestamp เป็นข้อความภาษาไทยแบบสั้น เช่น "5 นาทีที่แล้ว"
+  String get shortRelativeTime {
+    final diff = DateTime.now().difference(startDate);
+    if (diff.inMinutes < 1) return 'เมื่อสักครู่';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} นาทีที่แล้ว';
+    if (diff.inHours < 24) return '${diff.inHours} ชั่วโมงที่แล้ว';
+    if (diff.inDays < 30) return '${diff.inDays} วันที่แล้ว';
+    return '${(diff.inDays / 30).floor()} เดือนที่แล้ว';
+  }
+
+  /// วันที่จะถูกลบอัตโนมัติ (formatted)
+  String get autoDeletionText {
+    final d = dueDate;
+    return 'การแจ้งเตือนนี้จะถูกลบอัตโนมัติในวันที่ '
+        '${d.day}/${d.month}/${d.year}';
+  }
+
+  /// วันและเวลาที่อ่าน (formatted)
+  String? get readAtText {
+    if (readDate == null) return null;
+    final d = readDate!;
+    final h = d.hour.toString().padLeft(2, '0');
+    final m = d.minute.toString().padLeft(2, '0');
+    return 'การแจ้งเตือนนี้ถูกอ่านเมื่อ ${d.day}/${d.month}/${d.year} เวลา $h:$m น.';
+  }
+
+  /// ไอคอนประจำประเภท notification
+  String get iconPath {
+    switch (type) {
+      case 'achievement':
+        return 'assets/images/icon/iconAchievement.png';
+      case 'quest':
+        return 'assets/images/icon/trophy.png';
+      case 'club':
+        return 'assets/images/icon/communication.png';
+      case 'exam':
+        return 'assets/images/icon/education.png';
+      default:
+        return image.isNotEmpty
+            ? image
+            : 'assets/images/icon/iconAchievement.png';
     }
   }
 }
