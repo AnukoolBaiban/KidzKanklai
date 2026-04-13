@@ -29,6 +29,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
     // สั่งเช็คของรางวัลทันทีที่เปิดหน้านี้
     _checkDailyLoginRewards();
     // _giveMeCoins(); // สำหรับเทสเพิ่มเหรียญ
+    
+    // 🌟 แอบสั่งให้ Backend เช็คและสร้างข้อสอบประจำสัปดาห์
+    ApiService.generateWeeklyExams();
   }
 
   Future<void> _loadUserData() async {

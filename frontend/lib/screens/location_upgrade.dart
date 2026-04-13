@@ -46,6 +46,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
   String _intStat = "10";
   String _strStat = "10";
   String _creStat = "10";
+  String _stamina = "0"; // 🌟 1. เพิ่มตัวแปรเก็บค่าพลังงานตรงนี้
 
   SMINumber? _poseInput;
   SMINumber? _hairInput;
@@ -137,7 +138,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
 
       final charData = await _supabase
           .from('characters')
-          .select('level, experience, intelligence, strength, creative')
+          .select('level, experience, intelligence, strength, creative, stamina')
           .eq('user_id', user.id)
           .maybeSingle();
 
@@ -146,6 +147,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
           _intStat = charData['intelligence'].toString();
           _strStat = charData['strength'].toString();
           _creStat = charData['creative'].toString();
+          _stamina = charData['stamina'].toString(); // 🌟 2.2 เก็บค่าพลังงานที่ดึงมาได้
         });
 
         final dbLevel = charData['level'] as int? ?? 1;
@@ -279,13 +281,9 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                   /// Status Rewards Box
                   _buildStatusRewardsBox(),
 
-                  if (widget.locationName != 'สนามสอบ') ...[
+                  if (true) ...[
                     SizedBox(height: 20),
-                    EnergyBar(
-                      energy: 80,
-                      maxEnergy: 100,
-                      ticket: 10,
-                    ),
+                    EnergyBar(),
                     SizedBox(height: 20),
                   ],
 
@@ -371,32 +369,27 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
   }
 
   Widget _buildStatusRewardsBox() {
-    Map<String, int> displayRewards = {};
+    Map<String, dynamic> displayRewards = {}; // 🌟 เปลี่ยนเป็น dynamic เพื่อรองรับทั้ง int (stat) และ string (ข้อความสวนสาธารณะ)
 
     switch (widget.locationName) {
       case 'สวนสนุก':
         displayRewards = {
-          'ความฉลาด': 0,
-          'ความแข็งแรง': 0,
           'ความคิดสร้างสรรค์': 1,
         };
         break;
       case 'โรงยิม':
         displayRewards = {
-          'ความฉลาด': 0,
           'ความแข็งแรง': 1,
-          'ความคิดสร้างสรรค์': 0,
         };
         break;
       case 'หอสมุด':
         displayRewards = {
           'ความฉลาด': 1,
-          'ความแข็งแรง': 0,
-          'ความคิดสร้างสรรค์': 0,
         };
         break;
       case 'สวนสาธารณะ':
-        displayRewards = {'พลังงาน': 20};
+        // 🌟 ใส่ข้อความแทนตัวเลขไปเลยสำหรับสวนสาธารณะ
+        displayRewards = {'ฟื้นฟูพลังงาน': '70 - 90'}; 
         break;
       case 'สนามสอบ':
         return _buildExamMap();
@@ -456,10 +449,9 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
             child: Column(
               children: [
                 ...displayRewards.entries.map((entry) {
-                  final isIncreased = entry.value > 0;
                   return Padding(
                     padding: EdgeInsets.only(bottom: 2 * scale),
-                    child: _buildStatusRow(entry.key, entry.value, isIncreased),
+                    child: _buildStatusRow(entry.key, entry.value), // 🌟 ไม่ต้องส่ง isIncreased แล้ว
                   );
                 }).toList(),
 
@@ -474,33 +466,51 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
     );
   }
 
-  Widget _buildStatusRow(String statusName, int value, bool isIncreased) {
+  Widget _buildStatusRow(String statusName, dynamic value) {
+    String displayValue = "";
+    Color valueColor = const Color(0xFF4CAF50); // สีเขียวพื้นฐาน
+
+    // 🌟 1. ดึงค่า Stat ปัจจุบันของตัวละคร
+    String currentStat = "0";
+    if (statusName == 'ความฉลาด') currentStat = _intStat;
+    if (statusName == 'ความแข็งแรง') currentStat = _strStat;
+    if (statusName == 'ความคิดสร้างสรรค์') currentStat = _creStat;
+
+    // 🌟 2. จัดการวิธีแสดงผล
+    if (widget.locationName == 'สวนสาธารณะ') {
+      // ถ้าเป็นสวนสาธารณะ ให้โชว์ string ที่เราส่งมาเลย
+      displayValue = "$value"; 
+    } else {
+      // ถ้าเป็นค่า Stat ทั่วไป ให้เอา "ปัจจุบัน + ที่จะได้" (เช่น 10 +1)
+      displayValue = "$currentStat (+$value)";
+    }
+
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Color(0xFFE0E0E0), width: 1.5),
+          border: Border.all(color: const Color(0xFFE0E0E0), width: 1.5),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               statusName,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF000000),
               ),
             ),
             Text(
-              isIncreased ? '+$value' : '$value',
+              displayValue,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: isIncreased ? Color(0xFF4CAF50) : Colors.black,
+                color: valueColor,
               ),
             ),
           ],
@@ -523,7 +533,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
             children: [
               Center(
                 child: CostDisplayWidget(
-                  energyCost: 20,
+                  energyCostText: '20', // 🌟 ส่งข้อความไปโชว์แทน
                   ticketCost: 1,
                   showTicket: true,
                   showEnergy: !isPark,
@@ -554,32 +564,131 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
               ],
             ),
             child: ElevatedButton(
-              onPressed: () {
-                // 🔥 ไปหน้า Result
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        ResultStatScreen(statusRewards: widget.statusRewards),
+                onPressed: () async {
+                  // 🌟 1. แปลงชื่อสถานที่เป็นภาษาอังกฤษเพื่อส่งให้ API
+                  String apiLocation = '';
+                  switch (widget.locationName) {
+                    case 'หอสมุด':
+                      apiLocation = 'library';
+                      break;
+                    case 'โรงยิม':
+                      apiLocation = 'gym';
+                      break;
+                    case 'สวนสนุก':
+                      apiLocation = 'amusement_park';
+                      break;
+                    case 'สวนสาธารณะ':
+                      apiLocation = 'park';
+                      break;
+                    default:
+                      apiLocation = 'park';
+                  }
+
+                  // 🌟 2. โชว์ Loading สวยๆ ระหว่างรอ API
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (ctx) => const Center(child: CircularProgressIndicator()),
+                  );
+
+                  // 🌟 3. ยิง API
+                  final result = await api.ApiService.performLocationAction(apiLocation);
+
+                  // 🌟 4. ปิด Loading
+                  if (mounted) Navigator.pop(context);
+
+                  if (result != null) {
+                    // เก็บค่าเก่าก่อนอัปเดต เพื่อส่งให้ ResultStatScreen ทำอนิเมชัน
+                    Map<String, int> oldStatsData = {
+                      'ความฉลาด': int.tryParse(_intStat) ?? 0,
+                      'ความแข็งแรง': int.tryParse(_strStat) ?? 0,
+                      'ความคิดสร้างสรรค์': int.tryParse(_creStat) ?? 0,
+                      'พลังงาน': int.tryParse(_stamina) ?? 0, // เพิ่มการเก็บพลังงานเก่า
+                    };
+
+                    if (result['success'] == true) {
+                      // 🎉 กรณีสำเร็จ (ฝึกฝน หรือ ฟื้นฟูพลังงาน)
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(result['message']), backgroundColor: Colors.green),
+                        );
+                      }
+
+                      _fetchUserProfile(); // รีเฟรชข้อมูลตัวละคร
+
+                      if (mounted) {
+                        // 🌟 เตรียมของรางวัลที่จะส่งไปโชว์
+                        Map<String, int> correctRewards = {};
+                        if (widget.locationName == 'หอสมุด') correctRewards = {'ความฉลาด': 1};
+                        if (widget.locationName == 'โรงยิม') correctRewards = {'ความแข็งแรง': 1};
+                        if (widget.locationName == 'สวนสนุก') correctRewards = {'ความคิดสร้างสรรค์': 1};
+                        if (widget.locationName == 'สวนสาธารณะ') {
+                           // ถ้าเป็นสวนสาธารณะ ให้ดึงค่าที่ได้ฟื้นฟูจริงจาก API มาโชว์
+                           correctRewards = {'พลังงาน': result['stamina_change'] ?? 0};
+                        }
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ResultStatScreen(
+                              isSuccess: true, // บอกว่าสำเร็จ
+                              statusRewards: correctRewards,
+                              oldStats: oldStatsData,
+                            ),
+                          ),
+                        );
+                      }
+                    } else {
+                      // ❌ กรณีล้มเหลว (เช่น พลังงานไม่พอตอนฝึกฝนจนเหลือ 0)
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(result['message']), backgroundColor: Colors.red),
+                        );
+                      }
+
+                      _fetchUserProfile(); // รีเฟรชให้เห็นหลอดพลังงานลด
+
+                      // 🌟 เช็คว่าถ้าไม่ใช่สวนสาธารณะ ให้โชว์หน้าจอฝึกไม่สำเร็จ
+                      if (widget.locationName != 'สวนสาธารณะ' && mounted) {
+                        
+                        // 🌟 1. สร้าง Map เพื่อบอกว่าเราพยายามฝึกอะไรอยู่ (ใส่ค่า +0 เพราะไม่ได้เพิ่ม)
+                        Map<String, int> failedStat = {};
+                        if (widget.locationName == 'หอสมุด') failedStat = {'ความฉลาด': 0};
+                        if (widget.locationName == 'โรงยิม') failedStat = {'ความแข็งแรง': 0};
+                        if (widget.locationName == 'สวนสนุก') failedStat = {'ความคิดสร้างสรรค์': 0};
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ResultStatScreen(
+                              isSuccess: false, // บอกว่าล้มเหลว (จะโชว์รูปตัวละครเศร้าและเลขสีแดง)
+                              
+                              // 🌟 2. ส่ง stat ที่พยายามฝึก ไปแทนคำว่าพลังงาน!
+                              statusRewards: failedStat, 
+                              oldStats: oldStatsData,
+                            ),
+                          ),
+                        );
+                      }
+                    }
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
                   ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                shadowColor: Colors.transparent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25),
+                ),
+                child: Text(
+                  'เริ่มทำกิจกรรม',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ),
-              child: Text(
-                'เริ่มทำกิจกรรม',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
           ),
         ],
       ),
