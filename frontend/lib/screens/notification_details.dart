@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/api_service.dart';
 
-
 import 'package:flutter_application_1/widgets/custom_top_bar.dart';
-import 'package:flutter_application_1/widgets/bottom_navigation_bar.dart';
-import 'package:flutter_application_1/screens/notification.dart';
-import 'package:flutter_application_1/screens/lobby.dart';
+import 'package:flutter_application_1/widgets/confirm_delete_popup.dart';
 
 class NotificationDetailScreen extends StatefulWidget {
-  final NotificationItem notification;
+  final NotificationModel notification;
   final User? user;
 
   const NotificationDetailScreen({
@@ -23,219 +20,361 @@ class NotificationDetailScreen extends StatefulWidget {
 }
 
 class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
-  int _selectedIndex = 1;
+  Key _topBarKey = UniqueKey();
   bool _isPressed = false;
-  bool _isSelectionMode = false;
-  List<String> _selectedIds = [];
+  bool _isDeleting = false;
 
-  void _deleteSelectedNotifications() {
-    setState(() {
-      _selectedIds.clear();
-      _isSelectionMode = false;
-    });
+  @override
+  void initState() {
+    super.initState();
+    // Mark as read เมื่อเปิดหน้า Detail
+    if (!widget.notification.isRead) {
+      ApiService.markNotificationRead(widget.notification.id);
+    }
+  }
+
+  Future<void> _deleteAndGoBack() async {
+    setState(() => _isDeleting = true);
+
+    final ok = await ApiService.deleteNotification(widget.notification.id);
+
+    if (!mounted) return;
+    setState(() => _isDeleting = false);
+
+    if (ok) {
+      Navigator.pop(context, true); // กลับไปหน้า Notification list
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('เกิดข้อผิดพลาด ลองใหม่อีกครั้ง')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final notif = widget.notification;
+    final isAchievement = notif.type == 'achievement';
+    final isFail = notif.type.startsWith('quest_fail');
+
     return Scaffold(
       body: Stack(
         children: [
           Positioned.fill(
-            child: Image.asset('assets/images/background/bg1.png', fit: BoxFit.cover),
+            child: Image.asset(
+              'assets/images/background/bg1.png',
+              fit: BoxFit.cover,
+            ),
           ),
 
-          _buildTopBar(),
+          Column(
+            children: [
+              _buildTopBar(),
+              const SizedBox(height: 10),
 
-          // Main Content
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 150, 24, 24),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  height: 680,
-                  padding: EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.82),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: const Color(0xFFAAD7EA),
-                      width: 3,
-                    ),
-                  ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                   child: Column(
                     children: [
-                      const SizedBox(height: 40),
-
-                      // Icon
-                      Container(
-                        child: Center(
-                          child: Image.asset(
-                            widget.notification.imagePath,
-                            width: 100,
-                            height: 100,
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ),
-
-                      SizedBox(height: 24),
-
-                      // Title
-                      Text(
-                        widget.notification.title ?? 'แจ้งเตือน',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-
-                      SizedBox(height: 16),
-
-                      // Description
                       Expanded(
-                        child: SingleChildScrollView(
-                          child: Text(
-                            widget.notification.description,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.black87,
-                              height: 1.6,
+                        child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned.fill(
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.82),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: const Color(0xFFAAD7EA),
+                              width: 3,
                             ),
-                            textAlign: TextAlign.center,
+                          ),
+                          child: Column(
+                            children: [
+                              const SizedBox(height: 40),
+
+                              // Icon
+                              SizedBox(
+                                width: 120,
+                                height: 120,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: notif.iconPath.startsWith('http')
+                                      ? Image.network(
+                                          notif.iconPath,
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (_, __, ___) => Icon(
+                                            isAchievement
+                                                ? Icons.emoji_events
+                                                : Icons.notifications,
+                                            size: 48,
+                                            color: isAchievement
+                                                ? const Color(0xFFFFA000)
+                                                : const Color(0xFF2374B5),
+                                          ),
+                                        )
+                                      : Image.asset(
+                                          notif.iconPath,
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (_, __, ___) => Icon(
+                                            isAchievement
+                                                ? Icons.emoji_events
+                                                : Icons.notifications,
+                                            size: 48,
+                                            color: isAchievement
+                                                ? const Color(0xFFFFA000)
+                                                : const Color(0xFF2374B5),
+                                          ),
+                                        ),
+                                ),
+                              ),
+
+                              if (isAchievement) ...[
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFCA28),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text(
+                                    '🏆 ความสำเร็จ',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
+
+                              if (isFail) ...[
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE53935),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text(
+                                    '❌ ภารกิจล้มเหลว',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
+
+                              const SizedBox(height: 16),
+
+                              // Title
+                              Text(
+                                notif.title.isNotEmpty
+                                    ? notif.title
+                                    : 'แจ้งเตือน',
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              // Description
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  child: Text(
+                                    notif.detail.isNotEmpty
+                                        ? notif.detail
+                                        : '-',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.black87,
+                                      height: 1.6,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 12),
+
+                              // วันที่ได้รับ
+                              Text(
+                                notif.relativeTime,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.black38,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+
+                              // วันที่อ่านแล้ว (แสดงเฉพาะเมื่ออ่านแล้ว)
+                              if (notif.readAtText != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  notif.readAtText!,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF2374B5),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+
+                              const SizedBox(height: 4),
+
+                              // วันที่จะถูกลบอัตโนมัติ
+                              Text(
+                                notif.autoDeletionText,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Color.fromARGB(95, 214, 0, 0),
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+
+                              const SizedBox(height: 8),
+
+
+                            ],
                           ),
                         ),
                       ),
 
-                      SizedBox(height: 24),
-
-                      // Buttons Row
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(width: 60),
-                          // ปุ่มไปทำ (สีน้ำเงิน)
-                          Expanded(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Color(0xFF556AEB),
-                                    Color(0xFF59ABEC),
-                                  ],
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                ),
-                                borderRadius: BorderRadius.circular(25),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Color(0xFF4A8FE7).withOpacity(0.4),
-                                    blurRadius: 8,
-                                    offset: Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  // ไปหน้าที่เกี่ยวข้อง (เช่น quest screen)
-                                  Navigator.pop(context);
-                                  // TODO: Navigate to quest/achievement screen
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.transparent,
-                                  shadowColor: Colors.transparent,
-                                  padding: EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(25),
-                                  ),
-                                ),
-                                child: Text(
-                                  'ไปทำ',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-
-                          SizedBox(width: 60),
-                        ],
-                      ),
-
-                      SizedBox(height: 16),
+                      // Header Title
+                      _buildHeaderTitle(),
                     ],
                   ),
                 ),
 
-                // Header Title
-                _buildHeaderTitle(),
+                const SizedBox(height: 16),
 
-                Positioned(
-                  bottom: 0,
-                  left: 20,
-                  right: 20,
-                  child: _buildBottomButtons(),
-                ),
+                // ปุ่มลบ (ล่างสุด)
+                _buildDeleteButton(),
               ],
             ),
           ),
+                ), // close Expanded
+              ], // close Column
+            ), // close outer Column
         ],
       ),
     );
   }
 
-  Widget _buildTopBar() {
-    return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            alignment: Alignment.bottomCenter,
-            child: CustomTopBar(
-              onNotificationTapped: () {
-                Navigator.pushNamed(context, '/notification');
-              },
-              onSettingsTapped: () {
-                Navigator.pushNamed(context, '/setting');
-              },
-            ),
-          ),
-
-          // Back Button
-          Padding(
-            padding: const EdgeInsets.only(left: 20, top: 10),
-            child: GestureDetector(
-              onTapDown: (_) => setState(() => _isPressed = true),
-              onTapUp: (_) {},
-              onTapCancel: () => setState(() => _isPressed = false),
-              onTap: () async {
-                await Future.delayed(const Duration(milliseconds: 200));
-                if (!mounted) return;
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const NotificationScreen(),
-                  ),
-                ).then((_) {
-                  setState(() => _isPressed = false);
-                });
-              },
-              child: Image.asset(
-                _isPressed
-                    ? 'assets/images/button/bt-hover-Back.png'
-                    : 'assets/images/button/bt-Back.png',
-                width: 50,
-                height: 50,
+  Widget _buildDeleteButton() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Expanded(flex: 1, child: const SizedBox()),
+        Expanded(
+          flex: 2,
+          child: ElevatedButton(
+            onPressed: _isDeleting
+                ? null
+                : () {
+                    ConfirmDeletePopup.show(
+                      context,
+                      title: 'ยืนยันที่จะลบการแจ้งเตือนนี้หรือไม่?',
+                      onConfirm: () {
+                        Navigator.pop(context); // ปิด popup ก่อน
+                        _deleteAndGoBack(); // ค่อยลบจริง
+                      },
+                    );
+                  },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEA4444),
+              disabledBackgroundColor: const Color(0xFFEA4444).withOpacity(0.5),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(25),
               ),
             ),
+            child: _isDeleting
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Text(
+                    'ลบ',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
           ),
-        ],
+        ),
+        Expanded(flex: 1, child: const SizedBox()),
+      ],
+    );
+  }
+
+  Widget _buildTopBar() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+            padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
+            color: Colors.black.withOpacity(0.4),
+            child: CustomTopBar(
+              key: _topBarKey,
+              onNotificationTapped: () {
+                Navigator.pop(context, true); // กลับไปหน้า Notification เดิม
+              },
+              onSettingsTapped: () {
+                Navigator.pushReplacementNamed(context, '/setting');
+              },
+            ),
+          ),
+          _buildBackButton(),
+      ],
+    );
+  }
+
+  Widget _buildBackButton() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    final buttonSize = screenWidth * 0.12;
+    final topPadding = screenHeight * 0.010;
+
+    return Padding(
+      padding: EdgeInsets.only(left: screenWidth * 0.05, top: topPadding),
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapCancel: () => setState(() => _isPressed = false),
+        onTap: () async {
+          await Future.delayed(const Duration(milliseconds: 150));
+          if (!mounted) return;
+          setState(() => _isPressed = false);
+          Navigator.pop(context, true);
+        },
+        child: Image.asset(
+          _isPressed
+              ? 'assets/images/button/bt-hover-Back.png'
+              : 'assets/images/button/bt-Back.png',
+          width: buttonSize,
+          height: buttonSize,
+        ),
       ),
     );
   }
@@ -261,37 +400,6 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildBottomButtons() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        SizedBox(width: 60),
-        Expanded(
-          child: ElevatedButton(
-            onPressed: _deleteSelectedNotifications,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFFEA4444),
-              disabledBackgroundColor: Color(0xFFEA4444).withOpacity(0.5),
-              padding: EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(25),
-              ),
-            ),
-            child: Text(
-              'ลบ',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ),
-        SizedBox(width: 60),
-      ],
     );
   }
 }

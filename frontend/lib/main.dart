@@ -3,6 +3,7 @@ import 'package:flutter_application_1/api_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_application_1/globals.dart';
 import 'package:flutter_application_1/screens/all_quest.dart';
 
 import 'screens/login.dart';
@@ -17,6 +18,7 @@ import 'screens/notification.dart';
 import 'screens/achievement.dart';
 import 'screens/lootbox_screen.dart';
 import 'screens/map.dart';
+import 'screens/gasha.dart';
 import 'screens/club_screen.dart';
 import 'screens/setting.dart';
 import 'screens/startgame.dart';
@@ -68,6 +70,7 @@ class KidzKanklaiApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'KidzKanklai',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -109,6 +112,7 @@ class KidzKanklaiApp extends StatelessWidget {
         '/achievement': (context) => const AchievementScreen(),
         '/lootbox': (context) => const LootboxScreen(),
         '/map': (context) => const MapScreen(),
+        '/gasha': (context) => const GashaScreen(),
         '/club': (context) => const ClubScreen(),
         '/createclubquest': (context) => CreateClubQuestScreen(
           onSubmit: (data) {

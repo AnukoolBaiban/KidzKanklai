@@ -102,7 +102,7 @@ func ClaimLoginTickets(c *gin.Context) {
 	}
 	defer tx.Rollback(ctx)
 
-	// 🌟 3. ปรับฟังก์ชันช่วยทำ Upsert (ลบ itemName ออก เพราะเราจะดึงจาก Database แทน)
+	// 🌟 3. ปรับฟังก์ชันช่วยทำ Upsert
 	upsertTicket := func(itemID int64, maxCap int, addedAmt int, isDaily bool) {
 		inv, exists := inventoryMap[itemID]
 
@@ -126,24 +126,28 @@ func ClaimLoginTickets(c *gin.Context) {
 			newTotal := currentQty + addedAmt
 			if newTotal > maxCap {
 				newTotal = maxCap
-				addedAmt = newTotal - currentQty
+				addedAmt = newTotal - currentQty // ถ้าเต็มแล้ว addedAmt จะกลายเป็น 0
 			}
 
-			if addedAmt > 0 {
-				upsertQuery := `
-					INSERT INTO public.collect (user_id, item_id, quantity, acquired_date)
-					VALUES ($1, $2, $3, $4)
-					ON CONFLICT (user_id, item_id) 
-					DO UPDATE SET 
-						quantity = EXCLUDED.quantity,
-						acquired_date = EXCLUDED.acquired_date;
-				`
-				_, err := tx.Exec(ctx, upsertQuery, userId, itemID, newTotal, now)
-				if err == nil {
-
-					// 🌟 ดึงข้อมูลชื่อและรูปภาพจาก Map ที่ค้นหามาได้
+			// 🌟 1. ลบ if addedAmt > 0 ออก เพื่อบังคับอัปเดต Database เสมอ! 
+            // จะได้รีเซ็ตเวลา acquired_date เป็นของสัปดาห์นี้ ปิดช่องโหว่การได้ตั๋วซ้ำซ้อน
+			upsertQuery := `
+				INSERT INTO public.collect (user_id, item_id, quantity, acquired_date)
+				VALUES ($1, $2, $3, $4)
+				ON CONFLICT (user_id, item_id) 
+				DO UPDATE SET 
+					quantity = EXCLUDED.quantity,
+					acquired_date = EXCLUDED.acquired_date;
+			`
+			_, err := tx.Exec(ctx, upsertQuery, userId, itemID, newTotal, now)
+			
+            if err == nil {
+				
+				// 🌟 2. นำ if addedAmt > 0 มาครอบตอนส่ง Response กลับไปให้แอปแทน
+                // ถ้าตั๋วเต็มแล้ว (ได้ 0 ใบ) ก็ไม่ต้องส่งไปโชว์ใน Popup ให้รกตา
+				if addedAmt > 0 {
 					itemName := "Unknown Item"
-					itemImage := "assets/images/item/default_item.png" // รูปภาพสำรองเผื่อพลาด
+					itemImage := "assets/images/item/default_item.png"
 					if info, ok := itemsMap[itemID]; ok {
 						itemName = info.Name
 						if info.Image != "" {
@@ -154,13 +158,14 @@ func ClaimLoginTickets(c *gin.Context) {
 					rewards = append(rewards, RewardResponse{
 						ItemID: itemID,
 						Name:   itemName,
-						Image:  itemImage, // <--- แนบรูปส่งไปให้ Flutter
+						Image:  itemImage,
 						Added:  addedAmt,
 						Total:  newTotal,
 					})
-				} else {
-					fmt.Printf("❌ Upsert Error for item %d: %v\n", itemID, err)
 				}
+
+			} else {
+				fmt.Printf("❌ Upsert Error for item %d: %v\n", itemID, err)
 			}
 		}
 	}

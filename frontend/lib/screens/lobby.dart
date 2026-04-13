@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:flutter_application_1/api_service.dart';
 
 import 'package:flutter_application_1/widgets/bottom_navigation_bar.dart';
@@ -18,9 +19,21 @@ class LobbyScreen extends StatefulWidget {
 }
 
 class _LobbyScreenState extends State<LobbyScreen> {
+  Key _topBarKey = UniqueKey();
   int _selectedIndex = 1; // Default to Lobby (Room)
   User? _user; // Local user state
   bool _isLoading = true;
+  bool _hasUnclaimedAchievement = false;
+
+  void _onReturnFromOtherPage() {
+    if (mounted) {
+      setState(() {
+        _topBarKey = UniqueKey();
+      });
+      _loadUserData();
+      _checkUnclaimedAchievements();
+    }
+  }
 
   @override
   void initState() {
@@ -29,7 +42,11 @@ class _LobbyScreenState extends State<LobbyScreen> {
     _loadUserData();
     // สั่งเช็คของรางวัลทันทีที่เปิดหน้านี้
     _checkDailyLoginRewards();
+    _checkUnclaimedAchievements();
     // _giveMeCoins(); // สำหรับเทสเพิ่มเหรียญ
+    
+    // 🌟 แอบสั่งให้ Backend เช็คและสร้างข้อสอบประจำสัปดาห์
+    ApiService.generateWeeklyExams();
   }
 
   Future<void> _loadUserData() async {
@@ -43,6 +60,29 @@ class _LobbyScreenState extends State<LobbyScreen> {
         }
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _checkUnclaimedAchievements() async {
+    try {
+      final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+      if (currentUserId == null) return;
+      
+      final attainResponse = await Supabase.instance.client
+          .from('attain')
+          .select('status, reward_claimed')
+          .eq('user_id', currentUserId)
+          .eq('status', 'completed')
+          .eq('reward_claimed', false)
+          .limit(1);
+
+      if (mounted) {
+        setState(() {
+          _hasUnclaimedAchievement = attainResponse.isNotEmpty;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking unclaimed achievements: $e');
     }
   }
 
@@ -72,22 +112,23 @@ class _LobbyScreenState extends State<LobbyScreen> {
     MenuItem(
       imagePath: "assets/images/icon/iconAchievement.png",
       label: 'ความสำเร็จ',
+      hasNotification: _hasUnclaimedAchievement,
       onTap: () {
-        Navigator.pushNamed(context, '/achievement');
+        Navigator.pushNamed(context, '/achievement').then((_) => _onReturnFromOtherPage());
       },
     ),
     MenuItem(
       imagePath: "assets/images/icon/iconQuest.png",
       label: 'ภารกิจ',
       onTap: () {
-        Navigator.pushNamed(context, '/allquest').then((_) => _loadUserData());
+        Navigator.pushNamed(context, '/allquest').then((_) => _onReturnFromOtherPage());
       },
     ),
     MenuItem(
       imagePath: "assets/images/item/Gasha.png",
       label: 'กล่องสุ่ม',
       onTap: () {
-        Navigator.pushNamed(context, '/gasha');
+        Navigator.pushNamed(context, '/gasha').then((_) => _onReturnFromOtherPage());
       },
     ),
   ];
@@ -102,17 +143,21 @@ class _LobbyScreenState extends State<LobbyScreen> {
             fit: BoxFit.cover,
           ),
         ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Top Bar - ใช้ CustomTopBar
-              CustomTopBar(
-                onNotificationTapped: () {
-                  Navigator.pushNamed(context, '/notification').then((_) => _loadUserData());
-                },
-                onSettingsTapped: () {
-                  Navigator.pushNamed(context, '/setting').then((_) => _loadUserData());
-                },
+        child: Column(
+          children: [
+            // Top Bar - ใช้ CustomTopBar (หุ้มด้วยแถบสีดำบางๆ ให้เหมือนหน้าภารกิจ)
+            Container(
+              padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
+              color: Colors.black.withOpacity(0.4),
+              child: CustomTopBar(
+                  key: _topBarKey,
+                  onNotificationTapped: () {
+                    Navigator.pushNamed(context, '/notification').then((_) => _onReturnFromOtherPage());
+                  },
+                  onSettingsTapped: () {
+                    Navigator.pushNamed(context, '/setting').then((_) => _onReturnFromOtherPage());
+                  },
+                ),
               ),
 
               // Main Content
@@ -141,8 +186,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
               ),
 
               // Bottom Navigation
-              Padding(
-                padding: const EdgeInsets.only(bottom: 20),
+              SafeArea(
+                top: false,
                 child: CustomBottomNavigationBar(
                   selectedIndex: _selectedIndex,
                   onItemTapped: (index) {
@@ -152,28 +197,27 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
                     switch (index) {
                       case 0:
-                        Navigator.pushNamed(context, '/fashion').then((_) => _loadUserData());
+                        Navigator.pushNamed(context, '/fashion').then((_) => _onReturnFromOtherPage());
                         break;
                       case 1:
-                        Navigator.pushNamed(context, '/lobby').then((_) => _loadUserData());
+                        Navigator.pushNamed(context, '/lobby').then((_) => _onReturnFromOtherPage());
                         break;
                       case 2:
-                        Navigator.pushNamed(context, '/map').then((_) => _loadUserData());
+                        Navigator.pushNamed(context, '/map').then((_) => _onReturnFromOtherPage());
                         break;
                       case 3:
-                        Navigator.pushNamed(context, '/createclubquest').then((_) => _loadUserData());
+                        Navigator.pushNamed(context, '/createclubquest').then((_) => _onReturnFromOtherPage());
                         break;
                     }
                   },
                   onAvatarTapped: () {
-                    Navigator.pushNamed(context, '/profile').then((_) => _loadUserData());
+                    Navigator.pushNamed(context, '/profile').then((_) => _onReturnFromOtherPage());
                   },
                 ),
               ),
             ],
           ),
         ),
-      ),
     );
   }
 }

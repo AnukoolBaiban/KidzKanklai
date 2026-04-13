@@ -323,53 +323,134 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // 🔄 [แก้ไขฟังก์ชันนี้] เปลี่ยนจาก update supabase เป็นเรียก API แทน
   void _showEditDialog(String title, String currentValue, String columnToUpdate) {
     final TextEditingController controller = TextEditingController(text: currentValue);
+    final int maxLength = columnToUpdate == 'user_name' ? 15 : 30;
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text("แก้ไข$title"),
-          content: TextField(
-            controller: controller,
-            decoration: InputDecoration(hintText: "กรอก$titleใหม่"),
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFFAAD7EA),
+                width: 3,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "แก้ไข$title",
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF00385D),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: controller,
+                  maxLength: maxLength,
+                  style: const TextStyle(fontSize: 16),
+                  decoration: InputDecoration(
+                    hintText: "กรอก$titleใหม่",
+                    counterStyle: const TextStyle(color: Colors.black54),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFAAD7EA), width: 2),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF2374B5), width: 2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // ยกเลิก
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey.shade400,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("ยกเลิก", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // บันทึก
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF85D755), Color(0xFF34C759)],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () async {
+                            final newValue = controller.text.trim();
+                            // อนุญาตให้ Bio เป็นค่าว่างได้ แต่ชื่อห้ามว่าง
+                            if (columnToUpdate == 'user_name' && newValue.isEmpty) return;
+
+                            // ✅ เรียกใช้ฟังก์ชันยิง API
+                            final success = await _updateProfileViaApi(columnToUpdate, newValue);
+
+                            if (success) {
+                               if (mounted) {
+                                  setState(() {
+                                    if (columnToUpdate == 'user_name') _displayName = newValue;
+                                    if (columnToUpdate == 'user_detail') _displayBio = newValue;
+                                  });
+                                  Navigator.pop(context);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('บันทึกข้อมูลเรียบร้อย')),
+                                  );
+                                }
+                            } else {
+                               if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('เกิดข้อผิดพลาดในการบันทึก')),
+                                  );
+                               }
+                            }
+                          },
+                          child: const Text("บันทึก", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("ยกเลิก"),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final newValue = controller.text.trim();
-                
-                // อนุญาตให้ Bio เป็นค่าว่างได้ แต่ชื่อห้ามว่าง
-                if (columnToUpdate == 'user_name' && newValue.isEmpty) return;
-
-                // ✅ เรียกใช้ฟังก์ชันยิง API
-                final success = await _updateProfileViaApi(columnToUpdate, newValue);
-
-                if (success) {
-                   if (mounted) {
-                      setState(() {
-                        if (columnToUpdate == 'user_name') _displayName = newValue;
-                        if (columnToUpdate == 'user_detail') _displayBio = newValue;
-                      });
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('บันทึกข้อมูลเรียบร้อย')),
-                      );
-                    }
-                } else {
-                   if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('เกิดข้อผิดพลาดในการบันทึก')),
-                      );
-                   }
-                }
-              },
-              child: const Text("บันทึก"),
-            ),
-          ],
         );
       },
     );
@@ -391,23 +472,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           
-          // Top Bar Overlay
-          _buildTopBar(),
-
-          // Main Scrollable Content
-          Padding(
-            padding: const EdgeInsets.only(top: 100, left: 12, right: 12, bottom: 20),
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  _buildProfileBox(),
-                  const SizedBox(height: 40),
-                  _buildStatBox(),
-                  const SizedBox(height: 20),
-                  _buildAchievementBox(),
-                ],
+          // Main layout wraps top bar and content to prevent overlaps
+          Column(
+            children: [
+              _buildTopBar(),
+              
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(top: 20, left: 12, right: 12, bottom: 120), // เว้น 120px ล่างสุดไม่ให้บางปุ่มเมนู
+                  child: Column(
+                    children: [
+                      _buildProfileBox(),
+                      const SizedBox(height: 20), // ระยะห่างเท่ากัน
+                      _buildStatBox(),
+                      const SizedBox(height: 20), // ระยะห่างเท่ากัน
+                      _buildAchievementBox(),
+                    ],
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
           // Bottom Navigation
           Positioned(
@@ -451,24 +535,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildTopBar() {
-    return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(    
-            alignment: Alignment.bottomCenter,
-            child: CustomTopBar(
-              onNotificationTapped: () {
-                Navigator.pushNamed(context, '/notification');
-              },
-              onSettingsTapped: () {
-                Navigator.pushNamed(context, '/setting');
-              },
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
+          color: Colors.black.withOpacity(0.4),
+          child: CustomTopBar(
+            onNotificationTapped: () {
+              Navigator.pushNamed(context, '/notification');
+            },
+            onSettingsTapped: () {
+              Navigator.pushNamed(context, '/setting');
+            },
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

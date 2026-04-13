@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 /// Widget แสดง Cost แบบมีหางชี้ (Speech Bubble)
 class CostDisplayWidget extends StatelessWidget {
   final int energyCost;
+  final String? energyCostText; // 🌟 1. เพิ่มตัวแปรนี้เข้ามารองรับข้อความ
   final int ticketCost;
   final bool showTicket;
   final Color backgroundColor;
@@ -13,6 +14,7 @@ class CostDisplayWidget extends StatelessWidget {
   const CostDisplayWidget({
     Key? key,
     this.energyCost = 20,
+    this.energyCostText, // 🌟 2. ใส่ใน Constructor
     this.ticketCost = 1,
     this.showTicket = true,
     this.showEnergy = true,
@@ -38,7 +40,8 @@ class CostDisplayWidget extends StatelessWidget {
             if (showEnergy)
               _buildCostItem(
                 icon: 'assets/images/item/energy.png',
-                value: '-$energyCost',
+                // 🌟 3. เช็คว่ามีข้อความส่งมาไหม ถ้ามีใช้ข้อความ ถ้าไม่มีใช้ตัวเลขแบบเดิม
+                value: energyCostText != null ? '-$energyCostText' : '-$energyCost',
                 fallbackIcon: Icons.flash_on,
                 fallbackColor: Colors.yellow,
               ),

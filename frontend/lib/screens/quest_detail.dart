@@ -65,7 +65,18 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
 
       if (mounted) {
         setState(() {
-          _questStatus = data['status'] ?? 'in_progress'; // 🌟 เก็บสถานะ
+          String status = data['status'] ?? 'in_progress';
+          
+          if (status == 'in_progress' && questData['due_date'] != null) {
+            try {
+              DateTime dueDate = DateTime.parse(questData['due_date']);
+              if (dueDate.isBefore(DateTime.now())) {
+                status = 'expired';
+              }
+            } catch (_) {}
+          }
+          
+          _questStatus = status; // 🌟 เก็บสถานะ
           _title = questData['name'] ?? 'ไม่มีชื่อภารกิจ';
           _description = questData['detail'] ?? 'ไม่มีรายละเอียด';
           _startDate = _formatDate(questData['start_date']);
@@ -150,25 +161,28 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
           // Background
           _buildBackground(),
 
-          // Top Bar
-          _buildTopBar(topPadding, topBarHeight),
+          Column(
+            children: [
+              // Top Bar
+              _buildTopBar(topPadding),
 
-          // Main Content
-          Padding(
-            padding: EdgeInsets.only(
-              top: topBarHeight + 10,
-              left: size.width * 0.05,
-              right: size.width * 0.05,
-              bottom: bottomPadding + 100, // เว้นที่ให้ปุ่ม
-            ),
-            child: Column(
-              children: [
-                // Back Button
-                Row(children: [_buildBackButton()]),
+              // Main Content
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: 10,
+                    left: size.width * 0.05,
+                    right: size.width * 0.05,
+                    bottom: bottomPadding + 100, // เว้นที่ให้ปุ่ม
+                  ),
+                  child: Column(
+                    children: [
+                      // Back Button
+                      Row(children: [_buildBackButton()]),
 
-                SizedBox(height: 10),
+                      const SizedBox(height: 10),
 
-                // Content Card
+                      // Content Card
                 Expanded(
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 5),
@@ -195,14 +209,17 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
                                       MainAxisAlignment.spaceBetween,
                                   children: [
                                     Expanded(
-                                      child: Text(
-                                        _title,
-                                        style: TextStyle(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF447199),
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          _title,
+                                          style: TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF447199),
+                                          ),
                                         ),
-                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                     Column(
@@ -340,6 +357,9 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
                 ),
               ],
             ),
+                  ),
+                ),
+            ],
           ),
 
           // Bottom Buttons
@@ -383,22 +403,15 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
     );
   }
 
-  Widget _buildTopBar(double topPadding, double height) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: height,
+  Widget _buildTopBar(double topPadding) {
+    return Container(
         padding: EdgeInsets.only(top: topPadding),
         color: Colors.black.withOpacity(0.4),
-        alignment: Alignment.bottomCenter,
         child: CustomTopBar(
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
           onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
         ),
-      ),
     );
   }
 
@@ -458,9 +471,29 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
   }
 
   Widget _buildBottomButtons(double bottomPadding) {
-    // 🌟 3. ถ้าสถานะไม่ใช่ in_progress ให้ซ่อนปุ่มไปเลย 
+    if (_isLoading) return const SizedBox.shrink();
+
+    // 🌟 3. ถ้าสถานะไม่ใช่ in_progress ให้แสดงแถบบอกว่าสำเร็จหรือไม่
     if (_questStatus != 'in_progress') {
-      return const SizedBox.shrink(); // คืนค่าพื้นที่ว่างๆ แทนปุ่ม
+      bool isSuccess = _questStatus == 'completed';
+      Color textColor = isSuccess ? const Color(0xFF6CC732) : const Color(0xFFE74A4A);
+      String text = isSuccess ? 'ภารกิจสำเร็จ' : 'ภารกิจไม่สำเร็จ';
+
+      return Positioned(
+        bottom: bottomPadding + 30,
+        left: 0,
+        right: 0,
+        child: Center(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+          ),
+        ),
+      );
     }
     
     return Positioned(
