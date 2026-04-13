@@ -11,8 +11,8 @@ func main() {
 	// 1. เชื่อมต่อฐานข้อมูล
 	configs.ConnectDB()
 
-	// config.ResetDatabase() // Drop และ Create ตารางพร้อมเปิด RLS + Policies ตามปกติ
-	// config.DisableRLS()    // ปิด RLS + ลบ Policies ทั้งหมด
+	// //config.ResetDatabase() // Drop และ Create ตารางพร้อมเปิด RLS + Policies ตามปกติ
+	// //config.DisableRLS()    // ปิด RLS + ลบ Policies ทั้งหมด
 
 	// 2. เริ่มระบบ Auth
 	handlers.InitAuth()
@@ -65,6 +65,11 @@ func main() {
 	auth.POST("/quests/system/init", handlers.InitSystemQuests)
 	auth.POST("/quests/system/complete", handlers.CompleteSystemQuest)
 
+	// 🌟 เพิ่มบรรทัดนี้ เพื่อให้ Go รู้จัก API สถานที่
+	auth.POST("/locations/action", handlers.PerformLocationAction)
+
+	auth.POST("/exams/generate-weekly", handlers.GenerateWeeklyExams)
+	auth.POST("/exams/start", handlers.StartExam)
 	// --- Notifications ---
 	auth.GET("/notifications", handlers.GetNotifications)
 	auth.PUT("/notifications/:id/read", handlers.MarkNotificationRead)

@@ -561,6 +561,89 @@ class ApiService {
     }
   }
 
+  // --- ฟังก์ชันฝึกฝนในสถานที่ต่างๆ (Location Action) ---
+  // คืนค่าเป็น Map ที่มี success, message, stamina_change, stat_gained
+  static Future<Map<String, dynamic>?> performLocationAction(String location) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/locations/action'),
+        headers: _headers,
+        body: jsonEncode({
+          "location": location, // "library", "gym", "amusement_park", "park"
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data; // คืนค่าทั้งหมดไปให้ UI เอาไปโชว์
+      } else {
+        final errorData = jsonDecode(response.body);
+        print("Location Action Failed: ${response.statusCode} - ${errorData['error']}");
+        
+        // คืนค่า Error กลับไปเป็น Map แทน null เพื่อให้แอปนำไปใช้แสดง Popup เตือนได้
+        return {
+          "success": false,
+          "message": errorData['error'] ?? "เกิดข้อผิดพลาดในการเชื่อมต่อ",
+        };
+      }
+    } catch (e) {
+      print("Location Action Error: $e");
+      return {
+        "success": false,
+        "message": "ข้อผิดพลาดระบบ: $e",
+      };
+    }
+  }
+
+  // --- ฟังก์ชันสร้างข้อสอบประจำสัปดาห์ ---
+  // คืนค่า true ถ้าสร้างสำเร็จ (หรือมีอยู่แล้ว) และ false ถ้าเกิดข้อผิดพลาด
+  static Future<bool> generateWeeklyExams() async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/exams/generate-weekly'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          // แจ้งให้ Console ทราบว่าสร้างข้อสอบประเภทอะไร (หรือแจ้งว่าสร้างไปแล้ว)
+          print("Weekly Exam Status: ${data['message']} (Type: ${data['type'] ?? 'N/A'})");
+          return true;
+        }
+      } else {
+        final errorData = jsonDecode(response.body);
+        print("Generate Weekly Exams Failed: ${response.statusCode} - ${errorData['error']}");
+      }
+    } catch (e) {
+      print("Generate Weekly Exams Error: $e");
+    }
+    return false; // เกิด Error
+  }
+
+  // --- ฟังก์ชันเริ่มสอบ (Start Exam) ---
+  // คืนค่ากลับเป็น Map ที่บอกว่า ผ่าน/ไม่ผ่าน, โอกาสผ่านเท่าไหร่ และได้ของรางวัลอะไรบ้าง
+  static Future<Map<String, dynamic>?> startExam(int examId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/exams/start'),
+        headers: _headers,
+        body: jsonEncode({
+          "exam_id": examId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data; // คืนค่าทั้งหมดกลับไปให้ UI จัดการต่อ
+      } else {
+        final errorData = jsonDecode(response.body);
+        print("Start Exam Failed: ${response.statusCode} - ${errorData['error']}");
+        return {"error": errorData['error']}; // คืนค่า Error กลับไปให้โชว์ Popup ได้
+      }
+    } catch (e) {
+      print("Start Exam Error: $e");
+      return null;
   // --- ฟังก์ชันดึง Notification ทั้งหมดของ user ---
   static Future<List<NotificationModel>> getNotifications() async {
     try {

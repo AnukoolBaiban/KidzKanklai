@@ -26,9 +26,7 @@ type GetNotification struct {
 type Take struct {
 	ExamID        int64      `json:"exam_id"`
 	ItemID        int64      `json:"item_id"`
-	Status        *string    `json:"status"`
-	CompletedDate *time.Time `json:"completed_date"`
-	RewardClaimed *bool      `json:"reward_claimed"`
+	Quantity      *int       `json:"quantity"` // 🌟 เพิ่มบรรทัดนี้
 }
 
 // Table: wear (Character <-> Item)

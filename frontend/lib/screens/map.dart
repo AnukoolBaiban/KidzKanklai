@@ -17,6 +17,9 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   int _selectedIndex = 2;
 
+  // 🌟 1. เพิ่มตัวแปรนี้เพื่อเอาไว้บังคับรีโหลด EnergyBar
+  Key _energyKey = UniqueKey();
+
   // ค่าสถานะที่ได้รับจากแต่ละสถานที่
   final Map<String, Map<String, int>> _locationRewards = {
     'สนามสอบ': {
@@ -76,11 +79,7 @@ class _MapScreenState extends State<MapScreen> {
                     horizontal: 16,
                     vertical: 10,
                   ),
-                  child: EnergyBar(
-                    energy: 80,
-                    maxEnergy: 100,
-                    ticket: 10,
-                  ),
+                  child: EnergyBar(key: _energyKey), // 🌟 2. ใส่ key เข้าไปที่นี่
                 ),
 
                 /// MAP
@@ -242,9 +241,9 @@ class _MapScreenState extends State<MapScreen> {
       imagePath: imagePath,
       label: label,
       width: width,
-      onTap: () {
-        // Navigate to LocationDetailScreen
-        Navigator.push(
+      onTap: () async { // 🌟 1. เติม async ตรงนี้
+        // 🌟 2. เติม await ให้มันหยุดรอจนกว่าผู้เล่นจะกดย้อนกลับมาจากหน้า LocationUpgradeScreen
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => LocationUpgradeScreen(
@@ -255,6 +254,13 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ),
         );
+
+        // 🌟 3. พอกลับมาถึงหน้านี้ สั่งเปลี่ยน Key เพื่อบังคับให้ EnergyBar รีโหลดข้อมูลใหม่ทันที
+        if (mounted) {
+          setState(() {
+            _energyKey = UniqueKey();
+          });
+        }
       },
     );
   }
