@@ -17,6 +17,7 @@ import 'screens/notification.dart';
 import 'screens/achievement.dart';
 import 'screens/lootbox_screen.dart';
 import 'screens/map.dart';
+import 'screens/gasha.dart';
 import 'screens/club_screen.dart';
 import 'screens/setting.dart';
 import 'screens/startgame.dart';
@@ -109,6 +110,7 @@ class KidzKanklaiApp extends StatelessWidget {
         '/achievement': (context) => const AchievementScreen(),
         '/lootbox': (context) => const LootboxScreen(),
         '/map': (context) => const MapScreen(),
+        '/gasha': (context) => const GashaScreen(),
         '/club': (context) => const ClubScreen(),
         '/createclubquest': (context) => CreateClubQuestScreen(
           onSubmit: (data) {
