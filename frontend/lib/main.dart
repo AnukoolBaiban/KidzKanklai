@@ -3,6 +3,7 @@ import 'package:flutter_application_1/api_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_application_1/globals.dart';
 import 'package:flutter_application_1/screens/all_quest.dart';
 
 import 'screens/login.dart';
@@ -69,6 +70,7 @@ class KidzKanklaiApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'KidzKanklai',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(

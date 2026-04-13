@@ -65,5 +65,11 @@ func main() {
 	auth.POST("/quests/system/init", handlers.InitSystemQuests)
 	auth.POST("/quests/system/complete", handlers.CompleteSystemQuest)
 
+	// --- Notifications ---
+	auth.GET("/notifications", handlers.GetNotifications)
+	auth.PUT("/notifications/:id/read", handlers.MarkNotificationRead)
+	auth.DELETE("/notifications/:id", handlers.DeleteNotification)
+	auth.DELETE("/notifications", handlers.DeleteAllNotifications)
+
 	r.Run(":8080")
 }
