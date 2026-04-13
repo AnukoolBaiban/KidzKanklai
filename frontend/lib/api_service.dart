@@ -22,9 +22,11 @@ class User {
   final String equippedSkin;
   final String equippedHair;
   final String equippedFace;
+  final String equippedOutfit;
   final int statIntellect;
   final int statStrength;
   final int statCreativity;
+  final String bodyType; // 'KID', 'TEEN', 'ADULT'
 
   User({
     required this.id,
@@ -41,17 +43,12 @@ class User {
     required this.equippedSkin,
     required this.equippedHair,
     required this.equippedFace,
-    this.equippedCloth = '',
-    this.equippedShoes = '',
-    this.equippedBody = '',
+    this.equippedOutfit = '',
     required this.statIntellect,
     required this.statStrength,
     required this.statCreativity,
+    required this.bodyType,
   });
-
-  final String equippedCloth;
-  final String equippedShoes;
-  final String equippedBody;
 
   static int _parseInt(dynamic value) {
     if (value == null) return 0;
@@ -76,12 +73,11 @@ class User {
       equippedSkin: json['equipped_skin'] ?? '',
       equippedHair: json['equipped_hair'] ?? '',
       equippedFace: json['equipped_face'] ?? '',
-      equippedCloth: json['equipped_cloth'] ?? '',
-      equippedShoes: json['equipped_shoes'] ?? '',
-      equippedBody: json['equipped_body'] ?? '',
+      equippedOutfit: json['equipped_outfit'] ?? '',
       statIntellect: _parseInt(json['stat_intellect']),
       statStrength: _parseInt(json['stat_strength']),
       statCreativity: _parseInt(json['stat_creativity']),
+      bodyType: (json['body_type'] as String?) ?? 'KID',
     );
   }
 }
@@ -405,7 +401,8 @@ class ApiService {
   }
 
   // --- ฟังก์ชันรับรางวัลจากเควสทั่วไป ---
-  static Future<List<dynamic>?> completeNormalQuest(int questId) async {
+  // คืนค่าทั้งก้อน response (มี rewards, leveled_up, base_level, new_level)
+  static Future<Map<String, dynamic>?> completeNormalQuest(int questId) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/quests/complete'),
@@ -416,12 +413,8 @@ class ApiService {
       ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['success'] == true) {
-          // ถ้าสำเร็จ คืนค่าก้อนของรางวัลกลับไปให้หน้า UI โชว์
-          return data['rewards'] ?? [];
-        }
+        if (data['success'] == true) return data;
       } else {
-        // อ่านข้อความ Error จาก Backend มาโชว์ใน Console
         final errorData = jsonDecode(response.body);
         print(
           "Complete Quest Failed: ${response.statusCode} - ${errorData['error']}",
@@ -430,7 +423,6 @@ class ApiService {
     } catch (e) {
       print("Complete Quest Error: $e");
     }
-    // คืนค่า null กรณีเกิด Error หรือส่งไปแล้วแต่ถูกเตะกลับ
     return null;
   }
 
@@ -496,8 +488,8 @@ class ApiService {
   }
 
   // --- ฟังก์ชันส่งเควสทันทีและรับรางวัล (Complete Instant Quest) ---
-  // คืนค่าเป็น List ของรางวัลคล้ายๆ completeNormalQuest
-  static Future<List<dynamic>?> completeInstantQuest(int questId) async {
+  // คืนค่าทั้งก้อน response (มี rewards, leveled_up, base_level, new_level)
+  static Future<Map<String, dynamic>?> completeInstantQuest(int questId) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/quests/instant/complete'),
@@ -508,12 +500,8 @@ class ApiService {
       ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['success'] == true) {
-          // ถ้าสำเร็จ คืนค่าก้อนของรางวัลกลับไปให้หน้า UI โชว์
-          return data['rewards'] ?? [];
-        }
+        if (data['success'] == true) return data;
       } else {
-        // อ่านข้อความ Error จาก Backend มาโชว์ใน Console (เช่น กรณีกดส่งก่อนเวลาหมด)
         final errorData = jsonDecode(response.body);
         print(
           "Complete Instant Quest Failed: ${response.statusCode} - ${errorData['error']}",
@@ -522,7 +510,6 @@ class ApiService {
     } catch (e) {
       print("Complete Instant Quest Error: $e");
     }
-    // คืนค่า null กรณีเกิด Error หรือส่งไปแล้วแต่ถูกเตะกลับเพราะยังไม่หมดเวลา
     return null;
   }
 
@@ -538,11 +525,12 @@ class ApiService {
     }
   }
 
-  // รับรางวัลเควสระบบ
-  static Future<List<dynamic>?> completeSystemQuest(int questId) async {
+  // 6. API: รับรางวัลเควสระบบ
+  static Future<Map<String, dynamic>?> completeSystemQuest(int questId) async {
     try {
+      final url = Uri.parse('$baseUrl/quests/system/complete');
       final response = await http.post(
-        Uri.parse('$baseUrl/quests/system/complete'),
+        url,
         headers: _headers,
         body: jsonEncode({'quest_id': questId}),
       );
@@ -555,12 +543,32 @@ class ApiService {
         print("Failed to complete system quest: ${response.body}");
         return null;
       }
+      return null;
     } catch (e) {
-      print("Complete System Quest Error: $e");
+      print("API Error (completeSystemQuest): $e");
       return null;
     }
   }
 
+  // 7. API: เปลี่ยนร่างตัวละคร
+  static Future<bool> changeBodyType(String bodyType) async {
+    try {
+      final url = Uri.parse('$baseUrl/profile/body-type');
+      final response = await http.put(
+        url,
+        headers: _headers,
+        body: jsonEncode({'body_type': bodyType}),
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['body_type'] == bodyType;
+      }
+      return false;
+    } catch (e) {
+      print("API Error (changeBodyType): $e");
+      return false;
+    }
+  }
   // --- ฟังก์ชันฝึกฝนในสถานที่ต่างๆ (Location Action) ---
   // คืนค่าเป็น Map ที่มี success, message, stamina_change, stat_gained
   static Future<Map<String, dynamic>?> performLocationAction(String location) async {

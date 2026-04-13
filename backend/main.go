@@ -44,6 +44,9 @@ func main() {
 	// Endpoint สำหรับแก้ Bio
 	auth.PUT("/profile/bio", handlers.UpdateUserProfileBio)
 
+	// Endpoint สำหรับเปลี่ยนร่าง (Kid/Teen/Adult)
+	auth.PUT("/profile/body-type", handlers.UpdateBodyType)
+
 	// --- Fashion System ---
 	auth.GET("/inventory", handlers.GetInventory)
 	auth.POST("/equip", handlers.EquipItem)
@@ -51,7 +54,7 @@ func main() {
 
 	// --- Rewards ---
 	auth.POST("/rewards/login-bonus", handlers.ClaimLoginTickets)
-	auth.POST("/rewards/add-coins", handlers.AddTestCoins)
+
 	auth.POST("/rewards/claim-achievement", handlers.ClaimAchievementReward)
 
 	// --- AI ---

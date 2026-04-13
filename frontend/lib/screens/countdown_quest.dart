@@ -11,6 +11,8 @@ import 'package:flutter_application_1/widgets/confirm_exit_popup.dart';
 import 'package:flutter_application_1/widgets/confirm_zero_ticket_popup.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_application_1/widgets/reward_popup.dart';
+import 'package:flutter_application_1/widgets/level_up_popup.dart';
+import 'package:flutter_application_1/widgets/character_up_popup.dart';
 import 'package:flutter_application_1/screens/setting.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 
@@ -161,15 +163,15 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
     if (_currentQuestId == null) return;
 
     setState(() => _isLoadingAPI = true);
-    final rewards = await ApiService.completeInstantQuest(_currentQuestId!);
+    final result = await ApiService.completeInstantQuest(_currentQuestId!);
     setState(() => _isLoadingAPI = false);
 
     // 🌟 เช็คว่า API ทำงานสำเร็จ (ไม่เป็น null)
-    if (rewards != null && mounted) {
-      
+    if (result != null && mounted) {
+      final rewards = (result['rewards'] as List?) ?? [];
+
       // 🌟 เช็คว่ามีของรางวัลให้แจกจริงๆ หรือไม่ (ป้องกันกรณีสร้างตอนตั๋วหมด)
       if (rewards.isNotEmpty) {
-        // แปลงของรางวัลและโชว์ Popup
         List<RewardData> popupRewards = rewards.map<RewardData>((rw) {
           return RewardData(
             type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM',
@@ -179,27 +181,56 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
           );
         }).toList();
 
-        // 🌟 1. ใช้ await เพื่อหยุดรอจนกว่าผู้ใช้จะกด "ปิด" หน้าต่างรับของรางวัล
         await RewardPopup.show(context, rewards: popupRewards);
       } else {
-        // 🌟 กรณีไม่มีของรางวัล โชว์แค่แจ้งเตือนสีเขียวก็พอ
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('ทำภารกิจสำเร็จ!'),
             backgroundColor: Colors.green,
           ),
         );
-        // หน่วงเวลาให้อ่านแจ้งเตือนแป๊บนึง
         await Future.delayed(const Duration(seconds: 1));
       }
 
-      // 🌟 2. เมื่อ Popup ปิดลง หรือแจ้งเตือนจบแล้ว ให้ Pop หน้าต่างนับเวลาทิ้ง 
-      // ระบบจะเด้งกลับไปที่หน้า All Quest และรีเฟรชข้อมูลให้เองอัตโนมัติ
-      if (mounted) {
-        Navigator.pop(context, true); 
+      // 🌟 แสดง Level Up Popup ถ้าต้องการ
+      print("[DEBUG] Quest result: leveled_up=${result['leveled_up']}, base=${result['base_level']}, new=${result['new_level']}");
+      if (mounted && result['leveled_up'] == true) {
+        final baseLv = result['base_level'] as int? ?? 0;
+        final newLv  = result['new_level']  as int? ?? 0;
+        
+        // 🌟 ตรวสอบการเปลี่ยนร่างโดยใช้ Model Group (Kid: 0, Teen: 1, Adult: 2)
+        int getModelGroup(int lv) {
+          if (lv >= 30) return 2;
+          if (lv >= 15) return 1;
+          return 0;
+        }
+        final isEvolution = getModelGroup(newLv) > getModelGroup(baseLv);
+
+        // 🌟 รีเฟรช Profile ล่วงหน้า เพื่อให้ร่างวิวัฒนาการมีข้อมูลล่าสุด
+        final freshUser = await ApiService.getProfile(0);
+
+        if (isEvolution && mounted) {
+          // 1. ถ้าถึงเกณฑ์วิวัฒนาการ โชว์ CharacterUpPopup ทันที (มีข้อมูลเลเวลด้านบนอยู่แล้ว)
+          await CharacterUpPopup.show(
+            context,
+            baseLevel: baseLv,
+            newLevel: newLv,
+            user: freshUser ?? widget.user,
+            onTapContinue: () {},
+          );
+        } else if (mounted) {
+          // 2. ถ้าเลเวลอัปปกติ ค่อยโชว์ LevelUpPopup แบบเดิม
+          await LevelUpPopup.show(
+            context,
+            baseLevel: baseLv,
+            newLevel: newLv,
+            onTapContinue: () {},
+          );
+        }
       }
+
+      if (mounted) Navigator.pop(context, true);
     } else {
-      // ❌ กรณี Error จาก API
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

@@ -1,7 +1,9 @@
 import 'dart:async'; // 🌟 1. เพิ่ม import สำหรับ Stream
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'dart:math';
+import '../api_service.dart';
+import 'character_widget.dart';
 
 // 1. นำ GradientCircularProgressPainter จาก profile.dart มาใช้เพื่อให้ดีไซน์หลอดเลือดเหมือนกันเป๊ะ
 class GradientCircularProgressPainter extends CustomPainter {
@@ -84,11 +86,22 @@ class _CustomBottomNavigationBarState extends State<CustomBottomNavigationBar> {
   // State สำหรับเก็บข้อมูลจริง
   int _level = 1;
   double _expPercent = 0.0;
+  User? _user;
 
   @override
   void initState() {
     super.initState();
     _setupRealtimeCharacter(); // 🌟 3. สั่งรันตัวดักฟังตอนเปิด UI
+    _fetchUserAvatar();
+  }
+
+  Future<void> _fetchUserAvatar() async {
+    final user = await ApiService.getProfile(0); // Fetch to get the latest bodyType and outfits
+    if (mounted) {
+      setState(() {
+        _user = user;
+      });
+    }
   }
 
   @override
@@ -299,28 +312,26 @@ class _CustomBottomNavigationBarState extends State<CustomBottomNavigationBar> {
                       color: Colors.white,
                       border: Border.all(color: Colors.grey.shade200, width: 3),
                     ),
-                    child: ClipOval(
-                      child: widget.avatarUrl != null
-                          ? Image.network(
-                              widget.avatarUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Image.asset(
-                                  'assets/images/profile/profile_img.png',
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return _buildDefaultAvatar();
-                                  },
-                                );
-                              },
-                            )
-                          : Image.asset(
-                              'assets/images/profile/profile_img.png',
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return _buildDefaultAvatar();
-                              },
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                      ),
+                      clipBehavior: Clip.hardEdge,
+                      child: IgnorePointer(
+                        child: Transform.translate(
+                          offset: const Offset(0, 15), 
+                          child: Transform.scale(
+                            scale: 1.8,
+                            child: RepaintBoundary(
+                              child: CharacterWidget(
+                                user: _user,
+                                isInteractive: false,
+                              ),
                             ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
 

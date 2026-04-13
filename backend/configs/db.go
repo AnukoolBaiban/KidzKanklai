@@ -403,18 +403,18 @@ const createSchemaSQL = `
         VALUES (new.id)
         RETURNING id INTO char_id;
         
-        -- 2. แจก Item เริ่มต้น (ชื่อลงท้ายด้วย _0) เข้ากระเป๋า User (Table: collect)
+        -- 2. แจก Item เริ่มต้น (ชื่อลงท้ายด้วย _00) เข้ากระเป๋า User (Table: collect)
         INSERT INTO public.collect (user_id, item_id, quantity)
         SELECT new.id, id, 1 
         FROM public.items 
-        WHERE name LIKE '%_0';
+        WHERE name LIKE '%_00';
 
         -- 3. สวมใส่ Item เริ่มต้น (Table: wear) ให้ Character ทันที
         INSERT INTO public.wear (character_id, item_id, type)
         SELECT char_id, i.id, c.name
         FROM public.items i
         JOIN public.categories c ON i.category_id = c.id
-        WHERE i.name LIKE '%_0';
+        WHERE i.name LIKE '%_00';
 
         RETURN new;
     END;
@@ -478,18 +478,14 @@ const createSchemaSQL = `
     ('Skin', 'Skin Color'),
     ('Hair', 'Hairstyle'),
     ('Face', 'Facial Expression'),
-    ('Body', 'Body Type'),
-    ('Cloth', 'Full Body Outfit'),
-    ('Shoes', 'Footwear');
+    ('Outfit', 'Full Body Outfit');
 
-    -- Item Default (ลงท้ายด้วย _0 เพื่อให้ตรงกับ Animation Name ใน Rive)
+    -- Item Default (ลงท้ายด้วย _00 เพื่อให้ตรงกับ Animation Name ใน Rive)
     INSERT INTO public.items (name, description, rarity, category_id) VALUES
-    ('Skin_0', 'Default Skin', 'COMMON', (SELECT id FROM public.categories WHERE name='Skin')),
-    ('Hair_0', 'Default Hair', 'COMMON', (SELECT id FROM public.categories WHERE name='Hair')),
-    ('Face_0', 'Default Face', 'COMMON', (SELECT id FROM public.categories WHERE name='Face')),
-    ('Body_0', 'Default Body', 'COMMON', (SELECT id FROM public.categories WHERE name='Body')),
-    ('Cloth_0', 'Default Cloth', 'COMMON', (SELECT id FROM public.categories WHERE name='Cloth')),
-    ('Shoes_0', 'Default Shoes', 'COMMON', (SELECT id FROM public.categories WHERE name='Shoes'));
+    ('Skin_00', 'Default Skin', 'COMMON', (SELECT id FROM public.categories WHERE name='Skin')),
+    ('Hair_00', 'Default Hair', 'COMMON', (SELECT id FROM public.categories WHERE name='Hair')),
+    ('Face_00', 'Default Face', 'COMMON', (SELECT id FROM public.categories WHERE name='Face')),
+    ('Outfit_00', 'Default Outfit', 'COMMON', (SELECT id FROM public.categories WHERE name='Outfit'));
 `
 const disableRLSSQL = `
 	-- 1. ลบ Policy ทั้งหมดใน Schema 'public' แบบอัตโนมัติ

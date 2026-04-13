@@ -166,7 +166,7 @@ class _RewardPopupState extends State<RewardPopup> with SingleTickerProviderStat
                 ),
 
                 // Header Title (รับรางวัลสำเร็จ)
-                Positioned(top: -60, left: 0, right: 0, child: _buildHeader()),
+                _buildHeader(),
               ],
             ),
           ),
@@ -220,8 +220,6 @@ class _RewardPopupState extends State<RewardPopup> with SingleTickerProviderStat
   }
 
   Widget _buildHeader() {
-    final screenWidth = MediaQuery.of(context).size.width;
-    
     return Positioned(
       top: -60,
       left: 0,
@@ -243,7 +241,6 @@ class _RewardPopupState extends State<RewardPopup> with SingleTickerProviderStat
               ),
               const SizedBox(width: 4),
               
-              // 🌟 แก้ไขตรงนี้: เอา Positioned กับ Center ออก และย้าย maxLines เข้ามาใน Text
               Text(
                 'รับรางวัลสำเร็จ',
                 style: TextStyle(
@@ -256,13 +253,13 @@ class _RewardPopupState extends State<RewardPopup> with SingleTickerProviderStat
                       end: Alignment.bottomCenter,
                     ).createShader(const Rect.fromLTWH(0, 0, 200, 40)),
                 ),
-                maxLines: 1, // ✅ ย้ายเข้ามาอยู่ในวงเล็บของ Text แล้ว
-                overflow: TextOverflow.ellipsis, // ✅ ย้ายเข้ามาอยู่ในวงเล็บของ Text แล้ว
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               
               const SizedBox(width: 4),
               
-              // ดาวดวงที่ 2 (เอา Positioned ออกเช่นกัน เพราะอยู่ใน Row อยู่แล้ว)
+              // ดาวดวงที่ 2
               Image.asset(
                 'assets/images/icon/Star11.png',
                 width: 26,

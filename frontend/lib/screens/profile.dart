@@ -12,6 +12,7 @@ import 'package:flutter_application_1/config/app_config.dart'; // [ADDED] สำ
 import 'package:rive/rive.dart' hide LinearGradient, Image; // [ADDED] Rive
 import 'package:flutter_application_1/api_service.dart' as api; // [ADDED] ApiService
 import 'package:flutter_application_1/config/rive_cache.dart'; // [ADDED] RiveCache
+import '../widgets/character_widget.dart';
 
 
 class ProfileScreen extends StatefulWidget {
@@ -49,6 +50,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   SMINumber? _faceInput;
   SMINumber? _skinInput;
   SMINumber? _clothInput;
+  SMINumber? _armInput; // [ADDED]
   StateMachineController? _controller;
   api.User? _user; // Store full user profile
   bool _isRiveLoaded = false;
@@ -211,7 +213,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (input.name == 'HairID') _hairInput = input as SMINumber;
         if (input.name == 'FaceID') _faceInput = input as SMINumber;
         if (input.name == 'SkinID') _skinInput = input as SMINumber;
-        if (input.name == 'ClothID' || input.name == 'BodyID') _clothInput = input as SMINumber;
+        if (input.name == 'OutfitID') _clothInput = input as SMINumber;
       }
       
       // Initial Sync
@@ -223,6 +225,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     }
     if (mounted) setState(() => _isRiveLoaded = true);
+  }
+
+  String _getModelAsset() {
+    if (_user != null) {
+      final bt = _user!.bodyType.toUpperCase();
+      if (bt == 'ADULT') return 'assets/animation/adult.riv';
+      if (bt == 'TEEN') return 'assets/animation/teen.riv';
+      return 'assets/animation/kid.riv';
+    }
+    int lvl = _user?.level ?? 1;
+    if (lvl >= 30) return 'assets/animation/adult.riv';
+    if (lvl >= 15) return 'assets/animation/teen.riv';
+    return 'assets/animation/kid.riv';
   }
 
   double _parseId(String s) {
@@ -245,9 +260,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (_skinInput != null) _skinInput!.value = _parseId(_user!.equippedSkin);
         
         if (_clothInput != null) {
-            double val = _parseId(_user!.equippedCloth);
-            if (val == 0 && _user!.equippedBody.isNotEmpty) val = _parseId(_user!.equippedBody);
-            _clothInput!.value = val;
+            _clothInput!.value = _parseId(_user!.equippedOutfit);
+        }
+        if (_armInput != null) {
+            _armInput!.value = _parseId(_user!.equippedOutfit);
         }
         
         // Ensure Pose is set again just in case
@@ -608,9 +624,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               Container(
                 padding: const EdgeInsets.all(8),
-                child: const CircleAvatar(
-                  radius: 54,
-                  backgroundImage: AssetImage('assets/images/profile/profile_img.png'),
+                child: Container(
+                  width: 108,
+                  height: 108,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                  ),
+                  clipBehavior: Clip.hardEdge,
+                  child: IgnorePointer(
+                    child: Transform.translate(
+                      offset: const Offset(0, 20), // เลื่อนตัวละครลงมาให้เห็นไหล่
+                      child: Transform.scale(
+                        scale: 1.6, // ซูมหน้า
+                        child: RepaintBoundary( // แยก Layer ลดการวาดใหม่ของ UI
+                          child: CharacterWidget(
+                            user: _user,
+                            isInteractive: false,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -848,14 +883,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 width: 160,
                 child: _user == null 
                   ? const Center(child: CircularProgressIndicator()) 
-                  : (RiveCache().file != null 
+                  : (RiveCache().getFile(_getModelAsset()) != null 
                       ? RiveAnimation.direct(
-                          RiveCache().file!,
+                          RiveCache().getFile(_getModelAsset())!,
                           fit: BoxFit.contain,
                           onInit: _onRiveInit,
                         )
                       : RiveAnimation.asset(
-                          'assets/animation/Model2.0.riv', 
+                          _getModelAsset(), 
                           fit: BoxFit.contain,
                           onInit: _onRiveInit,
                         )),

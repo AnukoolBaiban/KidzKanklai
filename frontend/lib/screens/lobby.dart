@@ -8,6 +8,7 @@ import 'package:flutter_application_1/widgets/custom_top_bar.dart';
 import 'package:flutter_application_1/widgets/character_widget.dart';
 import 'package:flutter_application_1/widgets/reward_popup.dart';
 
+
 class LobbyScreen extends StatefulWidget {
   final User? user;
 
@@ -106,26 +107,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     }
   }
 
-  Future<void> _giveMeCoins() async {
-    final result = await ApiService.addTestCoins();
-
-    if (result != null && mounted) {
-      final addedCoin = result['added_coin'] as int;
-      // 🌟 รับค่าภาพและชื่อจาก API
-      final itemName = result['item_name'] as String;
-      final itemImage = result['item_image'] as String;
-
-      await RewardPopup.show(
-        context,
-        rewards: [
-          // 🌟 ใช้ RewardData.item เพื่อยัดรูปและชื่อที่ดึงจาก DB เข้าไปตรงๆ
-          RewardData.item(name: itemName, amount: addedCoin, image: itemImage),
-        ],
-      );
-    }
-  }
-
-  // Right Menu Items
+    // Right Menu Items
   List<MenuItem> get _menuItems => [
     MenuItem(
       imagePath: "assets/images/icon/iconAchievement.png",
@@ -186,7 +168,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   children: [
                     // Character Widget - อยู่ชั้นล่างสุด
                     Positioned(
-                      bottom: -30, // Adjust position as needed
+                      bottom: _user?.bodyType.toUpperCase() == 'ADULT' ? 25 :
+                              _user?.bodyType.toUpperCase() == 'TEEN' ? -40 : -150, // ร่างเด็กตัวเล็กเลยต้องกดลงมา ส่วนวัยรุ่น/ผู้ใหญ่ขยับขึ้นมาหน่อยไม่ให้ขาหลุดขอบ
                       child: _isLoading || _user == null
                           ? const SizedBox() // Or CircularProgressIndicator() if you want to see it loading
                           : CharacterWidget(

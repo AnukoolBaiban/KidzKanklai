@@ -10,6 +10,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     hide User; // 🌟 เพิ่ม Supabase
 import 'package:flutter_application_1/widgets/reward_popup.dart';
+import 'package:flutter_application_1/widgets/level_up_popup.dart';
+import 'package:flutter_application_1/widgets/character_up_popup.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AllQuestScreen extends StatefulWidget {
@@ -32,6 +34,7 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
   // 🌟 ลบ Mock Data ออก และสร้างตัวแปรรับข้อมูลจริงจาก DB
   List<Map<String, dynamic>> _allQuests = [];
   bool _isLoading = true;
+  User? _user; // 🌟 เพิ่มตัวแปรเก็บ User เพื่อใช้อัปเดต UI ภายในหน้านี้
 
   // 🌟 Search & Filter สำหรับแถบประวัติ
   final TextEditingController _searchController = TextEditingController();
@@ -44,6 +47,7 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
   @override
   void initState() {
     super.initState();
+    _user = widget.user; // 🌟 กำหนดค่าเริ่มต้นจาก widget
     // 🌟 ดึงข้อมูลทันทีเมื่อเข้าหน้านี้
     _fetchQuestsFromDB();
 
@@ -369,7 +373,7 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
         if (mounted) {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => LobbyScreen(user: widget.user)),
+            MaterialPageRoute(builder: (_) => LobbyScreen(user: _user ?? widget.user)),
           ).then((_) => setState(() => _isPressed = false));
         }
       },
@@ -968,27 +972,74 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
             );
 
             // ยิง API
-            final rewards = await ApiService.completeSystemQuest(
+            final result = await ApiService.completeSystemQuest(
               filteredQuests[index]['id'],
             );
 
             if (mounted) Navigator.pop(context); // ปิด Loading
 
-            if (rewards != null && mounted) {
-              // 🌟 แปลงของรางวัลและโชว์ Popup ได้เลย (แบบเดียวกับเควสปกติ)
-              List<RewardData> popupRewards = rewards.map<RewardData>((rw) {
-                return RewardData(
-                  type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM',
-                  amount: rw['added'],
-                  itemName: rw['name'],
-                  itemImage: rw['image'],
-                );
-              }).toList();
+            if (result != null && mounted) {
+              final rewards = (result['rewards'] as List?) ?? [];
+              
+              // 🌟 1. แสดงของรางวัล
+              if (rewards.isNotEmpty) {
+                List<RewardData> popupRewards = rewards.map<RewardData>((rw) {
+                  return RewardData(
+                    type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM',
+                    amount: rw['added'],
+                    itemName: rw['name'],
+                    itemImage: rw['image'],
+                  );
+                }).toList();
 
-              await RewardPopup.show(context, rewards: popupRewards);
+                await RewardPopup.show(context, rewards: popupRewards);
+              }
 
-              // รีเฟรชหน้า AllQuestScreen เพื่ออัปเดตสถานะ
-              _fetchQuestsFromDB();
+              // 🌟 2. แสดง Level Up Popup ถ้าต้องการ
+              if (mounted && result['leveled_up'] == true) {
+                final baseLv = result['base_level'] as int? ?? 0;
+                final newLv  = result['new_level']  as int? ?? 0;
+                
+                // 🌟 ตรวสอบการเปลี่ยนร่างโดยใช้ Model Group (Kid: 0, Teen: 1, Adult: 2)
+                int getModelGroup(int lv) {
+                  if (lv >= 30) return 2;
+                  if (lv >= 15) return 1;
+                  return 0;
+                }
+                final isEvolution = getModelGroup(newLv) > getModelGroup(baseLv);
+
+                // 🌟 รีเฟรช Profile ก่อนโชว์ Popup เพื่อให้มีข้อมูลล่าสุด
+                final freshUser = await ApiService.getProfile(0);
+
+                if (isEvolution && mounted) {
+                  // 1. ถ้าถึงเกณฑ์วิวัฒนาการ โชว์ CharacterUpPopup ทันที (มีข้อมูลเลเวลด้านบนอยู่แล้ว)
+                  await CharacterUpPopup.show(
+                    context,
+                    baseLevel: baseLv,
+                    newLevel: newLv,
+                    user: freshUser ?? widget.user,
+                    onTapContinue: () {},
+                  );
+                } else if (mounted) {
+                  // 2. ถ้าเลเวลอัปปกติ ค่อยโชว์ LevelUpPopup แบบเดิม
+                  await LevelUpPopup.show(
+                    context,
+                    baseLevel: baseLv,
+                    newLevel: newLv,
+                    onTapContinue: () {},
+                  );
+                }
+              }
+
+              // 🌟 3. รีเฟรชข้อมูล User และรายการเควส
+              await _fetchQuestsFromDB();
+              // เพิ่มการดึง Profile ใหม่เพื่ออัปเดตเลเวลผู้เล่นในหน้านี้
+              final freshProfile = await ApiService.getProfile(0);
+              if (freshProfile != null && mounted) {
+                setState(() {
+                  _user = freshProfile;
+                });
+              }
             } else {
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(

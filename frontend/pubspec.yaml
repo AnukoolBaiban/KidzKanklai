@@ -74,7 +74,8 @@ flutter:
     - assets/images/item/
     - assets/images/profile/
     - assets/images/Fashion/HairStyle/
-    - assets/images/Fashion/Cloth/
+    - assets/images/Fashion/Outfit/
+    - assets/images/Fashion/FaceStyle/
     - assets/images/Fashion/AgeIcon/
     - assets/images/map/
 

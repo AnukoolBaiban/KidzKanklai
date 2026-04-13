@@ -7,6 +7,8 @@ import '../widgets/confirm_giveup_popup.dart';
 import '../widgets/reward_popup.dart';
 // 🌟 1. นำเข้าไฟล์ ConfirmCompletePopup
 import '../widgets/confirm_complete_popup.dart'; // แก้ไข path ให้ตรงกับที่เก็บไฟล์
+import '../widgets/level_up_popup.dart';
+import '../widgets/character_up_popup.dart';
 
 class QuestDetailScreen extends StatefulWidget {
   final User? user;
@@ -646,16 +648,15 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
         );
 
         // 🌟 2. ยิง API (ใช้ completeNormalQuest สำหรับเควสทั่วไป)
-        final apiRewards = await ApiService.completeNormalQuest(widget.questId!);
+        final result = await ApiService.completeNormalQuest(widget.questId!);
 
         // ปิด Loading
-        if (mounted) {
-          Navigator.pop(context);
-        }
+        if (mounted) Navigator.pop(context);
 
-        // 🌟 3. ถ้า API ทำงานสำเร็จ (apiRewards ไม่ใช่ null)
-        if (apiRewards != null && mounted) {
-          
+        // 🌟 3. ถ้า API ทำงานสำเร็จ (result ไม่ใช่ null)
+        if (result != null && mounted) {
+          final apiRewards = (result['rewards'] as List?) ?? [];
+
           // 🌟 เช็คว่ามีของรางวัลให้โชว์หรือไม่
           if (apiRewards.isNotEmpty) {
             List<RewardData> popupRewards = apiRewards.map<RewardData>((rw) {
@@ -663,31 +664,67 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
                 type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM',
                 amount: rw['added'],
                 itemName: rw['name'],
-                itemImage: rw['image'], 
+                itemImage: rw['image'],
               );
             }).toList();
 
-            // ใช้ await หยุดรอจนกว่าผู้ใช้จะกดปิด Popup รับของรางวัล
             await RewardPopup.show(context, rewards: popupRewards);
           } else {
-            // 🌟 กรณีที่ทำสำเร็จแต่ไม่มีของรางวัล (เช่น สร้างตอนตั๋วหมด) ให้แจ้งเตือนสีเขียวแทน
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('ทำภารกิจสำเร็จ!'),
                 backgroundColor: Colors.green,
               ),
             );
-            // หน่วงเวลาให้ผู้ใช้อ่าน SnackBar แป๊บนึงก่อนเด้งออก
             await Future.delayed(const Duration(seconds: 1));
           }
 
-          // 🌟 5. เด้งกลับหน้า All Quest พร้อมส่งค่า true ไปรีเฟรช
+          // 🌟 แสดง Level Up Popup ถ้าต้องการ
+          print("[DEBUG] Normal Quest result: leveled_up=${result['leveled_up']}, base=${result['base_level']}, new=${result['new_level']}");
+          if (mounted && result['leveled_up'] == true) {
+            final baseLv = result['base_level'] as int? ?? 0;
+            final newLv  = result['new_level']  as int? ?? 0;
+            
+            // 🌟 ตรวสอบการเปลี่ยนร่างโดยใช้ Model Group (Kid: 0, Teen: 1, Adult: 2)
+            int getModelGroup(int lv) {
+              if (lv >= 30) return 2;
+              if (lv >= 15) return 1;
+              return 0;
+            }
+            final isEvolution = getModelGroup(newLv) > getModelGroup(baseLv);
+
+            // 🌟 รีเฟรช Profile ก่อนโชว์ Popup เพื่อให้มีข้อมูลล่าสุด
+            final freshUser = await ApiService.getProfile(0);
+
+            if (isEvolution && mounted) {
+              // 1. ถ้าถึงเกณฑ์วิวัฒนาการ โชว์ CharacterUpPopup ทันที (มีข้อมูลเลเวลด้านบนอยู่แล้ว)
+              await CharacterUpPopup.show(
+                context,
+                baseLevel: baseLv,
+                newLevel: newLv,
+                user: freshUser ?? widget.user,
+                onTapContinue: () {},
+              );
+            } else if (mounted) {
+              // 2. ถ้าเลเวลอัปปกติ ค่อยโชว์ LevelUpPopup แบบเดิม
+              await LevelUpPopup.show(
+                context,
+                baseLevel: baseLv,
+                newLevel: newLv,
+                onTapContinue: () {},
+              );
+            }
+          } else if (mounted) {
+            // กรณีไม่เลเวลอัพ ก็ควรดึง Profile ใหม่ไว้เผื่อ (เช่น ได้ EXP เพิ่มแต่ไม่ข้ามเวล)
+            await ApiService.getProfile(0);
+          }
+
+          // 🌟 เด้งกลับหน้า All Quest พร้อมส่งค่า true ไปรีเฟรช
           if (mounted) {
             Navigator.pop(context, true); 
           }
-
         } else {
-          // ❌ กรณีส่งล้มเหลว (apiRewards เป็น null จริงๆ)
+          // ❌ กรณีส่งล้มเหลว (result เป็น null จริงๆ)
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
