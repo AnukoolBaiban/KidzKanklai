@@ -11,12 +11,16 @@ class CharacterWidget extends StatefulWidget {
   final double height;
   final double width;
   final User? user;
+  final int? overrideLevel;
+  final bool isInteractive;
 
   const CharacterWidget({
     super.key,
     this.height = 500,
     this.width = 400,
     this.user,
+    this.overrideLevel,
+    this.isInteractive = true,
   });
 
   @override
@@ -32,6 +36,7 @@ class _CharacterWidgetState extends State<CharacterWidget>
   SMINumber? _skinInput;
   SMINumber? _faceInput;
   SMINumber? _clothInput;
+  SMINumber? _armInput;
   bool _isRiveLoaded = false;
 
   // --- Speech Bubble State ---
@@ -106,6 +111,13 @@ class _CharacterWidgetState extends State<CharacterWidget>
     if (controller != null) {
       artboard.addController(controller);
       _controller = controller;
+      
+      // [DEBUG] Print all available inputs from the Rive file to the terminal
+      print("===== RIVE INPUTS FOR \${_getModelAsset()} =====");
+      for (var input in controller.inputs) {
+        print("- \${input.name} (\${input.runtimeType})");
+      }
+      print("==========================================");
 
       _poseInput = controller.findInput<SMINumber>('Pose') as SMINumber?;
 
@@ -140,12 +152,12 @@ class _CharacterWidgetState extends State<CharacterWidget>
         _skinInput = skinInputRaw;
 
       var clothInputRaw = controller.inputs.firstWhere(
-        (e) => e.name == 'ClothID' || e.name == 'BodyID',
+        (e) => e.name == 'OutfitID',
         orElse: () => controller!.inputs.first,
       );
-      if (clothInputRaw is SMINumber &&
-          (clothInputRaw.name == 'ClothID' || clothInputRaw.name == 'BodyID'))
+      if (clothInputRaw is SMINumber && clothInputRaw.name == 'OutfitID') {
         _clothInput = clothInputRaw;
+      }
 
       _updateRiveInputs();
     }
@@ -154,8 +166,6 @@ class _CharacterWidgetState extends State<CharacterWidget>
   }
 
   void _updateRiveInputs() {
-    if (widget.user == null) return;
-
     double parseId(String s) {
       if (s.isEmpty) return 0;
       if (s.contains('_')) {
@@ -175,14 +185,16 @@ class _CharacterWidgetState extends State<CharacterWidget>
       }
     }
 
-    if (_hairInput != null)
-      _hairInput!.value = parseId(widget.user!.equippedHair);
-    if (_faceInput != null)
-      _faceInput!.value = parseId(widget.user!.equippedFace);
-    if (_skinInput != null)
-      _skinInput!.value = parseId(widget.user!.equippedSkin);
-    if (_clothInput != null)
-      _clothInput!.value = parseId(widget.user!.equippedCloth);
+    double hairVal = widget.user != null ? parseId(widget.user!.equippedHair) : 0.0;
+    double faceVal = widget.user != null ? parseId(widget.user!.equippedFace) : 0.0;
+    double skinVal = widget.user != null ? parseId(widget.user!.equippedSkin) : 0.0;
+    double clothVal = widget.user != null ? parseId(widget.user!.equippedOutfit) : 0.0;
+
+    if (_hairInput != null) _hairInput!.value = hairVal;
+    if (_faceInput != null) _faceInput!.value = faceVal;
+    if (_skinInput != null) _skinInput!.value = skinVal;
+    if (_clothInput != null) _clothInput!.value = clothVal;
+    if (_armInput != null) _armInput!.value = clothVal;
   }
 
   @override
@@ -203,6 +215,30 @@ class _CharacterWidgetState extends State<CharacterWidget>
 
     _updateRiveInputs();
 
+    final currentLevel = widget.overrideLevel ?? widget.user?.level ?? 1;
+
+    String getModelAsset() {
+      // 1. ถ้ามีการระบุ overrideLevel (เช่น ใน Animation วิวัฒนาการ) บังคับใช้ภาพตามเลเวลนี้โดยตรง!
+      if (widget.overrideLevel != null) {
+        if (widget.overrideLevel! >= 30) return 'assets/animation/adult.riv';
+        if (widget.overrideLevel! >= 15) return 'assets/animation/teen.riv';
+        return 'assets/animation/kid.riv';
+      }
+
+      // 2. ถ้าใช้งานปกติและมีข้อมูล User ให้ใช้ bodyType จาก Database เป็นหลัก (รองรับระบบเลือกร่างวัยรุ่นแม้เลเวล 30)
+      if (widget.user != null) {
+        final bt = widget.user!.bodyType.toUpperCase();
+        if (bt == 'ADULT') return 'assets/animation/adult.riv';
+        if (bt == 'TEEN') return 'assets/animation/teen.riv';
+        return 'assets/animation/kid.riv';
+      }
+
+      // 3. Fallback: ตรวจจับร่างจากเลเวลปัจจุบัน
+      if (currentLevel >= 30) return 'assets/animation/adult.riv';
+      if (currentLevel >= 15) return 'assets/animation/teen.riv';
+      return 'assets/animation/kid.riv';
+    }
+
     return SizedBox(
       height: widget.height,
       width: widget.width,
@@ -213,9 +249,9 @@ class _CharacterWidgetState extends State<CharacterWidget>
           if (!_isRiveLoaded) const CircularProgressIndicator(),
 
           // Rive Animation
-          if (RiveCache().file != null)
+          if (RiveCache().getFile(getModelAsset()) != null)
             RiveAnimation.direct(
-              RiveCache().file!,
+              RiveCache().getFile(getModelAsset())!,
               fit: BoxFit.contain,
               antialiasing: false,
               onInit: _onRiveInit,
@@ -223,14 +259,15 @@ class _CharacterWidgetState extends State<CharacterWidget>
             )
           else
             RiveAnimation.asset(
-              'assets/animation/Model2.0.riv',
+              getModelAsset(),
               fit: BoxFit.contain,
               antialiasing: false,
               onInit: _onRiveInit,
+              stateMachines: const ['State Machine 1'],
             ),
 
-          // Speech Bubble — แสดงเหนือตัวละคร
-          if (_showBubble && _greetingText != null)
+          // Speech Bubble — แสดงเหนือตัวละคร (ปิดถ้าไม่ได้อยู่ในโหมด Interactive)
+          if (widget.isInteractive && _showBubble && _greetingText != null)
             Positioned(
               top: 20,
               child: FadeTransition(
@@ -261,16 +298,17 @@ class _CharacterWidgetState extends State<CharacterWidget>
             ),
 
           // Tap Area → เปิด Speech Bubble + Rive animation
-          Positioned.fill(
-            child: GestureDetector(
-              onTap: () {
-                context.read<UserPoseProvider>().triggerReaction();
-                _showGreeting(); // เรียก AI
-              },
-              behavior: HitTestBehavior.translucent,
-              child: Container(color: Colors.transparent),
+          if (widget.isInteractive)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () {
+                  context.read<UserPoseProvider>().triggerReaction();
+                  _showGreeting(); // เรียก AI
+                },
+                behavior: HitTestBehavior.translucent,
+                child: Container(color: Colors.transparent),
+              ),
             ),
-          ),
         ],
       ),
     );

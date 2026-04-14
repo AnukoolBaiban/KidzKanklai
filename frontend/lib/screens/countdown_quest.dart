@@ -3,13 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_application_1/api_service.dart';
 
 import 'package:flutter_application_1/widgets/custom_top_bar.dart';
-import 'package:flutter_application_1/widgets/annotation.dart';
+import 'package:flutter_application_1/widgets/annotation_instant.dart';
 import 'package:flutter_application_1/widgets/ticket_box.dart';
 import 'package:flutter_application_1/widgets/confirm_giveup_popup.dart';
 import 'package:flutter_application_1/widgets/mission_fail_popup.dart';
+import 'package:flutter_application_1/widgets/confirm_exit_popup.dart';
+import 'package:flutter_application_1/widgets/confirm_zero_ticket_popup.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_application_1/widgets/reward_popup.dart';
+import 'package:flutter_application_1/widgets/level_up_popup.dart';
+import 'package:flutter_application_1/widgets/character_up_popup.dart';
 import 'package:flutter_application_1/screens/setting.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 
 class CountdownQuestScreen extends StatefulWidget {
   final User? user;
@@ -26,7 +31,7 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
   // ==========================================
   bool _isPressed = false;
   final TextEditingController _detailController = TextEditingController();
-  static const int _maxChars = 30;
+  static const int _maxChars = 15;
   int _charCount = 0;
 
   bool _isRunning = false;
@@ -97,8 +102,12 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
 
     if (result != null && result['success'] == true) {
       _currentQuestId = result['quest_id'];
-      // แปลงเวลา due_date ที่ได้จาก Server ให้เป็น Local Time ของเครื่อง
-      _targetEndTime = DateTime.parse(result['due_date']).toLocal();
+      // เริ่มนับเวลาถอยหลังใหม่จากวินาทีนี้เลย เพื่อป้องกันเวลาเดินไประหว่างรอ API หมุน
+      _targetEndTime = DateTime.now().add(Duration(
+        hours: _selectedMinutes,
+        minutes: _selectedSeconds,
+        seconds: _selectedActualSeconds, // วินาที
+      ));
 
       setState(() {
         _isRunning = true;
@@ -154,15 +163,15 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
     if (_currentQuestId == null) return;
 
     setState(() => _isLoadingAPI = true);
-    final rewards = await ApiService.completeInstantQuest(_currentQuestId!);
+    final result = await ApiService.completeInstantQuest(_currentQuestId!);
     setState(() => _isLoadingAPI = false);
 
     // 🌟 เช็คว่า API ทำงานสำเร็จ (ไม่เป็น null)
-    if (rewards != null && mounted) {
-      
+    if (result != null && mounted) {
+      final rewards = (result['rewards'] as List?) ?? [];
+
       // 🌟 เช็คว่ามีของรางวัลให้แจกจริงๆ หรือไม่ (ป้องกันกรณีสร้างตอนตั๋วหมด)
       if (rewards.isNotEmpty) {
-        // แปลงของรางวัลและโชว์ Popup
         List<RewardData> popupRewards = rewards.map<RewardData>((rw) {
           return RewardData(
             type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM',
@@ -172,27 +181,56 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
           );
         }).toList();
 
-        // 🌟 1. ใช้ await เพื่อหยุดรอจนกว่าผู้ใช้จะกด "ปิด" หน้าต่างรับของรางวัล
         await RewardPopup.show(context, rewards: popupRewards);
       } else {
-        // 🌟 กรณีไม่มีของรางวัล โชว์แค่แจ้งเตือนสีเขียวก็พอ
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('ทำภารกิจสำเร็จ!'),
             backgroundColor: Colors.green,
           ),
         );
-        // หน่วงเวลาให้อ่านแจ้งเตือนแป๊บนึง
         await Future.delayed(const Duration(seconds: 1));
       }
 
-      // 🌟 2. เมื่อ Popup ปิดลง หรือแจ้งเตือนจบแล้ว ให้ Pop หน้าต่างนับเวลาทิ้ง 
-      // ระบบจะเด้งกลับไปที่หน้า All Quest และรีเฟรชข้อมูลให้เองอัตโนมัติ
-      if (mounted) {
-        Navigator.pop(context, true); 
+      // 🌟 แสดง Level Up Popup ถ้าต้องการ
+      print("[DEBUG] Quest result: leveled_up=${result['leveled_up']}, base=${result['base_level']}, new=${result['new_level']}");
+      if (mounted && result['leveled_up'] == true) {
+        final baseLv = result['base_level'] as int? ?? 0;
+        final newLv  = result['new_level']  as int? ?? 0;
+        
+        // 🌟 ตรวสอบการเปลี่ยนร่างโดยใช้ Model Group (Kid: 0, Teen: 1, Adult: 2)
+        int getModelGroup(int lv) {
+          if (lv >= 30) return 2;
+          if (lv >= 15) return 1;
+          return 0;
+        }
+        final isEvolution = getModelGroup(newLv) > getModelGroup(baseLv);
+
+        // 🌟 รีเฟรช Profile ล่วงหน้า เพื่อให้ร่างวิวัฒนาการมีข้อมูลล่าสุด
+        final freshUser = await ApiService.getProfile(0);
+
+        if (isEvolution && mounted) {
+          // 1. ถ้าถึงเกณฑ์วิวัฒนาการ โชว์ CharacterUpPopup ทันที (มีข้อมูลเลเวลด้านบนอยู่แล้ว)
+          await CharacterUpPopup.show(
+            context,
+            baseLevel: baseLv,
+            newLevel: newLv,
+            user: freshUser ?? widget.user,
+            onTapContinue: () {},
+          );
+        } else if (mounted) {
+          // 2. ถ้าเลเวลอัปปกติ ค่อยโชว์ LevelUpPopup แบบเดิม
+          await LevelUpPopup.show(
+            context,
+            baseLevel: baseLv,
+            newLevel: newLv,
+            onTapContinue: () {},
+          );
+        }
       }
+
+      if (mounted) Navigator.pop(context, true);
     } else {
-      // ❌ กรณี Error จาก API
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -258,6 +296,12 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
   // Main Build Method
   // วาดโครงสร้างหลักของหน้าจอ , จัดการ PopScope สำหรับกดปุ่มย้อนกลับของโทรศัพท์มือถือ
   // ==========================================
+  bool _hasUnsavedChanges() {
+    bool nameChanged = _detailController.text.trim().isNotEmpty;
+    bool timeChanged = _selectedMinutes > 0 || _selectedSeconds > 0 || _selectedActualSeconds > 0;
+    return nameChanged || timeChanged;
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -270,31 +314,48 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
     final titleFontSize = isSmallScreen ? 28.0 : 36.0;
 
     return PopScope(
-      canPop: !_isRunning,
+      canPop: !_isRunning && !_hasUnsavedChanges(),
       onPopInvokedWithResult: (bool didPop, dynamic result) {
         if (didPop) return;
-        _handleBackInterrupt();
+        
+        if (_isRunning) {
+          _handleBackInterrupt();
+        } else if (_hasUnsavedChanges()) {
+          ConfirmExitPopup.show(
+            context,
+            onConfirm: () {
+              Navigator.pop(context); // ปิด Popup ยืนยัน
+              Navigator.pop(context); // ออกจากหน้า
+            },
+          );
+        }
       },
       child: Scaffold(
         resizeToAvoidBottomInset: false,
         body: Stack(
           children: [
             _buildBackground(),
-            _buildMainContentScrollable(
-              size,
-              topBarHeight,
-              headerHeight,
-              bottomPadding,
-              isSmallScreen,
+
+            Column(
+              children: [
+                _buildTopBar(topPadding),
+                _buildBlueHeader(headerHeight, titleFontSize),
+                Expanded(
+                  child: _buildMainContentScrollable(
+                    size,
+                    bottomPadding,
+                    isSmallScreen,
+                  ),
+                ),
+              ],
             ),
+
             Positioned(
               bottom: bottomPadding + 50,
               left: 0,
               right: 0,
               child: Center(child: _buildStartButton(size, isSmallScreen)),
             ),
-            _buildTopBar(topPadding, topBarHeight),
-            _buildBlueHeader(topBarHeight, headerHeight, titleFontSize),
           ],
         ),
       ),
@@ -317,16 +378,10 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
   }
 
   // แถบสีดำบางๆด้านบนสุด แสดงโปรไฟล์ผู้ใช้ เลเวล และเหรียญ
-  Widget _buildTopBar(double topPadding, double height) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: height,
+  Widget _buildTopBar(double topPadding) {
+    return Container(
         padding: EdgeInsets.only(top: topPadding),
         color: Colors.black.withValues(alpha: 0.4),
-        alignment: Alignment.bottomCenter,
         child: CustomTopBar(
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
@@ -340,21 +395,15 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
             );
           },
         ),
-      ),
     );
   }
 
   // กล่องหัวข้อ "ภารกิจทันที" , ปุ่มย้อนกลับ และไอคอนคำถาม (Annotation)
   Widget _buildBlueHeader(
-    double topOffset,
     double height,
     double titleFontSize,
   ) {
-    return Positioned(
-      top: topOffset,
-      left: 0,
-      right: 0,
-      child: Container(
+    return Container(
         height: height,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -384,7 +433,6 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
             const Positioned(bottom: 8, right: 15, child: AnnotationButton()),
           ],
         ),
-      ),
     );
   }
 
@@ -401,7 +449,20 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
           _handleBackInterrupt();
         } else {
           await Future.delayed(const Duration(milliseconds: 200));
-          if (mounted) Navigator.pop(context);
+          if (!mounted) return;
+
+          if (!_hasUnsavedChanges()) {
+            Navigator.pop(context);
+            return;
+          }
+
+          ConfirmExitPopup.show(
+            context,
+            onConfirm: () {
+              Navigator.pop(context); // ปิด popup
+              Navigator.pop(context); // ปิดหน้าจอสร้างเควสกลับไปหน้าเดิม
+            },
+          );
         }
       },
       child: Image.asset(
@@ -417,8 +478,6 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
   // กล่องตั้งค่าเวลา และช่องกรอกข้อความ
   Widget _buildMainContentScrollable(
     Size size,
-    double topBarHeight,
-    double headerHeight,
     double bottomPadding,
     bool isSmallScreen,
   ) {
@@ -427,8 +486,8 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
 
     return Padding(
       padding: EdgeInsets.only(
-        top: topBarHeight + headerHeight + 20,
-        bottom: bottomPadding + 20,
+        top: 20,
+        bottom: bottomPadding + 140, // เพิ่มพื้นที่สำหรับปุ่มล่างสุด
         left: size.width * 0.05,
         right: size.width * 0.05,
       ),
@@ -436,9 +495,7 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
         physics: const BouncingScrollPhysics(),
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            minHeight:
-                size.height -
-                (topBarHeight + headerHeight + bottomPadding + 40),
+            minHeight: size.height * 0.5,
           ),
           child: Column(
             children: [
@@ -586,6 +643,8 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
   Widget _buildStartButton(Size size, bool isSmallScreen) {
     // 🌟 1. เพิ่มการเช็ค _selectedActualSeconds (วินาที) เข้าไปด้วย
     bool isTimeSet = _selectedMinutes > 0 || _selectedSeconds > 0 || _selectedActualSeconds > 0;
+    bool isReady = isTimeSet && _detailController.text.trim().isNotEmpty;
+    
     final buttonWidth = isSmallScreen ? size.width * 0.70 : size.width * 0.60;
     final buttonHeight = isSmallScreen ? 60.0 : 72.0;
     final buttonFontSize = isSmallScreen ? 28.0 : 36.0;
@@ -594,13 +653,53 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
       clipBehavior: Clip.none,
       children: [
         GestureDetector(
-          onTap: () {
-            if (!isTimeSet || _isLoadingAPI) return; // 🌟 กันกดรัวๆ
+          onTap: () async {
+            if (!isReady || _isLoadingAPI) return; // 🌟 ต้องมีชื่อกิจกรรมและเวลาครบถ้วน
             
             if (_isRunning) {
               _handleBackInterrupt();
             } else {
-              _startQuest(); // 🌟 เปลี่ยนจาก _startTimer() เป็น _startQuest()
+              setState(() {
+                _isLoadingAPI = true;
+              });
+
+              // ดึงข้อมูลตั๋ว
+              final supabase = Supabase.instance.client;
+              final user = supabase.auth.currentUser;
+              int ticketCount = 0;
+
+              if (user != null) {
+                try {
+                  final res = await supabase
+                      .from('collect')
+                      .select('quantity')
+                      .eq('user_id', user.id)
+                      .eq('item_id', 17)
+                      .maybeSingle();
+                  if (res != null) {
+                    ticketCount = res['quantity'] as int? ?? 0;
+                  }
+                } catch (e) {
+                  debugPrint('Error fetch ticket: $e');
+                }
+              }
+
+              if (!mounted) return;
+              setState(() {
+                _isLoadingAPI = false;
+              });
+
+              if (ticketCount <= 0) {
+                ConfirmZeroTicketPopup.show(
+                  context,
+                  onConfirm: () {
+                    Navigator.pop(context); // ปิด popup
+                    _startQuest(); // ให้นับเวลาต่อเพื่อส่งให้ API เช็คเผื่อ Error อีกชั้น
+                  },
+                );
+              } else {
+                _startQuest(); // 🌟 เปลี่ยนจาก _startTimer() เป็น _startQuest()
+              }
             }
           },
           child: Container(
@@ -631,7 +730,7 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
                         end: Alignment.bottomCenter,
                         colors: _isRunning
                             ? const [Color(0xFFEA4444), Color(0xFF992B2B)] // Red: Give Up
-                            : isTimeSet
+                            : isReady
                             ? const [Color(0xFF59ABEC), Color(0xFF2374B5)] // Blue: Ready
                             : const [Color(0xFFD9D9D9), Color(0xFF8A8A8A)], // Grey: Disabled
                       ),

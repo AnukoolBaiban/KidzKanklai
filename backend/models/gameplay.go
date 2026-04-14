@@ -17,13 +17,17 @@ type Quest struct {
 
 // Table: exams
 type Exam struct {
-	ID     int64   `json:"id"`
-	Name   string  `json:"name"`
-	Detail *string `json:"detail"`
-	Status *string `json:"status"`
-	Type   *string `json:"type"`
-	Image  *string `json:"image"`
-	MapID  *int64  `json:"map_id"` // FK
+	ID     		 int64     `json:"id"`
+	Name   		 string    `json:"name"`
+	Detail 		 *string   `json:"detail"`
+	Type   		 *string   `json:"type"`
+	Intelligence int       `json:"intelligence"` // 🌟 เพิ่มบรรทัดนี้
+	Strength     int       `json:"strength"` 	 // 🌟 เพิ่มบรรทัดนี้
+	Creative     int       `json:"creative"` 	 // 🌟 เพิ่มบรรทัดนี้
+	Stamina      int       `json:"stamina"` 	 // 🌟 เพิ่มบรรทัดนี้
+	Status 		 *string   `json:"status"` 
+	Image  		 *string   `json:"image"`
+	MapID  		 *int64    `json:"map_id"` // FK 
 }
 
 // Table: maps

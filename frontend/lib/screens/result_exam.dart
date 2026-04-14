@@ -147,21 +147,34 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
                                       ),
                                       SizedBox(height: 16 * scale),
                                       Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          _buildRewardItem(
-                                            'assets/images/item/EXP.png',
-                                            '+59',
-                                            scale,
-                                          ),
-                                          SizedBox(width: 16 * scale),
-                                          _buildRewardItem(
-                                            'assets/images/item/Gasha.png',
-                                            'x1',
-                                            scale,
-                                          ),
-                                        ],
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        // 🌟 ใช้ .map() เพื่อดึงของรางวัลจาก API มาสร้างกล่องแบบไดนามิก
+                                        children: widget.statusRewards.isEmpty
+                                            ? [
+                                                // 🌟 กรณีไม่มีของรางวัล (เช่น สอบตก)
+                                                _buildRewardItem('assets/images/item/EXP.png', '+0', scale)
+                                              ]
+                                            : widget.statusRewards.entries.map((entry) {
+                                                String itemName = entry.key.toUpperCase();
+                                                String imgPath = 'assets/images/item/EXP.png'; // รูปเริ่มต้นเป็น EXP
+                                                String prefix = '+';
+
+                                                // 🌟 ดักจับคำในชื่อไอเทม เพื่อเลือกรูปภาพให้ถูกต้อง
+                                                if (itemName.contains('COIN') || itemName.contains('เหรียญ')) {
+                                                  imgPath = 'assets/images/item/coin.png'; // เปลี่ยนเป็น path รูปเหรียญของคุณ
+                                                } else if (itemName.contains('GASHA') || itemName.contains('กาชา')) {
+                                                  imgPath = 'assets/images/item/Gasha.png';
+                                                  prefix = 'x';
+                                                } else if (itemName.contains('TICKET') || itemName.contains('ตั๋ว')) {
+                                                  imgPath = 'assets/images/item/Ticket_exam_img.png';
+                                                  prefix = 'x';
+                                                }
+
+                                                return Padding(
+                                                  padding: EdgeInsets.symmetric(horizontal: 8 * scale),
+                                                  child: _buildRewardItem(imgPath, '$prefix${entry.value}', scale),
+                                                );
+                                              }).toList(),
                                       ),
                                     ],
                                   )

@@ -38,6 +38,7 @@ class _FashionPageState extends State<FashionPage> {
   SMINumber? _faceInput;
   SMINumber? _skinInput;
   SMINumber? _clothInput;
+  SMINumber? _armInput; // [ADDED]
   SMITrigger? _tapInput;
   bool _isRiveLoaded = false;
   StateMachineController? _controller;
@@ -73,6 +74,14 @@ class _FashionPageState extends State<FashionPage> {
           _equipped = eq;
           _user = user;
           _isLoading = false;
+          
+          if (_user != null) {
+            String bt = _user!.bodyType.toUpperCase();
+            if (bt == 'ADULT') selectedAge = 'Adult';
+            else if (bt == 'TEEN') selectedAge = 'Teen';
+            else selectedAge = 'Kid';
+          }
+          
           _syncRiveToEquipped();
         });
       }
@@ -105,9 +114,10 @@ class _FashionPageState extends State<FashionPage> {
         if (_skinInput != null) _skinInput!.value = parseId(_user!.equippedSkin);
         
         if (_clothInput != null) {
-          double val = parseId(_user!.equippedCloth);
-          if (val == 0 && _user!.equippedBody.isNotEmpty) val = parseId(_user!.equippedBody);
-          _clothInput!.value = val;
+          _clothInput!.value = parseId(_user!.equippedOutfit);
+        }
+        if (_armInput != null) {
+          _armInput!.value = parseId(_user!.equippedOutfit);
         }
         return;
       }
@@ -122,8 +132,9 @@ class _FashionPageState extends State<FashionPage> {
       var skin = _equipped.firstWhere((i) => i.category == 'Skin', orElse: () => InventoryItem(type: '', id: '', category: ''));
       if (_skinInput != null && skin.id.isNotEmpty) _skinInput!.value = skin.riveId.toDouble();
 
-      var cloth = _equipped.firstWhere((i) => i.category == 'Cloth' || i.category == 'Body', orElse: () => InventoryItem(type: '', id: '', category: ''));
+      var cloth = _equipped.firstWhere((i) => i.category == 'Outfit', orElse: () => InventoryItem(type: '', id: '', category: ''));
       if (_clothInput != null && cloth.id.isNotEmpty) _clothInput!.value = cloth.riveId.toDouble();
+      if (_armInput != null && cloth.id.isNotEmpty) _armInput!.value = cloth.riveId.toDouble();
 
     } catch (e) {
       print("Error syncing Rive: $e");
@@ -145,13 +156,26 @@ class _FashionPageState extends State<FashionPage> {
         if (input.name == 'HairID') _hairInput = input as SMINumber;
         if (input.name == 'FaceID') _faceInput = input as SMINumber;
         if (input.name == 'SkinID') _skinInput = input as SMINumber;
-        if (input.name == 'ClothID' || input.name == 'BodyID') _clothInput = input as SMINumber;
+        if (input.name == 'OutfitID') _clothInput = input as SMINumber;
         if (input.name == 'Tapcharacter' && input is SMITrigger) _tapInput = input;
       }
       
       _syncRiveToEquipped();
     }
     if (mounted) setState(() => _isRiveLoaded = true);
+  }
+
+  String _getModelAsset() {
+    if (_user != null) {
+      final bt = _user!.bodyType.toUpperCase();
+      if (bt == 'ADULT') return 'assets/animation/adult.riv';
+      if (bt == 'TEEN') return 'assets/animation/teen.riv';
+      return 'assets/animation/kid.riv';
+    }
+    int lvl = _user?.level ?? 1;
+    if (lvl >= 30) return 'assets/animation/adult.riv';
+    if (lvl >= 15) return 'assets/animation/teen.riv';
+    return 'assets/animation/kid.riv';
   }
 
   // --- ACTIONS ---
@@ -166,10 +190,18 @@ class _FashionPageState extends State<FashionPage> {
     setState(() => selectedSubTab = tab);
   }
 
-  void _onAgeSelected(String ageType) {
+  void _onAgeSelected(String ageType) async {
     setState(() => selectedAge = ageType);
     _showAgePopup(ageType);
-    // TODO: Add logic to update Rive or API if Age affects character
+
+    String dbForm = 'KID';
+    if (ageType == 'Teen') dbForm = 'TEEN';
+    if (ageType == 'Adult') dbForm = 'ADULT';
+
+    bool success = await ApiService.changeBodyType(dbForm);
+    if (success && mounted) {
+      _fetchData(); // Refresh the character model
+    }
   }
 
   void _showAgePopup(String ageType) {
@@ -220,7 +252,8 @@ class _FashionPageState extends State<FashionPage> {
     if (item.category == 'Hair' && _hairInput != null) _hairInput!.value = item.riveId.toDouble();
     if (item.category == 'Face' && _faceInput != null) _faceInput!.value = item.riveId.toDouble();
     if (item.category == 'Skin' && _skinInput != null) _skinInput!.value = item.riveId.toDouble();
-    if ((item.category == 'Cloth' || item.category == 'Body') && _clothInput != null) _clothInput!.value = item.riveId.toDouble();
+    if (item.category == 'Outfit' && _clothInput != null) _clothInput!.value = item.riveId.toDouble();
+    if (item.category == 'Outfit' && _armInput != null) _armInput!.value = item.riveId.toDouble();
 
     // API Call
     final success = await ApiService.equipItem(item.id);
@@ -270,15 +303,15 @@ class _FashionPageState extends State<FashionPage> {
                                   alignment: Alignment.center,
                                   child: (_isLoading || _user == null)
                                     ? const CircularProgressIndicator()
-                                    : (RiveCache().file != null
+                                    : (RiveCache().getFile(_getModelAsset()) != null
                                         ? RiveAnimation.direct(
-                                            RiveCache().file!,
+                                            RiveCache().getFile(_getModelAsset())!,
                                             fit: BoxFit.contain,
                                             onInit: _onRiveInit,
                                             stateMachines: const ['State Machine 1'],
                                           )
                                         : RiveAnimation.asset(
-                                            'assets/animation/Model2.0.riv',
+                                            _getModelAsset(),
                                             fit: BoxFit.contain,
                                             onInit: _onRiveInit,
                                           )
@@ -346,6 +379,7 @@ class _FashionPageState extends State<FashionPage> {
                   right: 10,
                   child: _AgeSelector(
                     selectedAge: selectedAge,
+                    userLevel: _user?.level ?? 1,
                     onAgeSelected: _onAgeSelected,
                   ),
                 ),
@@ -404,9 +438,14 @@ class _FashionBackground extends StatelessWidget {
 
 class _AgeSelector extends StatelessWidget {
   final String selectedAge;
+  final int userLevel;
   final ValueChanged<String> onAgeSelected;
 
-  const _AgeSelector({required this.selectedAge, required this.onAgeSelected});
+  const _AgeSelector({
+    required this.selectedAge, 
+    required this.userLevel,
+    required this.onAgeSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -423,32 +462,48 @@ class _AgeSelector extends StatelessWidget {
 
   Widget _buildButton(String ageType, String assetPath) {
     final isSelected = selectedAge == ageType;
+    
+    // Check if form is unlocked
+    bool isUnlocked = true;
+    if (ageType == 'Teen' && userLevel < 15) isUnlocked = false;
+    if (ageType == 'Adult' && userLevel < 30) isUnlocked = false;
+
     return GestureDetector(
-      onTap: () => onAgeSelected(ageType),
-      child: Container(
-        width: 50,
-        height: 50,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF556CEB), Color(0xFF58A9EC)],
+      onTap: isUnlocked ? () => onAgeSelected(ageType) : null,
+      child: Opacity(
+        opacity: isUnlocked ? 1.0 : 0.4,
+        child: Container(
+          width: 50,
+          height: 50,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: isUnlocked 
+                  ? const [Color(0xFF556CEB), Color(0xFF58A9EC)]
+                  : const [Colors.grey, Colors.black45],
+            ),
+            border: Border.all(
+              color: Colors.white,
+              width: isSelected ? 3.0 : 0.0, // Highlight selected
+            ),
+            boxShadow: [
+               if (isSelected && isUnlocked) 
+                 BoxShadow(color: Colors.white.withOpacity(0.5), blurRadius: 10, spreadRadius: 2)
+            ]
           ),
-          border: Border.all(
-            color: Colors.white,
-            width: isSelected ? 3.0 : 0.0, // Highlight selected
+          child: SizedBox(
+            width: 35,
+            height: 35,
+            child: isUnlocked 
+              ? Image.asset(assetPath, fit: BoxFit.contain, errorBuilder: (_,__,___) => const Icon(Icons.person, color: Colors.white))
+              : ColorFiltered(
+                  colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.saturation),
+                  child: Image.asset(assetPath, fit: BoxFit.contain, errorBuilder: (_,__,___) => const Icon(Icons.lock, color: Colors.white)),
+                ),
           ),
-          boxShadow: [
-             if (isSelected) 
-               BoxShadow(color: Colors.white.withOpacity(0.5), blurRadius: 10, spreadRadius: 2)
-          ]
-        ),
-        child: SizedBox(
-          width: 35,
-          height: 35,
-          child: Image.asset(assetPath, fit: BoxFit.contain, errorBuilder: (_,__,___) => const Icon(Icons.person, color: Colors.white)),
         ),
       ),
     );
@@ -583,7 +638,9 @@ class _ContentArea extends StatelessWidget {
     List<InventoryItem> filteredItems = [];
     if (selectedMainTab == 'เสื้อผ้า') {
        if (selectedSubTab == 'Grid') {
-         filteredItems = inventory.where((i) => i.category == 'Cloth' || i.category == 'Shoes').toList();
+         filteredItems = inventory.where((i) => i.category == 'Outfit' || i.category == 'Shoes' || i.category == 'Cloth').toList();
+       } else if (selectedSubTab == 'Cloth') {
+         filteredItems = inventory.where((i) => i.category == 'Outfit' || i.category == 'Cloth').toList();
        } else {
          filteredItems = inventory.where((i) => i.category == selectedSubTab).toList();
        }
@@ -753,8 +810,14 @@ class _ItemCard extends StatelessWidget {
   });
 
   String get _itemImagePath {
-    if (item.category == 'Hair') return 'assets/images/Fashion/HairStyle/hair0${item.riveId}.PNG';
-    if (item.category == 'Cloth') return 'assets/images/Fashion/Cloth/Clothes${item.riveId + 1}.png';
+    final cat = item.category.toLowerCase();
+    if (cat == 'hair') {
+      return 'assets/images/Fashion/HairStyle/${item.name}.PNG';
+    } else if (cat == 'outfit' || cat == 'cloth') {
+      return 'assets/images/Fashion/Outfit/${item.name}.PNG';
+    } else if (cat == 'face') {
+      return 'assets/images/Fashion/FaceStyle/${item.name}.PNG';
+    }
     return '';
   }
 
@@ -826,10 +889,13 @@ class _ItemCard extends StatelessWidget {
                       padding: const EdgeInsets.all(4.0),
                       child: Center(
                         child: _itemImagePath.isNotEmpty 
-                          ? Image.asset(
-                              _itemImagePath,
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_not_supported),
+                          ? Transform.scale(
+                              scale: item.category.toLowerCase() == 'face' ? 2.5 : 1.8,
+                              child: Image.asset(
+                                _itemImagePath,
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_not_supported),
+                              ),
                             )
                           : const Icon(Icons.checkroom, color: Colors.grey),
                       ),

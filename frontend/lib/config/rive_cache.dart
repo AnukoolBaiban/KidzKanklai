@@ -7,21 +7,24 @@ class RiveCache {
   factory RiveCache() => _instance;
   RiveCache._internal();
 
-  RiveFile? _file;
+  final Map<String, RiveFile> _files = {};
   bool _isLoading = false;
 
   /// เรียกใช้ฟังก์ชันนี้ที่ main.dart เพื่อโหลดโมเดลรอไว้ก่อน
-  Future<void> loadAsset(String assetPath) async {
-    if (_file != null) return;
+  Future<void> loadAssets(List<String> assetPaths) async {
     if (_isLoading) return;
 
     _isLoading = true;
     try {
-      print("RiveCache: Start loading $assetPath...");
       await RiveFile.initialize(); // สำคัญมาก
-      final data = await rootBundle.load(assetPath);
-      _file = RiveFile.import(data);
-      print("RiveCache: Successfully loaded Rive file!");
+      for (final path in assetPaths) {
+        if (!_files.containsKey(path)) {
+          print("RiveCache: Start loading $path...");
+          final data = await rootBundle.load(path);
+          _files[path] = RiveFile.import(data);
+          print("RiveCache: Successfully loaded Rive file $path !");
+        }
+      }
     } catch (e) {
       print("RiveCache: Error loading file: $e");
     } finally {
@@ -29,6 +32,5 @@ class RiveCache {
     }
   }
 
-  RiveFile? get file => _file;
-  bool get isLoaded => _file != null;
+  RiveFile? getFile(String assetPath) => _files[assetPath];
 }

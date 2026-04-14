@@ -5,9 +5,16 @@ import 'package:flutter_application_1/widgets/custom_top_bar.dart';
 class ResultStatScreen extends StatefulWidget {
   final Map<String, int> statusRewards;
   final User? user;
+  final Map<String, int> oldStats; // 🌟 1. เพิ่มตัวแปรเก็บค่าสเตตัสก่อนอัปเกรด
+  final bool isSuccess; // 🌟 1. เพิ่มตัวแปรเช็ค สำเร็จ/ไม่สำเร็จ
 
-  const ResultStatScreen({Key? key, required this.statusRewards, this.user})
-    : super(key: key);
+  const ResultStatScreen({
+    Key? key,
+    required this.statusRewards,
+    this.user,
+    this.oldStats = const {}, // ค่าเริ่มต้นเผื่อไม่ได้ส่งมา
+    this.isSuccess = true, // ค่าเริ่มต้นคือสำเร็จ เผื่อไม่ได้ส่งมา
+  }) : super(key: key);
 
   @override
   State<ResultStatScreen> createState() => _ResultStatScreenState();
@@ -60,20 +67,26 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
                       ),
                       child: Column(
                         children: [
-                          // ✅ Success Text + Icon
+                          // ✅ Success/Fail Text + Icon
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Image.asset(
-                                'assets/images/icon/check2.png', // 🔥 เปลี่ยนเป็นรูปคุณ
+                                widget.isSuccess 
+                                    ? 'assets/images/icon/check2.png' 
+                                    : 'assets/images/icon/X.png', // 🌟 เปลี่ยนไอคอนเป็น X ถ้าไม่สำเร็จ
                                 height: 50,
                                 errorBuilder: (context, error, stackTrace) {
-                                  return Icon(Icons.check_circle, size: 30);
+                                  return Icon(
+                                    widget.isSuccess ? Icons.check_circle : Icons.cancel, 
+                                    color: widget.isSuccess ? Colors.green : Colors.red,
+                                    size: 40
+                                  );
                                 },
                               ),
                               SizedBox(width: 8),
                               Text(
-                                'ทำกิจกรรมสำเร็จ',
+                                widget.isSuccess ? 'ทำกิจกรรมสำเร็จ' : 'ทำกิจกรรมไม่สำเร็จ', // 🌟 เปลี่ยนข้อความ
                                 style: TextStyle(
                                   fontSize: 32,
                                   fontWeight: FontWeight.bold,
@@ -83,9 +96,11 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
                             ],
                           ),
 
-                          // ✅ รูปตัวละคร (ใส่ภาพทีหลังได้)
+                          // ✅ รูปตัวละคร
                           Image.asset(
-                            'assets/images/profile/profile-character.png', // 🔥 เปลี่ยนเป็นรูปคุณ
+                            widget.isSuccess 
+                                ? 'assets/images/profile/profile-character.png'
+                                : 'assets/images/profile/sad-character.png', // 🌟 เปลี่ยนรูปถ้าไม่สำเร็จ
                             height: 250,
                             errorBuilder: (context, error, stackTrace) {
                               return Icon(Icons.person, size: 100);
@@ -171,6 +186,35 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
   }
 
   Widget _buildStatusRow(String statusName, int value, bool isIncreased) {
+    // 🌟 1. ดึงค่าเริ่มต้นมาจาก oldStats (ถ้าหาไม่เจอให้เริ่มที่ 0)
+    int startValue = widget.oldStats[statusName] ?? 0;
+    
+    // 🌟 2. คำนวณค่าสุดท้าย
+    int endValue = startValue + value;
+
+    // 🌟 3. จัดการกรณีพลังงาน
+    if (statusName == 'พลังงาน') {
+      if (widget.isSuccess) {
+        // ถ้าเป็นสวนสาธารณะ (สำเร็จ) และพลังงานเกิน 100 ให้ล็อกไว้ที่ 100
+        if (endValue > 100) {
+          endValue = 100;
+        }
+      } else {
+        // ถ้าฝึกฝนไม่สำเร็จ (ล้มเหลว) ให้โชว์เลขเดิมของสถานะที่พยายามจะฝึก 
+        // (เราไม่ต้องเอาค่าที่ติดลบไปคำนวณ ให้มันวิ่งจากค่าเดิมไปค่าเดิม จะได้นิ่งๆ)
+        endValue = startValue;
+      }
+    } else {
+      // สำหรับสเตตัสอื่นๆ ถ้าไม่สำเร็จก็ให้โชว์เลขเดิม
+      if (!widget.isSuccess) {
+        endValue = startValue;
+      }
+    }
+
+    // 🌟 4. กำหนดสี: ถ้าสำเร็จและเป็นบวก ให้สีเขียว, ถ้าล้มเหลว (isSuccess เป็น false) ให้สีแดง
+    // หมายเหตุ: แม้ค่า value จะเป็นลบ (เสียพลังงานตอนฝึกไม่ผ่าน) แต่เราโชว์เลขเดิมแล้ว เลยใช้ตัวแปร isSuccess เช็คสีแทนเลยจะชัวร์สุดครับ
+    Color statColor = widget.isSuccess ? Color(0xFF4CAF50) : Colors.red;
+
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 4),
       child: Container(
@@ -191,13 +235,13 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
                 color: Colors.black,
               ),
             ),
-            Text(
-              isIncreased ? '+$value' : '$value',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: isIncreased ? Color(0xFF4CAF50) : Colors.black,
-              ),
+            
+            // 🌟 ใช้งาน AnimatedStatValue แทน Text ธรรมดา
+            AnimatedStatValue(
+              startValue: startValue,
+              endValue: endValue,
+              suffix: "",
+              textColor: statColor, // 🌟 ส่งสีเข้าไป
             ),
           ],
         ),
@@ -255,6 +299,76 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
           onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
         ),
       ),
+    );
+  }
+}
+
+class AnimatedStatValue extends StatefulWidget {
+  final int startValue;
+  final int endValue;
+  final String suffix; // ไว้เติม (+1) ด้านหลัง
+  final Color textColor; // 🌟 รับค่าสีที่ต้องการให้แสดง
+
+  const AnimatedStatValue({
+    Key? key,
+    required this.startValue,
+    required this.endValue,
+    this.suffix = "",
+    this.textColor = const Color(0xFF4CAF50), // ค่าเริ่มต้นสีเขียว
+  }) : super(key: key);
+
+  @override
+  State<AnimatedStatValue> createState() => _AnimatedStatValueState();
+}
+
+class _AnimatedStatValueState extends State<AnimatedStatValue>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500), // 🌟 ความเร็ตอนิเมชัน (1.5 วินาที)
+    );
+
+    // สร้าง Tween ให้วิ่งจากเลขเดิม ไป เลขใหม่
+    _animation = Tween<double>(
+      begin: widget.startValue.toDouble(),
+      end: widget.endValue.toDouble(),
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic, // ให้มันค่อยๆ ช้าลงตอนใกล้จบ
+    ));
+
+    // สั่งให้เริ่มเล่น Animation ทันทีที่ Widget โหลดขึ้นมา
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        // ปัดเศษทศนิยมทิ้งให้เป็นจำนวนเต็ม
+        int currentValue = _animation.value.round();
+        return Text(
+          "$currentValue ${widget.suffix}",
+          style: TextStyle( // 🌟 ลบคำว่า const ออกจากตรงนี้
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: widget.textColor, // 🌟 ตอนนี้จะหาเจอและใช้งานได้ปกติแล้ว
+          ),
+        );
+      },
     );
   }
 }

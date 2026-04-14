@@ -10,6 +10,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'
     hide User; // 🌟 เพิ่ม Supabase
 import 'package:flutter_application_1/widgets/reward_popup.dart';
+import 'package:flutter_application_1/widgets/level_up_popup.dart';
+import 'package:flutter_application_1/widgets/character_up_popup.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AllQuestScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
@@ -26,23 +29,56 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
   bool _isPressed = false;
   int _selectedTabIndex = 0;
   final List<String> _tabs = ["ทั้งหมด", "ระบบ", "ส่วนตัว", "ประวัติ"];
+  Key _topBarKey = UniqueKey(); // 🌟 สำหรับรีเฟรชแถบด้านบน
 
   // 🌟 ลบ Mock Data ออก และสร้างตัวแปรรับข้อมูลจริงจาก DB
   List<Map<String, dynamic>> _allQuests = [];
   bool _isLoading = true;
+  User? _user; // 🌟 เพิ่มตัวแปรเก็บ User เพื่อใช้อัปเดต UI ภายในหน้านี้
+
+  // 🌟 Search & Filter สำหรับแถบประวัติ
+  final TextEditingController _searchController = TextEditingController();
+  String _searchText = '';
+  // ประเภทภารกิจ: 'ทั่วไป', 'ทันที'
+  final Set<String> _filterTypes = {};
+  // สถานะ: 'completed', 'failed'
+  final Set<String> _filterStatuses = {};
 
   @override
   void initState() {
     super.initState();
+    _user = widget.user; // 🌟 กำหนดค่าเริ่มต้นจาก widget
     // 🌟 ดึงข้อมูลทันทีเมื่อเข้าหน้านี้
     _fetchQuestsFromDB();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkTutorialPopup();
+    });
+
+    _searchController.addListener(() {
+      setState(() => _searchText = _searchController.text.trim().toLowerCase());
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // 🌟 ฟังก์ชันเช็คว่าเคยแสดง Popup ยินดีต้อนรับแล้วหรือยัง
+  Future<void> _checkTutorialPopup() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeen = prefs.getBool('has_seen_quest_tutorial') ?? false;
+
+    if (!hasSeen && mounted) {
       showDialog(
         context: context,
         builder: (context) => const TutorialQuestPopup(),
       );
-    });
+      // ตั้งค่าว่าเป็นเคยเห็นแล้ว
+      await prefs.setBool('has_seen_quest_tutorial', true);
+    }
   }
 
   // 🌟 ฟังก์ชันดึงข้อมูลจาก Supabase (รองรับของรางวัลไม่อั้น)
@@ -119,8 +155,11 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
         String type = questData['type'] ?? 'ทั่วไป';
         bool isSystem = (type == 'ระบบ'); // เควสระบบสืบสายดั้งเดิม
         bool isRecommended = (type == 'แนะนำ'); // ภารกิจแนะนำ (type='แนะนำ')
-        bool isSystemOrRecommended = isSystem || isRecommended; // ใช้สำหรับ logic UI
-        String category = isSystemOrRecommended ? 'ระบบ' : 'ส่วนตัว'; // 'แนะนำ' จัดอยู่ใน tab 'ระบบ'
+        bool isSystemOrRecommended =
+            isSystem || isRecommended; // ใช้สำหรับ logic UI
+        String category = isSystemOrRecommended
+            ? 'ระบบ'
+            : 'ส่วนตัว'; // 'แนะนำ' จัดอยู่ใน tab 'ระบบ'
 
         // --------------------------------------------------------
         // 🌟 สร้าง List เก็บของรางวัลทั้งหมดที่ดึงมาจาก DB
@@ -167,7 +206,8 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
           "rewards": rewardsList,
           "daysLeft": daysLeft,
           "hoursLeft": hoursLeft,
-          "isSystem": isSystemOrRecommended, // ใช้เป็น true ทั้งเควสระบบและเควสแนะนำ
+          "isSystem":
+              isSystemOrRecommended, // ใช้เป็น true ทั้งเควสระบบและเควสแนะนำ
           "isRecommended": isRecommended, // บอกว่าเป็นภารกิจแนะนำโดยเฉพาะ
           "progress": dbProgress,
           "totalReq": targetAmount,
@@ -175,7 +215,8 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
           "isClaimed": isClaimed,
           "isExpired": isExpired,
           "completedDate": completedDate,
-          "startDate": startDate ?? DateTime.now(), // 🌟 เผื่อเคสที่ไม่มี start_date
+          "startDate":
+              startDate ?? DateTime.now(), // 🌟 เผื่อเคสที่ไม่มี start_date
         });
       }
 
@@ -202,36 +243,49 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
     final topPadding = MediaQuery.of(context).padding.top;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    final topBarHeight = 75.0 + topPadding;
-    final headerHeight = 80.0;
+    return GestureDetector(
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      child: Scaffold(
+        resizeToAvoidBottomInset: false,
+        body: Stack(
+          children: [
+            _buildBackground(),
 
-    return Scaffold(
-      body: Stack(
-        children: [
-          _buildBackground(),
-
-          // Main Content
-          Padding(
-            padding: EdgeInsets.only(
-              top: topBarHeight + headerHeight + 10,
-              bottom: 110 + bottomPadding,
-              left: size.width * 0.05,
-              right: size.width * 0.05,
-            ),
-            child: Column(
-              children: [
-                _buildTabs(),
-                const SizedBox(height: 4),
-                Expanded(child: _buildQuestContent()),
-              ],
-            ),
+          Column(
+            children: [
+              _buildTopBar(topPadding),
+              _buildBlueHeader(),
+              
+              // Main Content
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: 10,
+                    bottom: 110 + bottomPadding,
+                    left: size.width * 0.05,
+                    right: size.width * 0.05,
+                  ),
+                  child: Column(
+                    children: [
+                      _buildTabs(),
+                      const SizedBox(height: 4),
+                      if (_selectedTabIndex == 3) ...[
+                        // 🌟 แสดง Search + Filter เฉพาะแถบประวัติ
+                        _buildSearchAndFilter(),
+                        const SizedBox(height: 6),
+                      ],
+                      Expanded(child: _buildQuestContent()),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
 
-          _buildTopBar(topPadding, topBarHeight),
-          _buildBlueHeader(topBarHeight),
           _buildBottomNavBar(),
         ],
       ),
+    ),
     );
   }
 
@@ -251,31 +305,33 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
     );
   }
 
-  Widget _buildTopBar(double topPadding, double height) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: height,
+  Widget _buildTopBar(double topPadding) {
+    return Container(
         padding: EdgeInsets.only(top: topPadding),
         color: Colors.black.withOpacity(0.4),
-        alignment: Alignment.bottomCenter,
         child: CustomTopBar(
+          key: _topBarKey,
           onNotificationTapped: () =>
-              Navigator.pushNamed(context, '/notification'),
-          onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
+              Navigator.pushNamed(context, '/notification').then((_) {
+            if (mounted) {
+              setState(() {
+                _topBarKey = UniqueKey();
+              });
+            }
+          }),
+          onSettingsTapped: () => Navigator.pushNamed(context, '/setting').then((_) {
+            if (mounted) {
+              setState(() {
+                _topBarKey = UniqueKey();
+              });
+            }
+          }),
         ),
-      ),
     );
   }
 
-  Widget _buildBlueHeader(double topOffset) {
-    return Positioned(
-      top: topOffset,
-      left: 0,
-      right: 0,
-      child: Container(
+  Widget _buildBlueHeader() {
+    return Container(
         height: 80,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -305,7 +361,6 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
             const Positioned(bottom: 8, right: 15, child: AnnotationButton()),
           ],
         ),
-      ),
     );
   }
 
@@ -318,7 +373,7 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
         if (mounted) {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => LobbyScreen(user: widget.user)),
+            MaterialPageRoute(builder: (_) => LobbyScreen(user: _user ?? widget.user)),
           ).then((_) => setState(() => _isPressed = false));
         }
       },
@@ -498,6 +553,290 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
     );
   }
 
+  // --- 🌟 Search + Filter Widget ---
+  Widget _buildSearchAndFilter({bool isOverlay = false}) {
+    final bool hasActiveFilters =
+        _filterTypes.isNotEmpty || _filterStatuses.isNotEmpty;
+
+    return Builder(
+      builder: (barContext) => Container(
+        height: 38,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.9),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFF9DD0E7), width: 1.5),
+        ),
+        child: TextField(
+          controller: _searchController,
+          style: GoogleFonts.kanit(fontSize: 13, color: Colors.black87),
+          textAlignVertical: TextAlignVertical.center,
+          onChanged: (val) {
+            if (!isOverlay) setState(() => _searchText = val.trim().toLowerCase());
+          },
+          decoration: InputDecoration(
+            hintText: 'ค้นหาภารกิจ...',
+            hintStyle: GoogleFonts.kanit(
+              fontSize: 13,
+              color: Colors.grey.shade400,
+            ),
+            prefixIcon: const Icon(
+              Icons.search,
+              size: 18,
+              color: Color(0xFF2374B5),
+            ),
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IgnorePointer(
+                  ignoring: _searchText.isEmpty || isOverlay,
+                  child: Opacity(
+                    opacity: _searchText.isNotEmpty ? 1.0 : 0.0,
+                    child: GestureDetector(
+                      onTap: () {
+                        if (!isOverlay) {
+                          _searchController.clear();
+                          setState(() => _searchText = '');
+                        }
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8.0),
+                        child: Icon(
+                          Icons.close,
+                          size: 16,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    if (!isOverlay) {
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      _showFilterPopup(barContext);
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 12.0),
+                    child: Icon(
+                      Icons.filter_list_rounded,
+                      size: 25,
+                      color: hasActiveFilters
+                          ? const Color(0xFFFF8C00)
+                          : const Color(0xFF2374B5),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.only(bottom: 12, top: 0),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showFilterPopup(BuildContext context) {
+    final RenderBox renderBox = context.findRenderObject() as RenderBox;
+    final offset = renderBox.localToGlobal(Offset.zero);
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black26,
+      useSafeArea: false,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Stack(
+              children: [
+                // ปิด popup เมื่อกดนอก
+                Positioned.fill(
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(dialogContext),
+                    child: Container(color: Colors.transparent),
+                  ),
+                ),
+                // แถบค้นหาที่จะโผล่มาทับด้านหน้า เพื่อไม่ให้โดนสีดำบัง
+                Positioned(
+                  left: offset.dx,
+                  top: offset.dy,
+                  width: renderBox.size.width,
+                  height: renderBox.size.height,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(dialogContext), // กดแถบก็จะปิดด้วย
+                    child: Material(
+                      color: Colors.transparent,
+                      child: AbsorbPointer(
+                        child: _buildSearchAndFilter(isOverlay: true),
+                      ),
+                    ),
+                  ),
+                ),
+                // กล่อง Filter
+                Positioned(
+                  top: offset.dy + renderBox.size.height + 8,
+                  right: MediaQuery.of(context).size.width * 0.05,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      width: 200,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 10,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // หัวข้อ ประเภทภารกิจ
+                          Text(
+                            'ประเภทภารกิจ',
+                            style: GoogleFonts.kanit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          _buildFilterChip(
+                            dialogContext,
+                            setDialogState,
+                            'ทั่วไป',
+                            _filterTypes,
+                          ),
+                          _buildFilterChip(
+                            dialogContext,
+                            setDialogState,
+                            'ทันที',
+                            _filterTypes,
+                          ),
+                          const Divider(height: 16),
+                          // หัวข้อ สถานะ
+                          Text(
+                            'สถานะ',
+                            style: GoogleFonts.kanit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          _buildFilterChip(
+                            dialogContext,
+                            setDialogState,
+                            'completed',
+                            _filterStatuses,
+                            label: 'สำเร็จ',
+                          ),
+                          _buildFilterChip(
+                            dialogContext,
+                            setDialogState,
+                            'failed',
+                            _filterStatuses,
+                            label: 'ไม่สำเร็จ',
+                          ),
+                          if (_filterTypes.isNotEmpty ||
+                              _filterStatuses.isNotEmpty) ...[
+                            const Divider(height: 12),
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _filterTypes.clear();
+                                  _filterStatuses.clear();
+                                });
+                                setDialogState(() {});
+                              },
+                              child: Center(
+                                child: Text(
+                                  'ล้างตัวกรอง',
+                                  style: GoogleFonts.kanit(
+                                    fontSize: 12,
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterChip(
+    BuildContext dialogContext,
+    StateSetter setDialogState,
+    String value,
+    Set<String> targetSet, {
+    String? label,
+  }) {
+    final display = label ?? value;
+    final isSelected = targetSet.contains(value);
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          if (isSelected) {
+            targetSet.remove(value);
+          } else {
+            targetSet.add(value);
+          }
+        });
+        setDialogState(() {});
+      },
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          color: isSelected ? const Color(0xFFE8F4FF) : Colors.transparent,
+          border: Border.all(
+            color: isSelected ? const Color(0xFF2374B5) : Colors.grey.shade300,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isSelected
+                  ? Icons.check_box_rounded
+                  : Icons.check_box_outline_blank_rounded,
+              size: 18,
+              color: isSelected
+                  ? const Color(0xFF2374B5)
+                  : Colors.grey.shade400,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              display,
+              style: GoogleFonts.kanit(
+                fontSize: 13,
+                color: isSelected ? const Color(0xFF002A50) : Colors.black87,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // --- 🌟 Logic การกรองข้อมูลตาม Tab แบบใหม่ ---
   Widget _buildQuestContent() {
     if (_isLoading) {
@@ -522,9 +861,11 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
     } else if (_selectedTabIndex == 1) {
       // 🌟 "ระบบ" = แสดงเควสหมวดระบบ และ เควสแนะนำ (ทั้งที่กำลังทำและสำเร็จแล้ว)
       filteredQuests = _allQuests
-          .where((q) =>
-              q['category'] == 'ระบบ' || // เควสระบบ (type='ระบบ')
-              (q['isRecommended'] == true)) // เควสแนะนำ (type='แนะนำ')
+          .where(
+            (q) =>
+                q['category'] == 'ระบบ' || // เควสระบบ (type='ระบบ')
+                (q['isRecommended'] == true),
+          ) // เควสแนะนำ (type='แนะนำ')
           .toList();
     } else if (_selectedTabIndex == 2) {
       // "ส่วนตัว" = หมวดส่วนตัว เฉพาะที่กำลังทำอยู่
@@ -536,19 +877,35 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
     } else if (_selectedTabIndex == 3) {
       // 🌟 "ประวัติ" = ทำสำเร็จแล้ว หรือ หมดเวลา (และต้องไม่ใช่หมวดระบบ) ไม่เกิน 3 เดือน
       filteredQuests = _allQuests.where((q) {
-        // เช็คสถานะ และเพิ่มเงื่อนไขไม่เอาเควส 'ระบบ' เข้ามาโชว์ในนี้
         bool isDoneOrFailed =
             (q['status'] == 'completed' || q['status'] == 'failed') &&
             q['category'] != 'ระบบ';
 
-        if (isDoneOrFailed) {
-          if (q['completedDate'] != null) {
-            DateTime compDate = q['completedDate'];
-            return compDate.isAfter(threeMonthsAgo);
-          }
-          return true;
+        if (!isDoneOrFailed) return false;
+
+        if (q['completedDate'] != null) {
+          DateTime compDate = q['completedDate'];
+          if (!compDate.isAfter(threeMonthsAgo)) return false;
         }
-        return false;
+
+        // 🌟 กรองตาม search text
+        if (_searchText.isNotEmpty) {
+          final title = (q['title'] ?? '').toString().toLowerCase();
+          if (!title.contains(_searchText)) return false;
+        }
+
+        // 🌟 กรองตาม type (ทั่วไป / ทันที)
+        if (_filterTypes.isNotEmpty) {
+          final type = (q['type'] ?? '').toString();
+          if (!_filterTypes.contains(type)) return false;
+        }
+
+        // 🌟 กรองตาม status (completed / failed)
+        if (_filterStatuses.isNotEmpty) {
+          if (!_filterStatuses.contains(q['status'])) return false;
+        }
+
+        return true;
       }).toList();
     }
 
@@ -615,27 +972,74 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
             );
 
             // ยิง API
-            final rewards = await ApiService.completeSystemQuest(
+            final result = await ApiService.completeSystemQuest(
               filteredQuests[index]['id'],
             );
 
             if (mounted) Navigator.pop(context); // ปิด Loading
 
-            if (rewards != null && mounted) {
-              // 🌟 แปลงของรางวัลและโชว์ Popup ได้เลย (แบบเดียวกับเควสปกติ)
-              List<RewardData> popupRewards = rewards.map<RewardData>((rw) {
-                return RewardData(
-                  type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM',
-                  amount: rw['added'],
-                  itemName: rw['name'],
-                  itemImage: rw['image'],
-                );
-              }).toList();
+            if (result != null && mounted) {
+              final rewards = (result['rewards'] as List?) ?? [];
+              
+              // 🌟 1. แสดงของรางวัล
+              if (rewards.isNotEmpty) {
+                List<RewardData> popupRewards = rewards.map<RewardData>((rw) {
+                  return RewardData(
+                    type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM',
+                    amount: rw['added'],
+                    itemName: rw['name'],
+                    itemImage: rw['image'],
+                  );
+                }).toList();
 
-              await RewardPopup.show(context, rewards: popupRewards);
+                await RewardPopup.show(context, rewards: popupRewards);
+              }
 
-              // รีเฟรชหน้า AllQuestScreen เพื่ออัปเดตสถานะ
-              _fetchQuestsFromDB();
+              // 🌟 2. แสดง Level Up Popup ถ้าต้องการ
+              if (mounted && result['leveled_up'] == true) {
+                final baseLv = result['base_level'] as int? ?? 0;
+                final newLv  = result['new_level']  as int? ?? 0;
+                
+                // 🌟 ตรวสอบการเปลี่ยนร่างโดยใช้ Model Group (Kid: 0, Teen: 1, Adult: 2)
+                int getModelGroup(int lv) {
+                  if (lv >= 30) return 2;
+                  if (lv >= 15) return 1;
+                  return 0;
+                }
+                final isEvolution = getModelGroup(newLv) > getModelGroup(baseLv);
+
+                // 🌟 รีเฟรช Profile ก่อนโชว์ Popup เพื่อให้มีข้อมูลล่าสุด
+                final freshUser = await ApiService.getProfile(0);
+
+                if (isEvolution && mounted) {
+                  // 1. ถ้าถึงเกณฑ์วิวัฒนาการ โชว์ CharacterUpPopup ทันที (มีข้อมูลเลเวลด้านบนอยู่แล้ว)
+                  await CharacterUpPopup.show(
+                    context,
+                    baseLevel: baseLv,
+                    newLevel: newLv,
+                    user: freshUser ?? widget.user,
+                    onTapContinue: () {},
+                  );
+                } else if (mounted) {
+                  // 2. ถ้าเลเวลอัปปกติ ค่อยโชว์ LevelUpPopup แบบเดิม
+                  await LevelUpPopup.show(
+                    context,
+                    baseLevel: baseLv,
+                    newLevel: newLv,
+                    onTapContinue: () {},
+                  );
+                }
+              }
+
+              // 🌟 3. รีเฟรชข้อมูล User และรายการเควส
+              await _fetchQuestsFromDB();
+              // เพิ่มการดึง Profile ใหม่เพื่ออัปเดตเลเวลผู้เล่นในหน้านี้
+              final freshProfile = await ApiService.getProfile(0);
+              if (freshProfile != null && mounted) {
+                setState(() {
+                  _user = freshProfile;
+                });
+              }
             } else {
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -651,12 +1055,11 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
             final shouldRefresh = await Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => QuestDetailScreen(
-                  questId: filteredQuests[index]['id'],
-                ),
+                builder: (context) =>
+                    QuestDetailScreen(questId: filteredQuests[index]['id']),
               ),
             );
-            
+
             // 🌟 ถ้ารับค่าเป็น true ให้รีเฟรชหน้าเพื่ออัปเดตข้อมูล
             if (shouldRefresh == true) {
               _fetchQuestsFromDB();
@@ -819,17 +1222,32 @@ class QuestCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      // 🌟 เปลี่ยนมาใช้การวนลูปสร้าง RewardBadge ตามจำนวนของรางวัลจริงๆ ใน List
-                      children: (quest['rewards'] as List<dynamic>? ?? [])
-                          .map<Widget>((reward) {
+                    Builder(
+                      builder: (context) {
+                        final rewards =
+                            quest['rewards'] as List<dynamic>? ?? [];
+                        if (rewards.isEmpty) {
+                          return Container(
+                            height: 60,
+                            alignment: Alignment.center,
+                            child: const Text(
+                              "ไม่มีของรางวัลสำหรับภารกิจนี้",
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          );
+                        }
+                        return Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: rewards.map<Widget>((reward) {
                             bool isExp = reward['isExp'] ?? false;
 
                             return RewardBadge(
                               label: isExp ? "EXP" : "Item",
-                              // ถ้าเป็น EXP โชว์เครื่องหมาย +, ถ้าเป็นของทั่วไปโชว์ตัว x
                               value: isExp
                                   ? "+${reward['amount']}"
                                   : "x${reward['amount']}",
@@ -839,8 +1257,9 @@ class QuestCard extends StatelessWidget {
                               iconPath: reward['image'],
                               isClaimed: isClaimed,
                             );
-                          })
-                          .toList(),
+                          }).toList(),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -978,16 +1397,17 @@ class QuestCard extends StatelessWidget {
                             fontWeight: FontWeight.bold,
                           ),
                         )
-                      else if (quest['daysLeft'] != null &&
-                          quest['daysLeft'] < 3)
+                      else if (quest['daysLeft'] != null)
                         Text(
                           quest['daysLeft'] < 1
                               ? (quest['hoursLeft'] <= 0
                                     ? "เหลือน้อยกว่า 1 ชั่วโมง"
                                     : "เหลืออีก ${quest['hoursLeft']} ชั่วโมง")
                               : "เหลืออีก ${quest['daysLeft']} วัน",
-                          style: const TextStyle(
-                            color: Colors.red,
+                          style: TextStyle(
+                            color: quest['daysLeft'] < 1
+                                ? Colors.red
+                                : Colors.black87,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1160,24 +1580,16 @@ class RewardBadge extends StatelessWidget {
               ),
             ),
           ),
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.all(4),
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            decoration: BoxDecoration(
-              color: const Color(0xFFD9D9D9),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
             ),
           ),
+          const SizedBox(height: 4),
         ],
       ),
     );

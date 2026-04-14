@@ -16,6 +16,53 @@ import (
 )
 
 // ------------------------------------------------------------------------
+// LEVEL-UP HELPER
+// EXP threshold per level: 100 * currentLevel (Lv1→2 needs 100, Lv2→3 needs 200, etc.)
+// Returns (baseLevel, newLevel, didLevelUp)
+// ------------------------------------------------------------------------
+func CalculateLevelUp(ctx context.Context, tx pgx.Tx, userID uuid.UUID) (int, int, bool) {
+	var currentLevel, currentExp int
+	err := tx.QueryRow(ctx, `SELECT level, experience FROM public.characters WHERE user_id = $1 FOR UPDATE`, userID).
+		Scan(&currentLevel, &currentExp)
+	if err != nil {
+		return 0, 0, false
+	}
+
+	baseLevel := currentLevel
+	leveled := false
+
+	// Allow multiple level-ups in one go (e.g., huge EXP reward)
+	for {
+		threshold := 100 * currentLevel
+		if currentExp < threshold {
+			break
+		}
+		currentExp -= threshold
+		currentLevel++
+		leveled = true
+	}
+
+	if leveled {
+		// คำนวณ body_type ตามเลเวลใหม่
+		bodyType := "KID"
+		if currentLevel >= 30 {
+			bodyType = "ADULT"
+		} else if currentLevel >= 15 {
+			bodyType = "TEEN"
+		}
+
+		_, err = tx.Exec(ctx,
+			`UPDATE public.characters SET level = $1, experience = $2, body_type = $3 WHERE user_id = $4`,
+			currentLevel, currentExp, bodyType, userID)
+		if err != nil {
+			return baseLevel, baseLevel, false
+		}
+	}
+
+	return baseLevel, currentLevel, leveled
+}
+
+// ------------------------------------------------------------------------
 // 1. API: สร้างภารกิจ (CreateNormalQuest)
 // ------------------------------------------------------------------------
 // POST /quests/create
@@ -43,7 +90,7 @@ func CreateNormalQuest(c *gin.Context) {
 
 	loc, err := time.LoadLocation("Asia/Bangkok")
 	if err != nil {
-		loc = time.FixedZone("UTC+7", 7*3600) 
+		loc = time.FixedZone("UTC+7", 7*3600)
 	}
 
 	var dueDate time.Time
@@ -95,9 +142,9 @@ func CreateNormalQuest(c *gin.Context) {
 	}
 
 	var imageUrlPtr *string
-	file, _, err := c.Request.FormFile("image") 
-	
-	if err == nil { 
+	file, _, err := c.Request.FormFile("image")
+
+	if err == nil {
 		defer file.Close()
 		cloudinaryURL := os.Getenv("CLOUDINARY_URL")
 		if cloudinaryURL == "" {
@@ -110,13 +157,13 @@ func CreateNormalQuest(c *gin.Context) {
 			return
 		}
 		resp, err := cld.Upload.Upload(ctx, file, uploader.UploadParams{
-			Folder: "KidzKanKlai/quests", 
+			Folder: "KidzKanKlai/quests",
 		})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image"})
 			return
 		}
-		url := resp.SecureURL 
+		url := resp.SecureURL
 		imageUrlPtr = &url
 	}
 
@@ -126,7 +173,7 @@ func CreateNormalQuest(c *gin.Context) {
 	}
 
 	var questID int64
-	questType := "ทั่วไป" 
+	questType := "ทั่วไป"
 
 	insertQuestQuery := `
 		INSERT INTO public.quests (name, detail, image, start_date, due_date, type)
@@ -182,13 +229,12 @@ func CreateNormalQuest(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "Normal quest created successfully",
-		"quest_id": questID,
+		"success":   true,
+		"message":   "Normal quest created successfully",
+		"quest_id":  questID,
 		"image_url": imageUrlPtr,
 	})
 }
-
 
 // ------------------------------------------------------------------------
 // 2. API: รับรางวัล (CompleteNormalQuest)
@@ -249,6 +295,16 @@ func CompleteNormalQuest(c *gin.Context) {
 		return
 	}
 
+	// 🌟 ลบการแจ้งเตือนเตือนความจำ (ถ้ามี)
+	deleteWarningsQuery := `
+		DELETE FROM public.get_notifications gn
+		USING public.notifications n
+		WHERE gn.notification_id = n.id 
+		  AND gn.user_id = $1 
+		  AND n.type IN ($2, $3)
+	`
+	tx.Exec(ctx, deleteWarningsQuery, userID, fmt.Sprintf("quest_1d_%d", input.QuestID), fmt.Sprintf("quest_1h_%d", input.QuestID))
+
 	// 🌟 2.3 ไปดึงข้อมูลของรางวัลแบบไดนามิกจากตาราง receive 🌟
 	rewardQuery := `
 		SELECT r.item_id, r.quantity, i.name, i.image 
@@ -279,9 +335,13 @@ func CompleteNormalQuest(c *gin.Context) {
 
 		if err := rows.Scan(&itemID, &qty, &namePtr, &imagePtr); err == nil {
 			name := "Unknown"
-			if namePtr != nil { name = *namePtr }
+			if namePtr != nil {
+				name = *namePtr
+			}
 			imageStr := "assets/images/item/default_item.png"
-			if imagePtr != nil && *imagePtr != "" { imageStr = *imagePtr }
+			if imagePtr != nil && *imagePtr != "" {
+				imageStr = *imagePtr
+			}
 
 			pendingRewards = append(pendingRewards, tempReward{
 				ItemID: itemID, Quantity: qty, Name: name, Image: imageStr,
@@ -292,7 +352,7 @@ func CompleteNormalQuest(c *gin.Context) {
 
 	// 🌟 2.4 วนลูปแจกของให้ตรงจุด (แยก EXP กับ Item) 🌟
 	var responseRewards []map[string]interface{}
-	
+
 	for _, rw := range pendingRewards {
 		if rw.ItemID == 22 {
 			// 🟢 ถ้าเป็น EXP (ID=22) ให้บวกเข้าตาราง characters
@@ -329,6 +389,9 @@ func CompleteNormalQuest(c *gin.Context) {
 	IncrementSystemQuestProgress(ctx, tx, userID, 20001) // แนะนำ: สำเร็จเควสทั่วไป
 	IncrementSystemQuestProgress(ctx, tx, userID, 20003) // แนะนำ: สำเร็จเควสรูปแบบใดก็ได้
 
+	// 🌟 คำนวณ Level Up
+	baseLv, newLv, didLevel := CalculateLevelUp(ctx, tx, userID)
+
 	if err := tx.Commit(ctx); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction commit failed"})
 		return
@@ -339,9 +402,12 @@ func CompleteNormalQuest(c *gin.Context) {
 	}(userID)
 
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "Quest completed successfully",
-		"rewards": responseRewards,
+		"success":    true,
+		"message":    "Quest completed successfully",
+		"rewards":    responseRewards,
+		"leveled_up": didLevel,
+		"base_level": baseLv,
+		"new_level":  newLv,
 	})
 }
 
@@ -472,7 +538,7 @@ func StartInstantQuest(c *gin.Context) {
 	dueDate := now.Add(time.Duration(input.DurationMinutes) * time.Minute)
 
 	var questID int64
-	questType := "ทันที" 
+	questType := "ทันที"
 	detail := fmt.Sprintf("กิจกรรมจับเวลา: %d นาที", input.DurationMinutes)
 
 	insertQuestQuery := `
@@ -530,8 +596,8 @@ func StartInstantQuest(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "Instant quest started",
+		"success":  true,
+		"message":  "Instant quest started",
 		"quest_id": questID,
 		"due_date": dueDate.Format(time.RFC3339),
 	})
@@ -612,7 +678,7 @@ func CompleteInstantQuest(c *gin.Context) {
 		WHERE r.quest_id = $1
 	`
 	rows, _ := tx.Query(ctx, rewardQuery, input.QuestID)
-	
+
 	type tempReward struct {
 		ItemID   int64
 		Quantity int
@@ -627,9 +693,13 @@ func CompleteInstantQuest(c *gin.Context) {
 		var namePtr, imagePtr *string
 		if err := rows.Scan(&itemID, &qty, &namePtr, &imagePtr); err == nil {
 			name := "Unknown"
-			if namePtr != nil { name = *namePtr }
+			if namePtr != nil {
+				name = *namePtr
+			}
 			imageStr := "assets/images/item/default_item.png"
-			if imagePtr != nil { imageStr = *imagePtr }
+			if imagePtr != nil {
+				imageStr = *imagePtr
+			}
 			pendingRewards = append(pendingRewards, tempReward{ItemID: itemID, Quantity: qty, Name: name, Image: imageStr})
 		}
 	}
@@ -657,6 +727,9 @@ func CompleteInstantQuest(c *gin.Context) {
 	IncrementSystemQuestProgress(ctx, tx, userID, 20002) // แนะนำ: สำเร็จเควสทันที
 	IncrementSystemQuestProgress(ctx, tx, userID, 20003) // แนะนำ: สำเร็จเควสรูปแบบใดก็ได้
 
+	// 🌟 คำนวณ Level Up
+	baseLv, newLv, didLevel := CalculateLevelUp(ctx, tx, userID)
+
 	tx.Commit(ctx)
 
 	go func(u uuid.UUID) {
@@ -664,9 +737,12 @@ func CompleteInstantQuest(c *gin.Context) {
 	}(userID)
 
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "Instant quest completed",
-		"rewards": responseRewards,
+		"success":    true,
+		"message":    "Instant quest completed",
+		"rewards":    responseRewards,
+		"leveled_up": didLevel,
+		"base_level": baseLv,
+		"new_level":  newLv,
 	})
 }
 
@@ -855,7 +931,6 @@ func InitSystemQuests(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
-
 // ------------------------------------------------------------------------
 // 6. API: รับรางวัลเควสระบบ (CompleteSystemQuest)
 // ------------------------------------------------------------------------
@@ -935,7 +1010,7 @@ func CompleteSystemQuest(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch rewards"})
 		return
 	}
-	
+
 	type tempReward struct {
 		ItemID   int64
 		Quantity int
@@ -950,9 +1025,13 @@ func CompleteSystemQuest(c *gin.Context) {
 		var namePtr, imagePtr *string
 		if err := rows.Scan(&itemID, &qty, &namePtr, &imagePtr); err == nil {
 			name := "Unknown"
-			if namePtr != nil { name = *namePtr }
+			if namePtr != nil {
+				name = *namePtr
+			}
 			imageStr := "assets/images/item/default_item.png"
-			if imagePtr != nil { imageStr = *imagePtr }
+			if imagePtr != nil {
+				imageStr = *imagePtr
+			}
 			pendingRewards = append(pendingRewards, tempReward{ItemID: itemID, Quantity: qty, Name: name, Image: imageStr})
 		}
 	}
@@ -972,21 +1051,30 @@ func CompleteSystemQuest(c *gin.Context) {
 		responseRewards = append(responseRewards, map[string]interface{}{"name": rw.Name, "added": rw.Quantity, "image": rw.Image})
 	}
 
-	tx.Commit(ctx)
+	// 🌟 คำนวณ Level-Up และอัพเดท DB ก่อน Commit
+	baseLv, newLv, didLevel := CalculateLevelUp(ctx, tx, userID)
+
+	if err := tx.Commit(ctx); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not commit transaction"})
+		return
+	}
 
 	go func(u uuid.UUID) {
 		CheckCoinAchievement(context.Background(), u)
 	}(userID)
 
-	// 🌟 ตรวจสอบและเปิดใช้งานภารกิจแนะนำ เมื่อผู้เล่นทำเควสระบบครบแล้ว
+	// 🌟 ตรวจสอบและเปิดใช้งานภารกิจแนะนำ เมื่อผู้เล่นทำเควสระบบครบแล้ว (แจกเฉพาะเควสระบบดั้งเดิม)
 	go func(u uuid.UUID) {
 		CheckAndInitRecommendedQuest(context.Background(), u)
 	}(userID)
 
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "System quest reward claimed",
-		"rewards": responseRewards,
+		"success":    true,
+		"message":    "System quest reward claimed",
+		"rewards":    responseRewards,
+		"leveled_up": didLevel,
+		"base_level": baseLv,
+		"new_level":  newLv,
 	})
 }
 
@@ -1082,4 +1170,3 @@ func CheckAndInitRecommendedQuest(ctx context.Context, userID uuid.UUID) {
 	fmt.Printf("✅ Recommended quest %d assigned to user %s (normal=%d, instant=%d)\n",
 		recommendedQuestID, userID, normalCount, instantCount)
 }
-

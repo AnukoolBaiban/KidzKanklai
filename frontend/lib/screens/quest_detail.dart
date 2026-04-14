@@ -7,6 +7,8 @@ import '../widgets/confirm_giveup_popup.dart';
 import '../widgets/reward_popup.dart';
 // 🌟 1. นำเข้าไฟล์ ConfirmCompletePopup
 import '../widgets/confirm_complete_popup.dart'; // แก้ไข path ให้ตรงกับที่เก็บไฟล์
+import '../widgets/level_up_popup.dart';
+import '../widgets/character_up_popup.dart';
 
 class QuestDetailScreen extends StatefulWidget {
   final User? user;
@@ -63,7 +65,18 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
 
       if (mounted) {
         setState(() {
-          _questStatus = data['status'] ?? 'in_progress'; // 🌟 เก็บสถานะ
+          String status = data['status'] ?? 'in_progress';
+          
+          if (status == 'in_progress' && questData['due_date'] != null) {
+            try {
+              DateTime dueDate = DateTime.parse(questData['due_date']);
+              if (dueDate.isBefore(DateTime.now())) {
+                status = 'expired';
+              }
+            } catch (_) {}
+          }
+          
+          _questStatus = status; // 🌟 เก็บสถานะ
           _title = questData['name'] ?? 'ไม่มีชื่อภารกิจ';
           _description = questData['detail'] ?? 'ไม่มีรายละเอียด';
           _startDate = _formatDate(questData['start_date']);
@@ -148,25 +161,28 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
           // Background
           _buildBackground(),
 
-          // Top Bar
-          _buildTopBar(topPadding, topBarHeight),
+          Column(
+            children: [
+              // Top Bar
+              _buildTopBar(topPadding),
 
-          // Main Content
-          Padding(
-            padding: EdgeInsets.only(
-              top: topBarHeight + 10,
-              left: size.width * 0.05,
-              right: size.width * 0.05,
-              bottom: bottomPadding + 100, // เว้นที่ให้ปุ่ม
-            ),
-            child: Column(
-              children: [
-                // Back Button
-                Row(children: [_buildBackButton()]),
+              // Main Content
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: 10,
+                    left: size.width * 0.05,
+                    right: size.width * 0.05,
+                    bottom: bottomPadding + 100, // เว้นที่ให้ปุ่ม
+                  ),
+                  child: Column(
+                    children: [
+                      // Back Button
+                      Row(children: [_buildBackButton()]),
 
-                SizedBox(height: 10),
+                      const SizedBox(height: 10),
 
-                // Content Card
+                      // Content Card
                 Expanded(
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 5),
@@ -193,14 +209,17 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
                                       MainAxisAlignment.spaceBetween,
                                   children: [
                                     Expanded(
-                                      child: Text(
-                                        _title,
-                                        style: TextStyle(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF447199),
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          _title,
+                                          style: TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF447199),
+                                          ),
                                         ),
-                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                     Column(
@@ -338,6 +357,9 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
                 ),
               ],
             ),
+                  ),
+                ),
+            ],
           ),
 
           // Bottom Buttons
@@ -381,22 +403,15 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
     );
   }
 
-  Widget _buildTopBar(double topPadding, double height) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: height,
+  Widget _buildTopBar(double topPadding) {
+    return Container(
         padding: EdgeInsets.only(top: topPadding),
         color: Colors.black.withOpacity(0.4),
-        alignment: Alignment.bottomCenter,
         child: CustomTopBar(
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
           onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
         ),
-      ),
     );
   }
 
@@ -456,9 +471,29 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
   }
 
   Widget _buildBottomButtons(double bottomPadding) {
-    // 🌟 3. ถ้าสถานะไม่ใช่ in_progress ให้ซ่อนปุ่มไปเลย 
+    if (_isLoading) return const SizedBox.shrink();
+
+    // 🌟 3. ถ้าสถานะไม่ใช่ in_progress ให้แสดงแถบบอกว่าสำเร็จหรือไม่
     if (_questStatus != 'in_progress') {
-      return const SizedBox.shrink(); // คืนค่าพื้นที่ว่างๆ แทนปุ่ม
+      bool isSuccess = _questStatus == 'completed';
+      Color textColor = isSuccess ? const Color(0xFF6CC732) : const Color(0xFFE74A4A);
+      String text = isSuccess ? 'ภารกิจสำเร็จ' : 'ภารกิจไม่สำเร็จ';
+
+      return Positioned(
+        bottom: bottomPadding + 30,
+        left: 0,
+        right: 0,
+        child: Center(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+          ),
+        ),
+      );
     }
     
     return Positioned(
@@ -613,16 +648,15 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
         );
 
         // 🌟 2. ยิง API (ใช้ completeNormalQuest สำหรับเควสทั่วไป)
-        final apiRewards = await ApiService.completeNormalQuest(widget.questId!);
+        final result = await ApiService.completeNormalQuest(widget.questId!);
 
         // ปิด Loading
-        if (mounted) {
-          Navigator.pop(context);
-        }
+        if (mounted) Navigator.pop(context);
 
-        // 🌟 3. ถ้า API ทำงานสำเร็จ (apiRewards ไม่ใช่ null)
-        if (apiRewards != null && mounted) {
-          
+        // 🌟 3. ถ้า API ทำงานสำเร็จ (result ไม่ใช่ null)
+        if (result != null && mounted) {
+          final apiRewards = (result['rewards'] as List?) ?? [];
+
           // 🌟 เช็คว่ามีของรางวัลให้โชว์หรือไม่
           if (apiRewards.isNotEmpty) {
             List<RewardData> popupRewards = apiRewards.map<RewardData>((rw) {
@@ -630,31 +664,67 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
                 type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM',
                 amount: rw['added'],
                 itemName: rw['name'],
-                itemImage: rw['image'], 
+                itemImage: rw['image'],
               );
             }).toList();
 
-            // ใช้ await หยุดรอจนกว่าผู้ใช้จะกดปิด Popup รับของรางวัล
             await RewardPopup.show(context, rewards: popupRewards);
           } else {
-            // 🌟 กรณีที่ทำสำเร็จแต่ไม่มีของรางวัล (เช่น สร้างตอนตั๋วหมด) ให้แจ้งเตือนสีเขียวแทน
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('ทำภารกิจสำเร็จ!'),
                 backgroundColor: Colors.green,
               ),
             );
-            // หน่วงเวลาให้ผู้ใช้อ่าน SnackBar แป๊บนึงก่อนเด้งออก
             await Future.delayed(const Duration(seconds: 1));
           }
 
-          // 🌟 5. เด้งกลับหน้า All Quest พร้อมส่งค่า true ไปรีเฟรช
+          // 🌟 แสดง Level Up Popup ถ้าต้องการ
+          print("[DEBUG] Normal Quest result: leveled_up=${result['leveled_up']}, base=${result['base_level']}, new=${result['new_level']}");
+          if (mounted && result['leveled_up'] == true) {
+            final baseLv = result['base_level'] as int? ?? 0;
+            final newLv  = result['new_level']  as int? ?? 0;
+            
+            // 🌟 ตรวสอบการเปลี่ยนร่างโดยใช้ Model Group (Kid: 0, Teen: 1, Adult: 2)
+            int getModelGroup(int lv) {
+              if (lv >= 30) return 2;
+              if (lv >= 15) return 1;
+              return 0;
+            }
+            final isEvolution = getModelGroup(newLv) > getModelGroup(baseLv);
+
+            // 🌟 รีเฟรช Profile ก่อนโชว์ Popup เพื่อให้มีข้อมูลล่าสุด
+            final freshUser = await ApiService.getProfile(0);
+
+            if (isEvolution && mounted) {
+              // 1. ถ้าถึงเกณฑ์วิวัฒนาการ โชว์ CharacterUpPopup ทันที (มีข้อมูลเลเวลด้านบนอยู่แล้ว)
+              await CharacterUpPopup.show(
+                context,
+                baseLevel: baseLv,
+                newLevel: newLv,
+                user: freshUser ?? widget.user,
+                onTapContinue: () {},
+              );
+            } else if (mounted) {
+              // 2. ถ้าเลเวลอัปปกติ ค่อยโชว์ LevelUpPopup แบบเดิม
+              await LevelUpPopup.show(
+                context,
+                baseLevel: baseLv,
+                newLevel: newLv,
+                onTapContinue: () {},
+              );
+            }
+          } else if (mounted) {
+            // กรณีไม่เลเวลอัพ ก็ควรดึง Profile ใหม่ไว้เผื่อ (เช่น ได้ EXP เพิ่มแต่ไม่ข้ามเวล)
+            await ApiService.getProfile(0);
+          }
+
+          // 🌟 เด้งกลับหน้า All Quest พร้อมส่งค่า true ไปรีเฟรช
           if (mounted) {
             Navigator.pop(context, true); 
           }
-
         } else {
-          // ❌ กรณีส่งล้มเหลว (apiRewards เป็น null จริงๆ)
+          // ❌ กรณีส่งล้มเหลว (result เป็น null จริงๆ)
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
