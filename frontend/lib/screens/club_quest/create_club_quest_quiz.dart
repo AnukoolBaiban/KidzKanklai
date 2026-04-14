@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/api_service.dart';
-import 'package:flutter_application_1/screens/lobby.dart';
+import 'package:flutter_application_1/screens/club_room_head.dart';
 import 'package:flutter_application_1/widgets/custom_top_bar.dart';
-import 'package:flutter_application_1/widgets/quest_info_card.dart';
+import 'package:flutter_application_1/screens/club_quest/club_quest_detail_leader.dart';
 import 'package:flutter_application_1/widgets/confirm_exit_popup.dart';
+import 'package:flutter_application_1/widgets/edit_club_quest_popup.dart';
 import 'package:flutter_application_1/widgets/club_confirm_save_popup.dart';
-import 'package:flutter_application_1/widgets/annotation_normal.dart';
+import '../../widgets/exit_edit_club_quest_popup.dart';
 
 class QuizQuestion {
   TextEditingController textController = TextEditingController();
@@ -25,23 +26,25 @@ class QuizQuestion {
   }
 }
 
-class CreateClubQuestScreen extends StatefulWidget {
+class CreateClubQuestQuizScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
   final Function(Map<String, dynamic>) onSubmit;
   final User? user;
+  final bool isEditing;
 
-  const CreateClubQuestScreen({
+  const CreateClubQuestQuizScreen({
     Key? key,
     required this.onSubmit,
     this.initialData,
     this.user,
+    this.isEditing = false,
   }) : super(key: key);
 
   @override
-  _CreateClubQuestScreenState createState() => _CreateClubQuestScreenState();
+  _CreateClubQuestQuizScreenState createState() => _CreateClubQuestQuizScreenState();
 }
 
-class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
+class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
   bool _isPressed = false;
   bool _showQuestInfo = false;
 
@@ -70,6 +73,23 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
       _nameController.text = widget.initialData!['name'] ?? '';
       _detailController.text = widget.initialData!['detail'] ?? '';
       _selectedDate = widget.initialData!['date'];
+      _minScore = widget.initialData!['minScore'] ?? 1;
+
+      if (widget.initialData!['questions'] != null) {
+        final List<dynamic> questionsData = widget.initialData!['questions'];
+        _questions = questionsData.map((qData) {
+          final q = QuizQuestion();
+          q.textController.text = qData['question'] ?? '';
+          if (qData['options'] != null) {
+            final List<dynamic> options = qData['options'];
+            for (int i = 0; i < options.length && i < 4; i++) {
+              q.optionControllers[i].text = options[i] ?? '';
+            }
+          }
+          q.correctOptionIndex = qData['correctOptionIndex'] ?? 0;
+          return q;
+        }).toList();
+      }
     }
   }
 
@@ -178,24 +198,13 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final topPadding = MediaQuery.of(context).padding.top;
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     final topBarHeight = 75.0 + topPadding;
     final headerHeight = 80.0;
 
     // ignore: deprecated_member_use
     return WillPopScope(
-      onWillPop: () async {
-        // เมื่อกดปุ่ม back → แสดง ConfirmExitPopup
-        await ClubConfirmSavePopup.show(
-          context,
-          onConfirm: () {
-            Navigator.pop(context); // ปิด popup
-            Navigator.pop(context); // ออกจากหน้า (ไม่บันทึก)
-          },
-        );
-        return false; // ไม่ให้กลับทันที
-      },
+      onWillPop: () async => true,
       child: Scaffold(
         body: Stack(
           children: [
@@ -225,17 +234,6 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
                   children: [
                     const SizedBox(height: 10),
 
-                    _buildTextField(
-                      controller: _nameController,
-                      hintText: 'ชื่อภารกิจ',
-                    ),
-
-                    SizedBox(height: 24),
-
-                    // เนื้อหา (อยู่นอกกล่อง)
-                    _buildSectionTitle('เนื้อหา'),
-                    SizedBox(height: 8),
-
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.8),
@@ -245,14 +243,6 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildDatePicker(),
-
-                          _buildDetailTextField(),
-                          SizedBox(height: 16),
-
-                          _buildCameraButton(),
-                          SizedBox(height: 24),
-
                           _buildQuizSection(),
                           SizedBox(height: 32),
 
@@ -303,6 +293,7 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
         color: Colors.black.withOpacity(0.4),
         alignment: Alignment.bottomCenter,
         child: CustomTopBar(
+          // user: widget.user,
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
           onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
@@ -339,17 +330,7 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
 
         setState(() => _isPressed = false);
 
-        ConfirmExitPopup.show(
-          context,
-          onConfirm: () {
-            Navigator.pop(context);
-
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => LobbyScreen(user: widget.user)),
-            );
-          },
-        );
+        Navigator.pop(context);
       },
       child: Image.asset(
         _isPressed
@@ -387,10 +368,10 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
             ),
 
             /// Title (อยู่กลางจริง)
-            const Positioned.fill(
+            Positioned.fill(
               child: Center(
                 child: Text(
-                  "สร้างภารกิจชมรม",
+                  widget.isEditing ? "แก้ไขภารกิจชมรม" : "สร้างภารกิจชมรม",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 32,
@@ -416,314 +397,41 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
       ),
     );
   }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String hintText,
+  Widget _buildScoreButton({
+    required IconData icon,
+    required bool enabled,
+    required VoidCallback onTap,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: Color(0xFF9DD0E7), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(10),
-                topRight: Radius.circular(10),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'ชื่อภารกิจ',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF002A50),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          TextField(
-            controller: controller,
-            decoration: InputDecoration(
-              hintText: hintText,
-              hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-              suffixIcon: Padding(
-                padding: EdgeInsets.all(15),
-                child: Image.asset(
-                  'assets/images/icon/iconEdit.png',
-                  width: 15,
-                  height: 15,
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
-            style: TextStyle(fontSize: 14, color: Color(0xFF002A50)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDatePicker() {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-      child: Align(
-        alignment: Alignment.centerRight,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'วันที่สิ้นสุด',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF002A50),
-              ),
-            ),
-            SizedBox(width: 12),
-
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Color(0xFFE6F3F9),
-                borderRadius: BorderRadius.circular(5),
-              ),
-              child: Text(
-                _selectedDate != null
-                    ? '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}'
-                    : '--/--/----',
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-              ),
-            ),
-
-            InkWell(
-              onTap: _selectDate,
-              child: Container(
-                padding: EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF75C6EA), Color(0xFF9DD0E7)],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-                child: Image.asset(
-                  'assets/images/icon/icon-calendar.png',
-                  width: 22,
-                  height: 22,
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailTextField() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Color(0xFF9DD0E7), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(10),
-                topRight: Radius.circular(10),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'รายละเอียด',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF002A50),
-                  ),
-                ),
-                Image(
-                  image: AssetImage('assets/images/icon/iconEdit.png'),
-                  width: 20,
-                  height: 20,
-                ),
-              ],
-            ),
-          ),
-
-          TextField(
-            controller: _detailController,
-            maxLines: 6,
-            decoration: InputDecoration(
-              hintText: 'รายละเอียด',
-              hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.all(16),
-            ),
-            style: TextStyle(fontSize: 14, color: Colors.black87),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCameraButton() {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: _hasImage ? _buildImagePreview() : _buildCameraIcon(),
-    );
-  }
-
-  Widget _buildCameraIcon() {
-    return InkWell(
-      onTap: _handleImagePick,
-      child: Container(
-        width: 60,
-        height: 60,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF68E2FA), Color(0xFF2374B5)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Color(0xFF64B5F6).withOpacity(0.4),
-              blurRadius: 8,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Center(
-          child: Image.asset(
-            'assets/images/icon/icon-camera.png',
-            width: 55,
-            height: 55,
-            fit: BoxFit.contain,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildImagePreview() {
     return GestureDetector(
-      onTap: () {
-        _handleImagePick();
-      },
-      child: Container(
-        width: 800,
-        height: 500,
+      onTap: enabled ? onTap : null,
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 200),
+        width: 44,
+        height: 44,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Color(0xFF9DD0E7), width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: Offset(0, 4),
-            ),
-          ],
+          shape: BoxShape.circle,
+          gradient: enabled
+              ? LinearGradient(
+                  colors: [Color(0xFF556AEB), Color(0xFF59ABEC)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: enabled ? null : Color(0xFFD0D0D0),
+          boxShadow: enabled
+              ? [
+                  BoxShadow(
+                    color: Color(0xFF556AEB).withOpacity(0.35),
+                    blurRadius: 8,
+                    offset: Offset(0, 3),
+                  ),
+                ]
+              : [],
         ),
-        child: Stack(
-          children: [
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.image, size: 60, color: Color(0xFF64B5F6)),
-                  SizedBox(height: 8),
-                  Text(
-                    'รูปภาพที่เลือก',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                  ),
-                ],
-              ),
-            ),
-
-            Positioned(
-              top: 8,
-              left: 8,
-              right: 8,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'รูปภาพ',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF002A50),
-                    ),
-                  ),
-
-                  Spacer(),
-
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _hasImage = false;
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('ลบรูปภาพแล้ว'),
-                          backgroundColor: Colors.orange,
-                          duration: Duration(seconds: 1),
-                        ),
-                      );
-                    },
-                    child: Icon(
-                      Icons.close,
-                      color: Color(0xFF447199),
-                      size: 28,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        child: Icon(
+          icon,
+          color: enabled ? Colors.white : Colors.white60,
+          size: 22,
         ),
       ),
     );
@@ -748,79 +456,6 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
               fontWeight: FontWeight.bold,
               color: Colors.black87,
             ),
-          ),
-        ),
-        SizedBox(height: 8),
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Color(0xFF9DD0E7), width: 1),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'คะแนนขั้นต่ำเพื่อผ่านภารกิจ',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              Row(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      if (_minScore > 1) {
-                        setState(() => _minScore--);
-                      }
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Text(
-                        '<',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.black87,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Container(
-                    width: 30,
-                    height: 25,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Color(0xFF9DD0E7), width: 1),
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    child: Text('$_minScore', style: TextStyle(fontSize: 14)),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      if (_minScore < _questions.length) {
-                        setState(() => _minScore++);
-                      }
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Text(
-                        '>',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.black87,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
           ),
         ),
         SizedBox(height: 8),
@@ -870,6 +505,82 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
                 ),
               ),
             ),
+          ),
+        ),
+        SizedBox(height: 15),
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: Color(0xFF9DD0E7), width: 1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'คะแนนขั้นต่ำเพื่อผ่านภารกิจ',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF002A50),
+                ),
+              ),
+              SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // ปุ่ม ลด (-)
+                  _buildScoreButton(
+                    icon: Icons.remove,
+                    enabled: _minScore > 1,
+                    onTap: () {
+                      if (_minScore > 1) setState(() => _minScore--);
+                    },
+                  ),
+                  SizedBox(width: 16),
+                  // แสดงคะแนน
+                  Container(
+                    width: 70,
+                    height: 50,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Color(0xFFEAF4FB),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Color(0xFF9DD0E7), width: 1.5),
+                    ),
+                    child: Text(
+                      '$_minScore',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF002A50),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 16),
+                  // ปุ่ม เพิ่ม (+)
+                  _buildScoreButton(
+                    icon: Icons.add,
+                    enabled: _minScore < _questions.length,
+                    onTap: () {
+                      if (_minScore < _questions.length) setState(() => _minScore++);
+                    },
+                  ),
+                ],
+              ),
+              SizedBox(height: 6),
+              Center(
+                child: Text(
+                  'สูงสุด ${_questions.length} คะแนน',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -1042,29 +753,37 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
       ],
     );
   }
-
   Widget _buildCancelButton() {
     return Container(
       decoration: BoxDecoration(
-        color: Color(0xFFEA4444),
+        color: Color(0xFFE94444),
         borderRadius: BorderRadius.circular(25),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.red.withOpacity(0.3),
-            blurRadius: 8,
-            offset: Offset(0, 4),
-          ),
-        ],
       ),
       child: ElevatedButton(
         onPressed: () {
-          ConfirmExitPopup.show(
-            context,
-            onConfirm: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-            },
-          );
+          if (widget.isEditing) {
+            ExitEditClubQuestPopup.show(
+              context,
+              onConfirm: () {
+                Navigator.pop(context);
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => ClubQuestDetailLeaderScreen()),
+                );
+              },
+            );
+          } else {
+            ConfirmExitPopup.show(
+              context,
+              onConfirm: () {
+                Navigator.pop(context);
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => ClubRoomHeadScreen()),
+                );
+              },
+            );
+          }
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
@@ -1079,7 +798,7 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: Color(0xFFFFFFFF),
           ),
         ),
       ),
@@ -1105,13 +824,23 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
       ),
       child: ElevatedButton(
         onPressed: () {
-          ClubConfirmSavePopup.show(
-            context,
-            onConfirm: () {
-              Navigator.pop(context);
-              _submit();
-            },
-          );
+          if (widget.isEditing) {
+            EditClubQuestPopup.show(
+              context,
+              onConfirm: () {
+                Navigator.pop(context);
+                _submit();
+              },
+            );
+          } else {
+            ClubConfirmSavePopup.show(
+              context,
+              onConfirm: () {
+                Navigator.pop(context);
+                _submit();
+              },
+            );
+          }
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,

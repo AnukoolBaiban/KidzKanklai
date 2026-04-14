@@ -18,6 +18,8 @@ import 'screens/notification.dart';
 import 'screens/achievement.dart';
 import 'screens/lootbox_screen.dart';
 import 'screens/map.dart';
+import 'screens/club.dart';
+import 'screens/club-create.dart';
 import 'screens/gasha.dart';
 import 'screens/club_screen.dart';
 import 'screens/setting.dart';
@@ -26,7 +28,10 @@ import 'screens/loading.dart';
 import 'screens/me.dart';
 import 'screens/fashion.dart';
 import 'screens/create_normal_quest.dart';
-import 'screens/create_club_quest.dart';
+import 'screens/club_quest/create_club_quest.dart';
+import 'screens/club_quest/club_quest_detail_member.dart';
+import 'screens/club_quest/club_quest_detail_leader.dart';
+import 'screens/club_room_head.dart';
 import 'screens/quest_detail.dart';
 import 'config/rive_cache.dart';
 import 'config/user_pose_provider.dart';
@@ -112,6 +117,8 @@ class KidzKanklaiApp extends StatelessWidget {
         '/achievement': (context) => const AchievementScreen(),
         '/lootbox': (context) => const LootboxScreen(),
         '/map': (context) => const MapScreen(),
+        '/club': (context) => const Club(),
+        '/club-create': (context) => const ClubCreateScreen(),
         '/gasha': (context) => const GashaScreen(),
         '/club': (context) => const ClubScreen(),
         '/createclubquest': (context) => CreateClubQuestScreen(
@@ -137,6 +144,8 @@ class KidzKanklaiApp extends StatelessWidget {
             );
           },
         ),
+        '/clubquestdetail': (context) => const ClubQuestDetailLeaderScreen(),
+        '/clubroom': (context) => const ClubRoomHeadScreen(),
         '/startgame': (context) => const StartGameScreen(),
         '/load': (context) => const LoadingScreen(),
       },
