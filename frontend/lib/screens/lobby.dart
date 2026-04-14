@@ -206,7 +206,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                         Navigator.pushNamed(context, '/map').then((_) => _onReturnFromOtherPage());
                         break;
                       case 3:
-                        Navigator.pushNamed(context, '/club');
+                        Navigator.pushNamed(context, '/club').then((_) => _onReturnFromOtherPage());
                         break;
                     }
                   },

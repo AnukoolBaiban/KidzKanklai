@@ -21,7 +21,6 @@ import 'screens/map.dart';
 import 'screens/club.dart';
 import 'screens/club-create.dart';
 import 'screens/gasha.dart';
-import 'screens/club_screen.dart';
 import 'screens/setting.dart';
 import 'screens/startgame.dart';
 import 'screens/loading.dart';
@@ -120,7 +119,6 @@ class KidzKanklaiApp extends StatelessWidget {
         '/club': (context) => const Club(),
         '/club-create': (context) => const ClubCreateScreen(),
         '/gasha': (context) => const GashaScreen(),
-        '/club': (context) => const ClubScreen(),
         '/createclubquest': (context) => CreateClubQuestScreen(
           onSubmit: (data) {
             // บันทึกข้อมูลภารกิจ
