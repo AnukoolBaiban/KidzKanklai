@@ -373,3 +373,249 @@ class _BubblePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
+
+// ============================================================
+// CountdownCharacterWidget
+// ตัวละคร Rive เฉพาะหน้า Countdown — ใช้ ScreenMode = 1
+// Fashion ตรงกับ CharacterWidget ทุกประการ แต่มีท่าพิเศษ:
+//   AutoSleepy   – idle 15 นาที
+//   Tapcharacter – แตะ (Cheerup, ไม่ขึ้นกับ Face)
+//   MissionWin   – เควสสำเร็จ
+//   MissionLose  – เควสล้มเหลว / ยอมแพ้
+// ============================================================
+class CountdownCharacterWidget extends StatefulWidget {
+  final User? user;
+  final double width;
+  final double height;
+  final String? initialAction; // 'Win' or 'Lose'
+
+  const CountdownCharacterWidget({
+    super.key,
+    this.user,
+    this.width = 260,
+    this.height = 260,
+    this.initialAction,
+  });
+
+  @override
+  State<CountdownCharacterWidget> createState() =>
+      CountdownCharacterWidgetState();
+}
+
+class CountdownCharacterWidgetState extends State<CountdownCharacterWidget> {
+  // ── Rive ────────────────────────────────────────────────────
+  StateMachineController? _controller;
+  bool _isRiveLoaded = false;
+
+  // ── Fashion inputs (เหมือน CharacterWidget ทุกประการ) ──────
+  SMINumber? _screenModeInput;
+  SMINumber? _poseInput;
+  SMINumber? _hairInput;
+  SMINumber? _skinInput;
+  SMINumber? _faceInput;
+  SMINumber? _clothInput;
+
+  // ── Countdown-exclusive triggers ────────────────────────────
+  SMITrigger? _autoSleepyInput;
+  SMITrigger? _tapcharacterInput;
+  SMITrigger? _missionWinInput;
+  SMITrigger? _missionLoseInput;
+
+  // ── Sleepy idle timer ────────────────────────────────────────
+  Timer? _sleepyTimer;
+  static const Duration _sleepyInterval = Duration(seconds: 15);
+
+  @override
+  void dispose() {
+    _sleepyTimer?.cancel();
+    super.dispose();
+  }
+
+  // ── Asset (เหมือน CharacterWidget) ───────────────────────────
+  String _getModelAsset() {
+    final u = widget.user;
+    if (u != null) {
+      final bt = u.bodyType.toUpperCase();
+      if (bt == 'ADULT') return 'assets/animation/adult.riv';
+      if (bt == 'TEEN')  return 'assets/animation/teen.riv';
+      return 'assets/animation/kid.riv';
+    }
+    final lv = u?.level ?? 1;
+    if (lv >= 30) return 'assets/animation/adult.riv';
+    if (lv >= 15) return 'assets/animation/teen.riv';
+    return 'assets/animation/kid.riv';
+  }
+
+  // ── Fashion value parser (เหมือน CharacterWidget) ────────────
+  double _parseId(String s) {
+    if (s.isEmpty) return 0;
+    if (s.contains('_')) {
+      try { return double.parse(s.split('_').last); } catch (_) {}
+    }
+    if (s.startsWith('Hair Style ')) {
+      try { return double.parse(s.replaceAll('Hair Style ', '')); } catch (_) {}
+    }
+    try { return double.parse(s); } catch (_) { return 0; }
+  }
+
+  void _updateFashionInputs() {
+    final u = widget.user;
+    if (u == null) return;
+    if (_hairInput  != null) _hairInput!.value  = _parseId(u.equippedHair);
+    if (_faceInput  != null) _faceInput!.value  = _parseId(u.equippedFace);
+    if (_skinInput  != null) _skinInput!.value  = _parseId(u.equippedSkin);
+    if (_clothInput != null) _clothInput!.value = _parseId(u.equippedOutfit);
+  }
+
+  // ── Rive Init ─────────────────────────────────────────────────
+  void _onRiveInit(Artboard artboard) {
+    var controller = StateMachineController.fromArtboard(
+      artboard, 'State Machine 1',
+    );
+    if (controller == null && artboard.stateMachines.isNotEmpty) {
+      controller = StateMachineController.fromArtboard(
+        artboard, artboard.stateMachines.first.name,
+      );
+    }
+    if (controller == null) return;
+
+    artboard.addController(controller);
+    _controller = controller;
+
+    // [DEBUG] print all inputs
+    debugPrint('===== COUNTDOWN RIVE INPUTS [${_getModelAsset()}] =====');
+    for (var input in controller.inputs) {
+      debugPrint('  - ${input.name} (${input.runtimeType})');
+    }
+    debugPrint('=======================================================');
+
+    for (var input in controller.inputs) {
+      switch (input.name) {
+        case 'ScreenMode':
+          if (input is SMINumber) _screenModeInput = input;
+          break;
+        case 'Pose':
+          if (input is SMINumber) _poseInput = input;
+          break;
+        case 'HairID':
+          if (input is SMINumber) _hairInput = input;
+          break;
+        case 'SkinID':
+          if (input is SMINumber) _skinInput = input;
+          break;
+        case 'FaceID':
+          if (input is SMINumber) _faceInput = input;
+          break;
+        case 'OutfitID':
+          if (input is SMINumber) _clothInput = input;
+          break;
+        case 'AutoSleepy':
+          if (input is SMITrigger) _autoSleepyInput = input;
+          break;
+        case 'Tapcharacter':
+          if (input is SMITrigger) _tapcharacterInput = input;
+          break;
+        case 'MissionWin':
+          if (input is SMITrigger) _missionWinInput = input;
+          break;
+        case 'MissionLose':
+          if (input is SMITrigger) _missionLoseInput = input;
+          break;
+      }
+    }
+
+    // เซ็ต ScreenMode ทันที
+    _screenModeInput?.value = 1;
+    _updateFashionInputs();
+
+    // เล่นท่าใน popup ถ้าระบุไว้
+    if (widget.initialAction == 'Win') {
+      _missionWinInput?.fire();
+    } else if (widget.initialAction == 'Lose') {
+      _missionLoseInput?.fire();
+    }
+
+    setState(() {
+      _isRiveLoaded = true;
+    });
+
+    // เริ่ม timer สำหรับท่าทางหาว
+    _startSleepyTimer();
+  }
+
+  // ── Sleepy Timer ──────────────────────────────────────────────
+  void _startSleepyTimer() {
+    _sleepyTimer?.cancel();
+    _sleepyTimer = Timer(_sleepyInterval, () {
+      if (mounted) {
+        _autoSleepyInput?.fire();
+        _startSleepyTimer(); // วนซ้ำ
+      }
+    });
+  }
+
+  // ── Public API ────────────────────────────────────────────────
+
+  /// เล่นท่า Win เมื่อเควสสำเร็จ
+  void triggerWin() {
+    _missionWinInput?.fire();
+    _sleepyTimer?.cancel();
+  }
+
+  /// เล่นท่า Lose เมื่อเควสล้มเหลว / ยอมแพ้
+  void triggerLose() {
+    _missionLoseInput?.fire();
+    _sleepyTimer?.cancel();
+  }
+
+  /// เล่นท่า Cheerup เมื่อแตะ (ถูกเรียกจากข้างนอกที่ซ้อน overlay ไว้)
+  void triggerCheerup() {
+    _tapcharacterInput?.fire();
+    _startSleepyTimer(); // reset idle timer
+  }
+
+  // ── Build ─────────────────────────────────────────────────────
+  @override
+  Widget build(BuildContext context) {
+    // อัปเดต fashion ทุก build
+    _updateFashionInputs();
+
+    final asset = _getModelAsset();
+
+    return GestureDetector(
+      onTap: () {
+        _tapcharacterInput?.fire();
+        _startSleepyTimer(); // reset idle timer เมื่อแตะ
+      },
+      behavior: HitTestBehavior.translucent,
+      child: SizedBox(
+        width: widget.width,
+        height: widget.height,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            if (!_isRiveLoaded) const CircularProgressIndicator(),
+
+            if (RiveCache().getFile(asset) != null)
+              RiveAnimation.direct(
+                RiveCache().getFile(asset)!,
+                fit: BoxFit.contain,
+                antialiasing: false,
+                onInit: _onRiveInit,
+                stateMachines: const ['State Machine 1'],
+              )
+            else
+              RiveAnimation.asset(
+                asset,
+                fit: BoxFit.contain,
+                antialiasing: false,
+                onInit: _onRiveInit,
+                stateMachines: const ['State Machine 1'],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

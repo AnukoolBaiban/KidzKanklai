@@ -13,6 +13,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_application_1/widgets/reward_popup.dart';
 import 'package:flutter_application_1/widgets/level_up_popup.dart';
 import 'package:flutter_application_1/widgets/character_up_popup.dart';
+import 'package:flutter_application_1/widgets/character_widget.dart';
 import 'package:flutter_application_1/screens/setting.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 
@@ -29,6 +30,11 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
   // ==========================================
   // State Variables & Controllers
   // ==========================================
+
+  // GlobalKey เพื่อเรียก triggerWin/triggerLose จาก CountdownCharacterWidget
+  final GlobalKey<CountdownCharacterWidgetState> _characterKey =
+      GlobalKey<CountdownCharacterWidgetState>();
+
   bool _isPressed = false;
   final TextEditingController _detailController = TextEditingController();
   static const int _maxChars = 15;
@@ -45,6 +51,9 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
   int? _currentQuestId; // 🌟 เพิ่ม: เก็บ ID ของเควสที่เพิ่งสร้าง
   DateTime? _targetEndTime; // 🌟 เพิ่ม: เก็บเวลาสิ้นสุดที่ Server ตอบกลับมา
 
+  // 👤 User data (โหลดเองเพื่อได้ fashion ล่าสุดเสมอ)
+  User? _loadedUser;
+
   late AnimationController _blinkController;
   late Animation<double> _blinkAnimation;
 
@@ -52,6 +61,15 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
   void initState() {
     super.initState();
     _initBlinkAnimation();
+    _fetchUser();
+  }
+
+  /// โหลด user พร้อม fashion data ล่าสุดด้วยตัวเอง
+  Future<void> _fetchUser() async {
+    final user = await ApiService.getProfile(0);
+    if (mounted && user != null) {
+      setState(() => _loadedUser = user);
+    }
   }
 
   void _initBlinkAnimation() {
@@ -162,6 +180,9 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
   Future<void> _completeQuest() async {
     if (_currentQuestId == null) return;
 
+    // 🎉 เล่นท่า Win ก่อนยิง API
+    _characterKey.currentState?.triggerWin();
+
     setState(() => _isLoadingAPI = true);
     final result = await ApiService.completeInstantQuest(_currentQuestId!);
     setState(() => _isLoadingAPI = false);
@@ -181,7 +202,10 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
           );
         }).toList();
 
-        await RewardPopup.show(context, rewards: popupRewards);
+        await RewardPopup.show(
+          context, 
+          rewards: popupRewards,
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -271,6 +295,9 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
         context,
         onConfirm: () async {
           Navigator.pop(context); // ปิด Popup ยืนยัน
+
+          // 💔 เล่นท่า Lose ก่อน API
+          _characterKey.currentState?.triggerLose();
           
           if (_currentQuestId != null) {
             // ยิง API บอก Backend ว่าขอยอมแพ้
@@ -336,6 +363,40 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
           children: [
             _buildBackground(),
 
+            // ── ตัวละคร (อยู่หลังโต๊ะ) ──────────────────────────────
+            Positioned(
+              // ร่างเด็กเล็กกว่า → ลงมาให้เห็นแค่ครึ่งตัวเหนือโต๊ะ
+              bottom: (() {
+                final bt = (_loadedUser ?? widget.user)
+                    ?.bodyType
+                    .toUpperCase() ?? '';
+                if (bt == 'KID') return bottomPadding + 75.0;
+                return bottomPadding + 60.0; // TEEN / ADULT
+              })(),
+              left: 0,
+              right: 0,
+              child: Center(
+                child: CountdownCharacterWidget(
+                  key: _characterKey,
+                  user: _loadedUser ?? widget.user,
+                  width: size.width * 1.1,
+                  height: size.width * 1.1,
+                ),
+              ),
+            ),
+
+            // ── โต๊ะ (อยู่หน้าตัวละคร สร้าง Depth) ─────────────────
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Image.asset(
+                'assets/images/background/Desk.png',
+                width: size.width,
+                fit: BoxFit.fitWidth,
+              ),
+            ),
+
             Column(
               children: [
                 _buildTopBar(topPadding),
@@ -355,6 +416,20 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
               left: 0,
               right: 0,
               child: Center(child: _buildStartButton(size, isSmallScreen)),
+            ),
+
+            // ── Overlay โซนกดตัวละครเพื่อให้เล่นท่า Cheerup (ดัก Tap ไว้หน้าสุด) ──
+            Positioned(
+              bottom: bottomPadding + 140, // อยู่เหนือโต๊ะและปุ่ม
+              left: size.width * 0.2, // กะขนาดให้พอดีตัวละครช่วงกลางจอ
+              right: size.width * 0.2,
+              height: size.width * 0.8, // สูงพอคลุมครึ่งตัวบนของตัวละคร
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () {
+                  _characterKey.currentState?.triggerCheerup();
+                },
+              ),
             ),
           ],
         ),
