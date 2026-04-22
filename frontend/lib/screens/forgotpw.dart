@@ -14,8 +14,6 @@ class ForgotPWScreen extends StatefulWidget {
 
 class _ForgotPWScreenState extends State<ForgotPWScreen> {
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _otpController = TextEditingController();
-  bool _isOtpSent = false;
   
   // เพิ่มตัวแปรสำหรับ Loading
   bool _isLoading = false; 
@@ -43,7 +41,6 @@ class _ForgotPWScreenState extends State<ForgotPWScreen> {
   @override
   void dispose() {
     _emailController.dispose();
-    _otpController.dispose();
     super.dispose();
   }
 
@@ -159,13 +156,22 @@ class _ForgotPWScreenState extends State<ForgotPWScreen> {
                               color: Colors.black,
                             ),
                           ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            "กรุณากรอกอีเมลของคุณ\nเพื่อรับลิงก์สำหรับตั้งรหัสผ่านใหม่",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey,
+                            ),
+                          ),
                           const SizedBox(height: 32),
 
                           // Email Input
                           TextField(
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
-                            textInputAction: TextInputAction.next,
+                            textInputAction: TextInputAction.done,
                             decoration: InputDecoration(
                               labelText: "อีเมล",
                               prefixIcon: Icon(Icons.email, color: primaryColor),
@@ -177,76 +183,6 @@ class _ForgotPWScreenState extends State<ForgotPWScreen> {
                               fillColor: Colors.grey[100],
                             ),
                           ),
-                          const SizedBox(height: 16),
-
-                          // OTP Input (คงไว้ตาม UI เดิม แต่ไม่ได้ใช้ Logic OTP)
-                          TextField(
-                            controller: _otpController,
-                            keyboardType: TextInputType.number,
-                            textInputAction: TextInputAction.done,
-                            decoration: InputDecoration(
-                              labelText: "รหัส OTP",
-                              prefixIcon: Icon(Icons.lock_clock, color: primaryColor),
-                              suffixIcon: SizedBox(
-                                height: 60, // Ensure it fills height
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    // แค่เปลี่ยน UI state ตามเดิม ไม่ยิง API
-                                    if (!_isOtpSent) {
-                                      setState(() {
-                                        _isOtpSent = true;
-                                      });
-                                    }
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: _isOtpSent ? Colors.white : Colors.black,
-                                    foregroundColor: _isOtpSent ? const Color(0xFF828587) : Colors.white,
-                                    elevation: 0,
-                                    padding: const EdgeInsets.symmetric(horizontal: 15),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: const BorderRadius.only(
-                                        topRight: Radius.circular(12),
-                                        bottomRight: Radius.circular(12),
-                                      ),
-                                      side: _isOtpSent
-                                          ? const BorderSide(color: Color(0xFFCED4DA))
-                                          : BorderSide.none,
-                                    ),
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                  child: const Text(
-                                    "ขอรหัส",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
-                              ),
-                              filled: true,
-                              fillColor: Colors.grey[100],
-                            ),
-                          ),
-                          
-                          if (_isOtpSent) ...[
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _isOtpSent = false;
-                                  });
-                                },
-                                child: Text(
-                                  "ยังไม่ได้รับรหัสใช่ไหม?",
-                                  style: TextStyle(color: primaryColor),
-                                ),
-                              ),
-                            ),
-                          ],
                           const SizedBox(height: 32),
 
                           // Reset Password Button (ปุ่มหลักในการส่งอีเมล)
