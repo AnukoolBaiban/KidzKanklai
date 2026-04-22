@@ -37,24 +37,48 @@ func GenerateWeeklyExams(c *gin.Context) {
 	}
 	defer tx.Rollback(ctx)
 
-	// 🌟 1. ตรวจสอบว่าสัปดาห์นี้มีการสร้างข้อสอบให้ผู้เล่นคนนี้ไปหรือยัง
-	// เช็คจากตาราง conduct ว่ามีข้อสอบที่ค้างอยู่ (pending) หรือ ทำสำเร็จแล้วในสัปดาห์นี้หรือไม่
-	var existingExams int
+	// 🌟 0. Lock แถวของผู้เล่นคนนี้ไว้ เพื่อบังคับให้ API ที่ยิงมารัวๆ ต้องเข้าคิวทีละคน (แก้ปัญหาบั๊กสร้างข้อสอบเบิ้ล 9 ข้อ)
+	var lockedID string
+	lockQuery := `SELECT id FROM public.user_profiles WHERE id = $1 FOR UPDATE`
+	err = tx.QueryRow(ctx, lockQuery, userID).Scan(&lockedID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to acquire user lock"})
+		return
+	}
+
+	// 🌟 1. ลบข้อสอบเก่าของสัปดาห์ที่แล้วทิ้ง 
+	// ลบออกจากตาราง exams โดยตรง (ข้อมูลใน conduct และ take จะโดนลบตามไปด้วยอัตโนมัติเพราะเราตั้ง ON DELETE CASCADE ไว้)
+	cleanupQuery := `
+		DELETE FROM public.exams 
+		WHERE id IN (
+			SELECT exam_id FROM public.conduct 
+			WHERE user_id = $1 
+			AND completed_date < date_trunc('week', current_date)
+		)
+	`
+	_, err = tx.Exec(ctx, cleanupQuery, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cleanup old exams"})
+		return
+	}
+
+	// 🌟 2. ตรวจสอบว่า "สัปดาห์นี้" มีการสร้างข้อสอบไปแล้วหรือยัง
+	// ตอน insert ครั้งแรก completed_date คือเวลาที่สร้างข้อสอบ เราเลยใช้ค่านี้มาเช็คได้เลย
+	var examsThisWeek int
 	checkQuery := `
 		SELECT COUNT(*) 
-		FROM public.conduct c
-		JOIN public.exams e ON c.exam_id = e.id
-		WHERE c.user_id = $1 
-		AND (c.status = 'pending' OR (c.status = 'completed' AND c.completed_date >= date_trunc('week', current_date)))
+		FROM public.conduct 
+		WHERE user_id = $1 
+		AND completed_date >= date_trunc('week', current_date)
 	`
-	err = tx.QueryRow(ctx, checkQuery, userID).Scan(&existingExams)
+	err = tx.QueryRow(ctx, checkQuery, userID).Scan(&examsThisWeek)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check existing exams"})
 		return
 	}
 
-	// ถ้ามีข้อสอบของสัปดาห์นี้อยู่แล้ว ให้ข้ามการสร้างไปเลย
-	if existingExams > 0 {
+	// 🌟 3. ถ้ามีข้อสอบของสัปดาห์นี้อยู่แล้ว ให้ข้ามการสร้างไปเลย
+	if examsThisWeek > 0 {
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
 			"message": "Weekly exams already generated",
@@ -373,6 +397,9 @@ func StartExam(c *gin.Context) {
 		// ถ้าสอบตก ให้ค้างสถานะ pending ไว้เหมือนเดิมเผื่อกดสอบซ้ำ
 	}
 
+	// 🌟 คำนวณ Level-Up และอัปเดต DB ก่อน Commit (เหมือน Quest)
+	baseLv, newLv, didLevel := CalculateLevelUp(ctx, tx, userID)
+
 	// ยืนยัน Transaction
 	if err := tx.Commit(ctx); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction commit failed"})
@@ -385,5 +412,8 @@ func StartExam(c *gin.Context) {
 		"pass_chance": passChance,
 		"roll_result": roll,
 		"rewards":     rewards,
+		"leveled_up":  didLevel,
+		"base_level":  baseLv,
+		"new_level":   newLv,
 	})
 }

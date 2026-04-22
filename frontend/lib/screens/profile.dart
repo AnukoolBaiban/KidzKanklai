@@ -634,7 +634,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   clipBehavior: Clip.hardEdge,
                   child: IgnorePointer(
                     child: Transform.translate(
-                      offset: const Offset(0, 20), // เลื่อนตัวละครลงมาให้เห็นไหล่
+                      offset: const Offset(2, 20), // เลื่อนตัวละครลงมาให้เห็นไหล่ และปรับแกน X ให้ตรงกลาง
                       child: Transform.scale(
                         scale: 1.6, // ซูมหน้า
                         child: RepaintBoundary( // แยก Layer ลดการวาดใหม่ของ UI
@@ -883,17 +883,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 width: 160,
                 child: _user == null 
                   ? const Center(child: CircularProgressIndicator()) 
-                  : (RiveCache().getFile(_getModelAsset()) != null 
-                      ? RiveAnimation.direct(
-                          RiveCache().getFile(_getModelAsset())!,
-                          fit: BoxFit.contain,
-                          onInit: _onRiveInit,
-                        )
-                      : RiveAnimation.asset(
-                          _getModelAsset(), 
-                          fit: BoxFit.contain,
-                          onInit: _onRiveInit,
-                        )),
+                  : Transform.translate(
+                      offset: Offset(0, _user!.bodyType.toUpperCase() == 'KID' ? 20 : 0),
+                      child: (RiveCache().getFile(_getModelAsset()) != null 
+                          ? RiveAnimation.direct(
+                              RiveCache().getFile(_getModelAsset())!,
+                              fit: BoxFit.contain,
+                              onInit: _onRiveInit,
+                            )
+                          : RiveAnimation.asset(
+                              _getModelAsset(), 
+                              fit: BoxFit.contain,
+                              onInit: _onRiveInit,
+                            )),
+                    ),
               ),
               const SizedBox(width: 12),
               Expanded(

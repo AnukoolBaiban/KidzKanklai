@@ -125,6 +125,8 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
 
   // 🌟 ฟังก์ชัน Submit ที่ปรับให้ยิง API จริง
   Future<void> _submit() async {
+    if (_isSubmitting) return; // Prevent double submission
+
     if (_nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

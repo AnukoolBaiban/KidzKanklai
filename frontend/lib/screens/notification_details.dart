@@ -143,7 +143,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Text(
-                                    '🏆 ความสำเร็จ',
+                                    'ความสำเร็จ',
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold,
@@ -165,7 +165,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Text(
-                                    '❌ ภารกิจล้มเหลว',
+                                    'ภารกิจล้มเหลว',
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold,
