@@ -320,7 +320,7 @@ class _CustomBottomNavigationBarState extends State<CustomBottomNavigationBar> {
                       clipBehavior: Clip.hardEdge,
                       child: IgnorePointer(
                         child: Transform.translate(
-                          offset: const Offset(0, 15), 
+                          offset: const Offset(2, 15), 
                           child: Transform.scale(
                             scale: 1.8,
                             child: RepaintBoundary(

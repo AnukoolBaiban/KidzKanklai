@@ -463,7 +463,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   Widget _buildNotificationCard(BuildContext context, NotificationModel item) {
     final isSelected = _selectedIds.contains(item.id);
-    final isFail = item.type.startsWith('quest_fail');
 
     return GestureDetector(
       onTap: () {
@@ -504,8 +503,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
               color: isSelected
                   ? const Color(0xFF90CAF9).withOpacity(0.5)
                   : !item.isRead
-                  ? (isFail ? const Color(0xFFF28282) : const Color(0xFF85C3DF))
-                  : (isFail ? const Color(0xFFF5B6B6) : const Color(0xFFBADEEE)),
+                      ? const Color(0xFF85C3DF)
+                      : const Color(0xFFBADEEE),
               borderRadius: BorderRadius.circular(12),
               border: isSelected
                   ? Border.all(color: const Color(0xFF1976D2), width: 2)

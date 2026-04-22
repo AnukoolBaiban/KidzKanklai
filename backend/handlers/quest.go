@@ -29,37 +29,67 @@ func CalculateLevelUp(ctx context.Context, tx pgx.Tx, userID uuid.UUID) (int, in
 	}
 
 	baseLevel := currentLevel
-	leveled := false
 
-	// Allow multiple level-ups in one go (e.g., huge EXP reward)
+	// 🌟 คำนวณเลเวลจากค่า Total EXP โดยอ้างอิงสูตรเดียวกับ frontend/profile.dart
+	calculatedLevel := 1
+	tempExp := currentExp
+
 	for {
-		threshold := 100 * currentLevel
-		if currentExp < threshold {
+		var req int
+		if calculatedLevel < 6 {
+			req = 40 * calculatedLevel
+		} else {
+			req = 200 + (calculatedLevel * calculatedLevel)
+		}
+
+		if tempExp < req {
 			break
 		}
-		currentExp -= threshold
-		currentLevel++
-		leveled = true
+		tempExp -= req
+		calculatedLevel++
 	}
 
-	if leveled {
+	// 🌟 ป้องกันเลเวลลดลง: ถ้าเคยเจอบั๊กหัก EXP ไปแล้ว EXP จะน้อยกว่าความเป็นจริง
+	if calculatedLevel < currentLevel {
+		// 🛠️ ซ่อมแซมแบบ Silent: เติม EXP ขั้นต่ำของเลเวลปัจจุบันให้เลย เพื่อให้หลอด EXP ฝั่งหน้าบ้านไม่ติดลบ
+		minExpRequired := 0
+		for i := 1; i < currentLevel; i++ {
+			if i < 6 {
+				minExpRequired += 40 * i
+			} else {
+				minExpRequired += 200 + (i * i)
+			}
+		}
+		
+		// อัปเดตชดเชย EXP ให้เต็มฐานของเลเวลนั้น
+		if currentExp < minExpRequired {
+			_, _ = tx.Exec(ctx, `UPDATE public.characters SET experience = $1 WHERE user_id = $2`, minExpRequired, userID)
+		}
+		
+		// เลเวลยังเท่าเดิม ถือว่าไม่ได้อัปเลเวลในรอบนี้
+		return baseLevel, currentLevel, false
+
+	} else if calculatedLevel > currentLevel {
 		// คำนวณ body_type ตามเลเวลใหม่
 		bodyType := "KID"
-		if currentLevel >= 30 {
+		if calculatedLevel >= 30 {
 			bodyType = "ADULT"
-		} else if currentLevel >= 15 {
+		} else if calculatedLevel >= 15 {
 			bodyType = "TEEN"
 		}
 
+		// 🌟 อัปเดตเฉพาะ level และ body_type (ห้ามหัก experience อีกเด็ดขาด!)
 		_, err = tx.Exec(ctx,
-			`UPDATE public.characters SET level = $1, experience = $2, body_type = $3 WHERE user_id = $4`,
-			currentLevel, currentExp, bodyType, userID)
+			`UPDATE public.characters SET level = $1, body_type = $2 WHERE user_id = $3`,
+			calculatedLevel, bodyType, userID)
 		if err != nil {
 			return baseLevel, baseLevel, false
 		}
+
+		return baseLevel, calculatedLevel, true
 	}
 
-	return baseLevel, currentLevel, leveled
+	return baseLevel, currentLevel, false
 }
 
 // ------------------------------------------------------------------------

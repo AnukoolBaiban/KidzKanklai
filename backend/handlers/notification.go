@@ -353,7 +353,7 @@ func ProcessQuestNotifications(ctx context.Context, userID uuid.UUID) {
 			
 			typeKey := fmt.Sprintf("quest_fail_%d", q.ID)
 			if !sentTypes[typeKey] {
-				createQuestNotification(ctx, userID, "ภารกิจล้มเหลว", fmt.Sprintf("หมดเวลาทำภารกิจ '%s' แล้ว ไว้รอบหน้าลองใหม่นะ", q.Name), typeKey, notifDueDate)
+				createQuestNotification(ctx, userID, "ภารกิจล้มเหลว ❌", fmt.Sprintf("หมดเวลาทำภารกิจ '%s' แล้ว ไว้รอบหน้าลองใหม่นะ", q.Name), typeKey, notifDueDate)
 			}
 		} else if remainingHours <= 1 {
 			// 1 hour
@@ -374,16 +374,23 @@ func ProcessQuestNotifications(ctx context.Context, userID uuid.UUID) {
 func createQuestNotification(ctx context.Context, userID uuid.UUID, title, detail, notifType string, dueDate time.Time) {
 	imgArg := "assets/images/icon/iconQuest.png"
 
-	// 1. Insert เข้า notifications table
+	// 1. Insert เข้า notifications table (ใช้ CTE ป้องกัน Race Condition)
 	var notifID int64
 	insertNotifQuery := `
-		INSERT INTO public.notifications (title, detail, type, image, start_date, due_date)
-		VALUES ($1, $2, $3, $4, NOW(), $5)
-		RETURNING id
+		WITH new_notif AS (
+			INSERT INTO public.notifications (title, detail, type, image, start_date, due_date)
+			SELECT $1, $2, $3, $4, NOW(), $5
+			WHERE NOT EXISTS (SELECT 1 FROM public.notifications WHERE type = $3)
+			RETURNING id
+		)
+		SELECT id FROM new_notif
+		UNION ALL
+		SELECT id FROM public.notifications WHERE type = $3
+		LIMIT 1;
 	`
 	err := configs.DB.QueryRow(ctx, insertNotifQuery, title, detail, notifType, imgArg, dueDate).Scan(&notifID)
 	if err != nil {
-		fmt.Printf("❌ [createQuestNotification] Failed to insert notification: %v\n", err)
+		fmt.Printf("❌ [createQuestNotification] Failed to insert/find notification: %v\n", err)
 		return
 	}
 

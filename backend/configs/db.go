@@ -50,6 +50,88 @@ func ConnectDB() {
 	}
 
 	log.Println("✅ Connected to Supabase DB via Connection Pool (Simple Protocol)")
+	
+	// ✅ 6. อัปเดตข้อมูลผู้เล่นเก่าโดยอัตโนมัติ (ให้ได้รับ/สวมใส่ Starter Item ใหม่)
+	EnsureStarterItemsForExistingUsers()
+}
+
+// ✅ [เพิ่มฟังก์ชันนี้] สำหรับแจกและสวมใส่ไอเทมเริ่มต้นให้ผู้เล่นปัจจุบันแบบอัตโนมัติ
+func EnsureStarterItemsForExistingUsers() {
+	if DB == nil {
+		return
+	}
+	ctx := context.Background()
+
+	// 1. Update the Stored Procedure for future new users (without dropping schema)
+	updateFuncSQL := `
+    CREATE OR REPLACE FUNCTION public.handle_new_user_character()
+    RETURNS trigger AS $$
+    DECLARE
+        char_id bigint;
+    BEGIN
+        INSERT INTO public.characters (user_id)
+        VALUES (new.id)
+        RETURNING id INTO char_id;
+        
+        INSERT INTO public.collect (user_id, item_id, quantity)
+        SELECT new.id, id, 1 
+        FROM public.items 
+        WHERE name LIKE '%_00' OR id IN (23, 27, 28, 29, 30, 31, 36)
+		ON CONFLICT (user_id, item_id) DO NOTHING;
+
+        INSERT INTO public.wear (character_id, item_id, type)
+        SELECT DISTINCT ON (c.name) char_id, i.id, c.name
+        FROM public.items i
+        JOIN public.categories c ON i.category_id = c.id
+        WHERE i.name LIKE '%_00' OR i.id IN (23, 27, 28, 29, 30, 31, 36)
+		ORDER BY c.name, (CASE WHEN i.id IN (23, 27, 28, 29, 30, 31, 36) THEN 1 ELSE 2 END)
+		ON CONFLICT (character_id, item_id) DO NOTHING;
+
+        RETURN new;
+    END;
+    $$ LANGUAGE plpgsql SECURITY DEFINER;
+	`
+	_, err := DB.Exec(ctx, updateFuncSQL)
+	if err != nil {
+		log.Printf("❌ Failed to update handle_new_user_character func: %v\n", err)
+	}
+
+	// 2. Give starter items to existing users (collect table)
+	giveCollectQuery := `
+		INSERT INTO public.collect (user_id, item_id, quantity)
+		SELECT u.id, i.id, 1
+		FROM public.user_profiles u
+		CROSS JOIN public.items i
+		WHERE i.id IN (23, 27, 28, 29, 30, 31, 36)
+		ON CONFLICT (user_id, item_id) DO NOTHING;
+	`
+	tag, err := DB.Exec(ctx, giveCollectQuery)
+	if err != nil {
+		log.Printf("❌ Failed to give starter items to existing users: %v\n", err)
+	} else {
+		log.Printf("✅ Given starter collect items to existing users (Rows affected: %d)\n", tag.RowsAffected())
+	}
+
+	// 3. Equip starter items for existing users (wear table)
+	giveWearQuery := `
+		INSERT INTO public.wear (character_id, item_id, type)
+		SELECT c.id, i.id, cat.name
+		FROM public.characters c
+		CROSS JOIN public.items i
+		JOIN public.categories cat ON i.category_id = cat.id
+		WHERE i.id IN (23, 27, 28, 29, 30, 31, 36)
+		  AND NOT EXISTS (
+			  SELECT 1 FROM public.wear w 
+			  WHERE w.character_id = c.id AND w.type = cat.name
+		  )
+		ON CONFLICT (character_id, item_id) DO NOTHING;
+	`
+	tag2, err := DB.Exec(ctx, giveWearQuery)
+	if err != nil {
+		log.Printf("❌ Failed to equip starter items to existing characters: %v\n", err)
+	} else {
+		log.Printf("✅ Equipped starter wear items to existing characters (Rows affected: %d)\n", tag2.RowsAffected())
+	}
 }
 
 // ✅ [เพิ่มฟังก์ชันนี้] สำหรับ Reset Database
@@ -403,18 +485,22 @@ const createSchemaSQL = `
         VALUES (new.id)
         RETURNING id INTO char_id;
         
-        -- 2. แจก Item เริ่มต้น (ชื่อลงท้ายด้วย _00) เข้ากระเป๋า User (Table: collect)
+        -- 2. แจก Item เริ่มต้น (ชื่อลงท้ายด้วย _00 และ item เสริม) เข้ากระเป๋า User (Table: collect)
         INSERT INTO public.collect (user_id, item_id, quantity)
         SELECT new.id, id, 1 
         FROM public.items 
-        WHERE name LIKE '%_00';
+        WHERE name LIKE '%_00' OR id IN (23, 27, 28, 29, 30, 31, 36)
+        ON CONFLICT (user_id, item_id) DO NOTHING;
 
         -- 3. สวมใส่ Item เริ่มต้น (Table: wear) ให้ Character ทันที
+        -- ใส่ทั้งแบบ _00 และไอเทมเริ่มต้นใหม่ตามที่ระบุ
         INSERT INTO public.wear (character_id, item_id, type)
-        SELECT char_id, i.id, c.name
+        SELECT DISTINCT ON (c.name) char_id, i.id, c.name
         FROM public.items i
         JOIN public.categories c ON i.category_id = c.id
-        WHERE i.name LIKE '%_00';
+        WHERE i.name LIKE '%_00' OR i.id IN (23, 27, 28, 29, 30, 31, 36)
+        ORDER BY c.name, (CASE WHEN i.id IN (23, 27, 28, 29, 30, 31, 36) THEN 1 ELSE 2 END)
+        ON CONFLICT (character_id, item_id) DO NOTHING;
 
         RETURN new;
     END;

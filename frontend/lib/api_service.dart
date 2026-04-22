@@ -135,11 +135,13 @@ class InventoryItem {
       return 0;
     }
 
+    // Backend /inventory returns "category", /equipped returns "type"
+    final category = (json['category'] ?? json['type'] ?? '') as String;
     return InventoryItem(
-      type: json['category'] ?? '',
+      type: category,
       id: json['id'].toString(),
       name: name,
-      category: json['category'] ?? '',
+      category: category,
       imagePath: json['image'] ?? '',
       riveId: parseRiveId(name),
     );
@@ -538,12 +540,11 @@ class ApiService {
       ApiService._checkUnauthorized(response.statusCode);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['rewards'];
+        return data;
       } else {
         print("Failed to complete system quest: ${response.body}");
         return null;
       }
-      return null;
     } catch (e) {
       print("API Error (completeSystemQuest): $e");
       return null;

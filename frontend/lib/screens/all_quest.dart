@@ -911,22 +911,30 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
 
     // --- 🌟 เรียงลำดับตามความสำคัญ ---
     /*
-      1. ภารกิจแนะนำ (อยู่บนสุด)
+      1. ภารกิจแนะนำ (ที่ยังไม่เสร็จ/ยังไม่กดรับรางวัล) อยู่บนสุด
       2. ภารกิจส่วนตัว (เรียงตามที่สร้างมาใหม่สุด startDate descending)
-      3. ภารกิจระบบ (อยู่เกือบสุด)
-      4. ภารกิจระบบที่สำเร็จแล้ว (อยู่ล่างสุด)
+      3. ภารกิจระบบที่พร้อมรับรางวัล
+      4. ภารกิจระบบที่ยังไม่เสร็จ
+      5. ภารกิจแนะนำที่เสร็จ/รับรางวัลแล้ว (ต่ำกว่าส่วนตัว แต่เหนือกว่าระบบที่เสร็จแล้ว)
+      6. ภารกิจระบบที่รับรางวัลแล้ว (อยู่ล่างสุด)
     */
     filteredQuests.sort((a, b) {
       int getRank(Map<String, dynamic> q) {
         bool isRec = q['isRecommended'] == true;
-        bool isSys = q['category'] == 'ระบบ';
+        bool isSys = q['category'] == 'ระบบ' && !isRec;
         bool isCmp = q['status'] == 'completed';
 
-        if (isRec) return 1; // แนะนำ
+        int progress = q['progress'] ?? 0;
+        int totalReq = q['totalReq'] ?? 1;
+        bool isReadyToClaim = progress >= totalReq;
+
+        if (isRec && !isCmp) return 1; // แนะนำ (กำลังทำ/พร้อมรับรางวัล)
         if (q['category'] == 'ส่วนตัว') return 2; // ส่วนตัว
-        if (isSys && !isCmp) return 3; // ระบบที่ยังไม่เสร็จ
-        if (isSys && isCmp) return 4; // ระบบที่เสร็จแล้ว
-        return 5;
+        if (isSys && !isCmp && isReadyToClaim) return 3; // ระบบที่พร้อมรับรางวัล
+        if (isSys && !isCmp && !isReadyToClaim) return 4; // ระบบที่ยังไม่เสร็จ
+        if (isRec && isCmp) return 5; // แนะนำที่ตั้งใจจะให้อยู่ตรงกลาง (สมบูรณ์แล้ว)
+        if (isSys && isCmp) return 6; // ระบบที่เสร็จแล้ว (สมบูรณ์แล้ว)
+        return 7;
       }
 
       int aRank = getRank(a);

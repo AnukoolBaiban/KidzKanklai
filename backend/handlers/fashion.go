@@ -144,6 +144,24 @@ func EquipItem(c *gin.Context) {
 		return
 	}
 
+	// อัปเดต characters table สำหรับ Skin และ Face (sync ข้อมูลเพิ่มเติม)
+	if categoryName == "Skin" || categoryName == "Face" {
+		var itemName string
+		_ = configs.DB.QueryRow(ctx, `SELECT name FROM public.items WHERE id = $1`, input.ItemID).Scan(&itemName)
+		if itemName != "" {
+			var colName string
+			if categoryName == "Skin" {
+				colName = "skin_color"
+			} else {
+				colName = "emotion"
+			}
+			_, _ = configs.DB.Exec(ctx,
+				"UPDATE public.characters SET "+colName+" = $1 WHERE user_id = $2",
+				itemName, userId,
+			)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Equipped successfully", "item_id": input.ItemID, "type": categoryName})
 }
 
@@ -156,7 +174,7 @@ func GetEquippedItems(c *gin.Context) {
 	}
 
 	query := `
-		SELECT i.id, i.name, i.image, w.type
+		SELECT i.id, i.name, COALESCE(i.image, ''), w.type
 		FROM public.wear w
 		JOIN public.items i ON w.item_id = i.id
 		JOIN public.characters ch ON w.character_id = ch.id

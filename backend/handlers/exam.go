@@ -397,6 +397,9 @@ func StartExam(c *gin.Context) {
 		// ถ้าสอบตก ให้ค้างสถานะ pending ไว้เหมือนเดิมเผื่อกดสอบซ้ำ
 	}
 
+	// 🌟 คำนวณ Level-Up และอัปเดต DB ก่อน Commit (เหมือน Quest)
+	baseLv, newLv, didLevel := CalculateLevelUp(ctx, tx, userID)
+
 	// ยืนยัน Transaction
 	if err := tx.Commit(ctx); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction commit failed"})
@@ -409,5 +412,8 @@ func StartExam(c *gin.Context) {
 		"pass_chance": passChance,
 		"roll_result": roll,
 		"rewards":     rewards,
+		"leveled_up":  didLevel,
+		"base_level":  baseLv,
+		"new_level":   newLv,
 	})
 }
