@@ -277,16 +277,14 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                   /// Status Rewards Box
                   _buildStatusRewardsBox(),
 
-                  if (true) ...[
+                  if (widget.locationName != 'สนามสอบ') ...[
                     SizedBox(height: 20),
                     EnergyBar(),
                     SizedBox(height: 20),
+                    /// Stat Box
+                    _buildStatBox(),
+                    SizedBox(height: 20),
                   ],
-
-                  /// Stat Box
-                  _buildStatBox(),
-
-                  SizedBox(height: 20),
                 ],
               ),
             ),
@@ -776,14 +774,14 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
 
   Widget _buildExamMap() {
     return SizedBox(
-      height: 380,
+      height: 420,
       width: double.infinity,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           // อาคารบนซ้าย (วิทย์)
           Positioned(
-            top: 40,
+            top: 150,
             left: 0,
             child: _buildExamBuilding(
               label: 'ตึกสอบวิทยาศาสตร์',
@@ -794,7 +792,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
           ),
           // อาคารบนขวา (คณิต)
           Positioned(
-            top: 0,
+            top: 40,
             right: 0,
             child: _buildExamBuilding(
               label: 'ตึกสอบคณิตศาสตร์',
@@ -806,7 +804,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
 
           // อาคารล่าง (อังกฤษ)
           Positioned(
-            top: 170,
+            top: 360,
             right: 30,
             child: _buildExamBuilding(
               label: 'ตึกสอบอังกฤษ',
@@ -826,51 +824,23 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
     required Map<String, int> stat,
     double width = 120,
   }) {
-    return GestureDetector(
+    return _ExamBuildingItem(
+      imagePath: image,
+      label: label,
+      width: width,
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) =>
-                ExamScreen(
-                  user: _user,
-                  locationName: label,
-                  locationImage: image,
-                  statusRewards: stat,
-                ),
+            builder: (_) => ExamScreen(
+              user: _user,
+              locationName: label,
+              locationImage: image,
+              statusRewards: stat,
+            ),
           ),
         );
       },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Image.asset(
-            image,
-            width: width,
-            fit: BoxFit.contain,
-          ),
-        ],
-      ),
     );
   }
 
@@ -1113,4 +1083,85 @@ class GradientCircularProgressPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(CustomPainter oldDelegate) => true;
+}
+
+class _ExamBuildingItem extends StatefulWidget {
+  final String imagePath;
+  final String label;
+  final double width;
+  final VoidCallback onTap;
+
+  const _ExamBuildingItem({
+    required this.imagePath,
+    required this.label,
+    required this.width,
+    required this.onTap,
+  });
+
+  @override
+  State<_ExamBuildingItem> createState() => _ExamBuildingItemState();
+}
+
+class _ExamBuildingItemState extends State<_ExamBuildingItem> {
+  bool _isHovered = false;
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = _isPressed ? 0.90 : (_isHovered ? 1.05 : 1.0);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapUp: (_) => setState(() => _isPressed = false),
+        onTapCancel: () => setState(() => _isPressed = false),
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: scale,
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeInOut,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                widget.imagePath,
+                width: widget.width,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: _isHovered ? 8 : 4,
+                      offset: Offset(0, _isHovered ? 4 : 2),
+                    )
+                  ],
+                ),
+                child: Text(
+                  widget.label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
