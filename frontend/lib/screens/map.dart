@@ -54,7 +54,7 @@ class _MapScreenState extends State<MapScreen> {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
     final titleFontSize = (size.width * 0.038).clamp(14.0, 18.0);
 
-    final topBarHeight = 75.0 + topPadding;
+    final topBarHeight = 60.0 + topPadding;
 
     return Scaffold(
       body: Stack(
@@ -272,10 +272,8 @@ class _MapScreenState extends State<MapScreen> {
       left: 0,
       right: 0,
       child: Container(
-        height: height,
         padding: EdgeInsets.only(top: topPadding),
         color: Colors.black.withOpacity(0.4),
-        alignment: Alignment.bottomCenter,
         child: CustomTopBar(
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
