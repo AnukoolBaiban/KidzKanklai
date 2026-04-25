@@ -243,6 +243,19 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
     }
   }
 
+  String _getModelAsset() {
+    if (_user != null) {
+      final bt = _user!.bodyType.toUpperCase();
+      if (bt == 'ADULT') return 'assets/animation/adult.riv';
+      if (bt == 'TEEN') return 'assets/animation/teen.riv';
+      return 'assets/animation/kid.riv';
+    }
+    int lvl = _level;
+    if (lvl >= 30) return 'assets/animation/adult.riv';
+    if (lvl >= 15) return 'assets/animation/teen.riv';
+    return 'assets/animation/kid.riv';
+  }
+
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
@@ -867,13 +880,30 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.all(8),
-                child: const CircleAvatar(
-                  radius: 54,
-                  backgroundImage: AssetImage(
-                    'assets/images/profile/profile_img.png',
-                  ),
-                ),
+                width: 114,
+                height: 114,
+                clipBehavior: Clip.antiAlias,
+                decoration: const BoxDecoration(shape: BoxShape.circle),
+                child: _user == null 
+                  ? const Center(child: CircularProgressIndicator()) 
+                  : Transform.scale(
+                      scale: 1.6,
+                      alignment: Alignment.center,
+                      child: Transform.translate(
+                        offset: Offset(1, _user!.bodyType.toUpperCase() == 'KID' ? 15 : 15),
+                        child: (RiveCache().getFile(_getModelAsset()) != null 
+                            ? RiveAnimation.direct(
+                                RiveCache().getFile(_getModelAsset())!,
+                                fit: BoxFit.contain,
+                                onInit: _onRiveInit,
+                              )
+                            : RiveAnimation.asset(
+                                _getModelAsset(), 
+                                fit: BoxFit.contain,
+                                onInit: _onRiveInit,
+                              )),
+                      ),
+                    ),
               ),
             ],
           ),
@@ -956,14 +986,17 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.black,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.black,
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 8),
