@@ -690,6 +690,9 @@ class _ContentArea extends StatelessWidget {
               selectedTab: selectedSubTab,
               onTabSelected: onSubTabSelected,
             ),
+            
+          if (selectedMainTab == 'หน้าตา' || selectedMainTab == 'ทรงผม')
+            const SizedBox(height: 20),
 
           // Main Content
           Expanded(

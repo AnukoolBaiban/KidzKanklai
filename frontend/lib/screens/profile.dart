@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_application_1/screens/lobby.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http; // เพิ่ม import นี้
@@ -718,10 +719,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(width: 5),
-              Image.asset(
-                'assets/images/icon/iconCopy.png',
-                width: 16,
-                height: 16,
+              GestureDetector(
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: _uid));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('คัดลอก UID เรียบร้อยแล้ว'),
+                      duration: Duration(seconds: 2),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(4.0),
+                  child: Image.asset(
+                    'assets/images/icon/iconCopy.png',
+                    width: 16,
+                    height: 16,
+                  ),
+                ),
               ),
             ],
           ),
@@ -879,8 +895,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               // [UPDATED] Show Rive Character
               SizedBox(
-                height: 160,
-                width: 160,
+                height: 140,
+                width: 140,
                 child: _user == null 
                   ? const Center(child: CircularProgressIndicator()) 
                   : Transform.translate(
@@ -946,14 +962,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.black,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.black,
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 8),
