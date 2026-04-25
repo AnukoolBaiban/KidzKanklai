@@ -360,12 +360,36 @@ class _AnimatedStatValueState extends State<AnimatedStatValue>
       builder: (context, child) {
         // ปัดเศษทศนิยมทิ้งให้เป็นจำนวนเต็ม
         int currentValue = _animation.value.round();
-        return Text(
-          "$currentValue ${widget.suffix}",
-          style: TextStyle( // 🌟 ลบคำว่า const ออกจากตรงนี้
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: widget.textColor, // 🌟 ตอนนี้จะหาเจอและใช้งานได้ปกติแล้ว
+        
+        // ถ้าค่าไม่เปลี่ยน ให้แสดงเลขเดียวเป็นสีตาม textColor
+        if (widget.startValue == widget.endValue) {
+          return Text(
+            "$currentValue ${widget.suffix}".trim(),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: widget.textColor,
+            ),
+          );
+        }
+
+        // 🌟 ปรับรูปแบบการแสดงผลเป็น "ค่าเก่า -> " (สีดำ) และ "ค่าใหม่" (สีตาม textColor)
+        return RichText(
+          text: TextSpan(
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+            children: [
+              TextSpan(
+                text: "${widget.startValue} -> ",
+                style: const TextStyle(color: Colors.black),
+              ),
+              TextSpan(
+                text: "$currentValue ${widget.suffix}".trim(),
+                style: TextStyle(color: widget.textColor),
+              ),
+            ],
           ),
         );
       },
