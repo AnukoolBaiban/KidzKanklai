@@ -56,6 +56,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
   StateMachineController? _controller;
   api.User? _user;
   bool _isRiveLoaded = false;
+  Map<String, String> _examStatuses = {}; // เก็บสถานะว่าสอบผ่านหรือยัง
 
   // Background paths สำหรับแต่ละสถานที่
   String get _backgroundPath {
@@ -80,6 +81,56 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
     super.initState();
     _fetchUserProfile();
     _fetchFullProfileForRive();
+    if (widget.locationName == 'สนามสอบ') {
+      _fetchExamStatuses();
+    }
+  }
+
+  Future<void> _fetchExamStatuses() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+
+      final conductData = await _supabase
+          .from('conduct')
+          .select('exam_id, status, exams(name)')
+          .eq('user_id', user.id)
+          .order('exam_id', ascending: false)
+          .limit(3);
+
+      debugPrint('📋 conductData: $conductData');
+
+      if (conductData != null && (conductData as List).isNotEmpty) {
+        Map<String, String> fetched = {};
+        for (var conduct in conductData) {
+          final exam = conduct['exams'];
+          if (exam == null) continue;
+          String dbName = exam['name'] ?? '';
+          String status = conduct['status'] ?? 'pending';
+          debugPrint('📋 exam name: "$dbName" | status: "$status"');
+          
+          // แมปชื่อตรงๆ จาก DB (ชื่อในฐานข้อมูลคือ ตึกสอบวิทยาศาสตร์, ตึกสอบคณิตศาสตร์, ตึกสอบอังกฤษ)
+          String key = '';
+          if (dbName.contains('วิทยาศาสตร์')) {
+            key = 'ตึกสอบวิทยาศาสตร์';
+          } else if (dbName.contains('คณิตศาสตร์')) {
+            key = 'ตึกสอบคณิตศาสตร์';
+          } else if (dbName.contains('อังกฤษ')) {
+            key = 'ตึกสอบอังกฤษ';
+          }
+          if (key.isNotEmpty) {
+            // ถ้าเคยมีสถานะเป็น completed แล้ว อย่าให้ pending ทับ
+            if (fetched[key] != 'completed') {
+              fetched[key] = status;
+            }
+          }
+        }
+        debugPrint('📋 fetched exam statuses: $fetched');
+        if (mounted) setState(() => _examStatuses = fetched);
+      }
+    } catch (e) {
+      debugPrint('Error fetching exam statuses: $e');
+    }
   }
 
   void _updateLevelUI(int dbLevel, int totalExp) {
@@ -787,6 +838,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
 
   Widget _buildExamMap() {
     return SizedBox(
+      key: ValueKey('exam-map-${_examStatuses.values.join('-')}'),
       height: 420,
       width: double.infinity,
       child: Stack(
@@ -801,6 +853,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
               image: 'assets/images/map/sci_building.png',
               stat: {'ความฉลาด': 1, 'ความแข็งแรง': 0, 'ความคิดสร้างสรรค์': 0},
               width: 140,
+              isPassed: _examStatuses['ตึกสอบวิทยาศาสตร์'] == 'completed',
             ),
           ),
           // อาคารบนขวา (คณิต)
@@ -812,6 +865,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
               image: 'assets/images/map/math_building.png',
               stat: {'ความฉลาด': 2, 'ความแข็งแรง': 0, 'ความคิดสร้างสรรค์': 0},
               width: 130,
+              isPassed: _examStatuses['ตึกสอบคณิตศาสตร์'] == 'completed',
             ),
           ),
 
@@ -824,6 +878,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
               image: 'assets/images/map/eng_building.png',
               stat: {'ความฉลาด': 1, 'ความแข็งแรง': 0, 'ความคิดสร้างสรรค์': 1},
               width: 160,
+              isPassed: _examStatuses['ตึกสอบอังกฤษ'] == 'completed',
             ),
           ),
         ],
@@ -836,13 +891,16 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
     required String image,
     required Map<String, int> stat,
     double width = 120,
+    bool isPassed = false,
   }) {
     return _ExamBuildingItem(
+      key: ValueKey('$label-$isPassed'), // บังคับ rebuild เมื่อสถานะเปลี่ยน
       imagePath: image,
       label: label,
       width: width,
-      onTap: () {
-        Navigator.push(
+      isPassed: isPassed,
+      onTap: () async {
+        final result = await Navigator.push<bool>(
           context,
           MaterialPageRoute(
             builder: (_) => ExamScreen(
@@ -853,6 +911,18 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
             ),
           ),
         );
+        debugPrint('📋 [location_upgrade] returned from ExamScreen with result: $result for $label');
+        // ถ้า ExamScreen ส่งค่า true กลับมา แปลว่าสอบผ่านแล้ว → อัปเดตสถานะทันที
+        if (mounted) {
+          if (result == true) {
+            setState(() {
+              _examStatuses[label] = 'completed';
+            });
+            debugPrint('📋 [location_upgrade] forcefully set $label to completed');
+          }
+          // ดึงข้อมูลล่าสุดจาก DB อีกครั้งเพื่อความถูกต้อง
+          await _fetchExamStatuses();
+        }
       },
     );
   }
@@ -1123,12 +1193,15 @@ class _ExamBuildingItem extends StatefulWidget {
   final String label;
   final double width;
   final VoidCallback onTap;
+  final bool isPassed;
 
   const _ExamBuildingItem({
+    super.key,
     required this.imagePath,
     required this.label,
     required this.width,
     required this.onTap,
+    this.isPassed = false,
   });
 
   @override
@@ -1159,10 +1232,42 @@ class _ExamBuildingItemState extends State<_ExamBuildingItem> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Image.asset(
-                widget.imagePath,
-                width: widget.width,
-                fit: BoxFit.contain,
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Image.asset(
+                    widget.imagePath,
+                    width: widget.width,
+                    fit: BoxFit.contain,
+                  ),
+                  // ✅ ติ๊กถูกบอกว่าสอบผ่านแล้ว
+                  if (widget.isPassed)
+                    Positioned(
+                      top: -5,
+                      right: -5,
+                      child: Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.check,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 6),
               Container(
@@ -1171,8 +1276,9 @@ class _ExamBuildingItemState extends State<_ExamBuildingItem> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: widget.isPassed ? Colors.green.shade50 : Colors.white,
                   borderRadius: BorderRadius.circular(8),
+                  border: widget.isPassed ? Border.all(color: Colors.green, width: 1.5) : null,
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black26,
@@ -1184,10 +1290,10 @@ class _ExamBuildingItemState extends State<_ExamBuildingItem> {
                 child: Text(
                   widget.label,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
-                    color: Colors.black,
+                    color: widget.isPassed ? Colors.green.shade800 : Colors.black,
                   ),
                 ),
               ),
