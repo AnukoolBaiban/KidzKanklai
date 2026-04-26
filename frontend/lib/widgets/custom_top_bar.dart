@@ -198,7 +198,7 @@ class _CustomTopBarState extends State<CustomTopBar> {
           const SizedBox(width: 8),
 
           // Notification Button
-          _buildTopBarIconButton(
+          TopBarIconButton(
             imagePath: 'assets/images/icon/icon-notification.png',
             showRedDot: _hasUnreadNotifications,
             onTap: () {
@@ -213,7 +213,7 @@ class _CustomTopBarState extends State<CustomTopBar> {
           const SizedBox(width: 8),
 
           // Settings Button
-          _buildTopBarIconButton(
+          TopBarIconButton(
             imagePath: 'assets/images/icon/icon-setting.png',
             onTap: () {
               if (widget.onSettingsTapped != null) {
@@ -265,15 +265,39 @@ class _CustomTopBarState extends State<CustomTopBar> {
       ),
     );
   }
+}
 
-  Widget _buildTopBarIconButton({
-    required String imagePath,
-    required VoidCallback onTap,
-    bool showRedDot = false,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+class TopBarIconButton extends StatefulWidget {
+  final String imagePath;
+  final VoidCallback onTap;
+  final bool showRedDot;
+
+  const TopBarIconButton({
+    Key? key,
+    required this.imagePath,
+    required this.onTap,
+    this.showRedDot = false,
+  }) : super(key: key);
+
+  @override
+  State<TopBarIconButton> createState() => _TopBarIconButtonState();
+}
+
+class _TopBarIconButtonState extends State<TopBarIconButton> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapCancel: () => setState(() => _isPressed = false),
+      onTap: () async {
+        setState(() => _isPressed = true);
+        await Future.delayed(const Duration(milliseconds: 200));
+        if (!mounted) return;
+        setState(() => _isPressed = false);
+        widget.onTap();
+      },
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -281,10 +305,12 @@ class _CustomTopBarState extends State<CustomTopBar> {
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(
+              gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF59ABEC), Color(0xFF93C8D0)],
+                colors: _isPressed 
+                    ? const [Color(0xFF3B8DC9), Color(0xFF75AAB2)]
+                    : const [Color(0xFF59ABEC), Color(0xFF93C8D0)],
               ),
               border: Border.all(color: const Color(0xFF114575), width: 1),
               boxShadow: [
@@ -296,7 +322,7 @@ class _CustomTopBarState extends State<CustomTopBar> {
               ],
             ),
             child: Image.asset(
-              imagePath,
+              widget.imagePath,
               width: 18,
               height: 18,
               fit: BoxFit.contain,
@@ -310,7 +336,7 @@ class _CustomTopBarState extends State<CustomTopBar> {
               },
             ),
           ),
-          if (showRedDot)
+          if (widget.showRedDot)
             Positioned(
               top: 0,
               right: 2,
