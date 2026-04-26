@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // NotificationResponse — struct ที่ส่งกลับให้ Flutter
@@ -81,7 +82,7 @@ func GetNotifications(c *gin.Context) {
 			gn.read_date
 		FROM public.get_notifications gn
 		JOIN public.notifications n ON gn.notification_id = n.id
-		WHERE gn.user_id = $1
+		WHERE gn.user_id = $1 AND gn.status != 'deleted'
 		ORDER BY n.start_date DESC
 	`
 	rows, err := configs.DB.Query(ctx, query, userID)
@@ -190,7 +191,8 @@ func DeleteNotification(c *gin.Context) {
 
 	ctx := context.Background()
 	query := `
-		DELETE FROM public.get_notifications
+		UPDATE public.get_notifications
+		SET status = 'deleted'
 		WHERE user_id = $1 AND notification_id = $2
 	`
 	tag, err := configs.DB.Exec(ctx, query, userID, notifID)
@@ -199,9 +201,6 @@ func DeleteNotification(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete notification"})
 		return
 	}
-
-	// ลบออกจากตารางหลักด้วยเลยเมื่อไม่มีเชื่อมโยง
-	configs.DB.Exec(ctx, "DELETE FROM public.notifications WHERE id = $1", notifID)
 
 	if tag.RowsAffected() == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Notification not found"})
@@ -227,7 +226,7 @@ func DeleteAllNotifications(c *gin.Context) {
 	}
 
 	ctx := context.Background()
-	query := `DELETE FROM public.get_notifications WHERE user_id = $1`
+	query := `UPDATE public.get_notifications SET status = 'deleted' WHERE user_id = $1`
 	tag, err := configs.DB.Exec(ctx, query, userID)
 	if err != nil {
 		fmt.Printf("❌ [DeleteAllNotifications] Error: %v\n", err)
@@ -235,18 +234,9 @@ func DeleteAllNotifications(c *gin.Context) {
 		return
 	}
 
-	// 🌟 พิเศษ: รีเซ็ต ID ให้กลับไปเริ่มที่ 1 ใหม่ (TRUNCATE TABLE ... RESTART IDENTITY)
-	// ลบข้อมูลออกทั้งหมดแล้วเริ่มนับเลขใหม่ จะส่งผลเต็มประสิทธิภาพเมื่อเคลียร์การแจ้งเตือนทิ้งหมด
-	_, errTruncate := configs.DB.Exec(ctx, "TRUNCATE TABLE public.notifications RESTART IDENTITY CASCADE")
-	if errTruncate != nil {
-		fmt.Printf("⚠️ [DeleteAllNotifications] Failed to reset ID sequence: %v\n", errTruncate)
-	} else {
-		fmt.Println("♻️ [DeleteAllNotifications] Notification ID sequence has been reset to 1")
-	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": fmt.Sprintf("Deleted %d notifications and reset ID sequence to 1", tag.RowsAffected()),
+		"message": fmt.Sprintf("Deleted %d notifications", tag.RowsAffected()),
 	})
 }
 
@@ -290,13 +280,25 @@ func CreateAchievementNotification(ctx context.Context, userID uuid.UUID, achiev
 
 // ProcessQuestNotifications ตรวจสอบและสร้างการแจ้งเตือนสำหรับภารกิจที่กำลังจะหมดเวลาหรือหมดเวลาแล้ว
 func ProcessQuestNotifications(ctx context.Context, userID uuid.UUID) {
+	tx, err := configs.DB.Begin(ctx)
+	if err != nil {
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// ใช้ advisory lock เพื่อป้องกัน Race Condition ระหว่างหลาย Request ของ user คนเดียวกัน
+	_, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1::text))", userID.String())
+	if err != nil {
+		return
+	}
+
 	query := `
 		SELECT dq.quest_id, q.name, q.due_date 
 		FROM public.do_quests dq
 		JOIN public.quests q ON dq.quest_id = q.id
 		WHERE dq.user_id = $1 AND dq.status = 'in_progress' AND q.type = 'ทั่วไป'
 	`
-	rows, err := configs.DB.Query(ctx, query, userID)
+	rows, err := tx.Query(ctx, query, userID)
 	if err != nil {
 		return
 	}
@@ -309,12 +311,9 @@ func ProcessQuestNotifications(ctx context.Context, userID uuid.UUID) {
 	var quests []activeQuest
 	for rows.Next() {
 		var q activeQuest
-		err := rows.Scan(&q.ID, &q.Name, &q.DueDate)
-		if err != nil {
-			fmt.Printf("⚠️ [ProcessQuestNotifications] Row scan error: %v\n", err)
-			continue
+		if err := rows.Scan(&q.ID, &q.Name, &q.DueDate); err == nil {
+			quests = append(quests, q)
 		}
-		quests = append(quests, q)
 	}
 	rows.Close()
 
@@ -322,14 +321,14 @@ func ProcessQuestNotifications(ctx context.Context, userID uuid.UUID) {
 		return
 	}
 
-	// ตรวจสอบประเภทที่เคยแจ้งเตือนไปแล้ว
+	// ตรวจสอบประเภทที่เคยแจ้งเตือนไปแล้ว (เช็ครวมถึง status 'deleted' เพื่อไม่ให้เด้งซ้ำ)
 	notifQuery := `
 		SELECT n.type 
 		FROM public.notifications n
 		JOIN public.get_notifications gn ON n.id = gn.notification_id
 		WHERE gn.user_id = $1 AND n.type LIKE 'quest_%'
 	`
-	rNotif, err := configs.DB.Query(ctx, notifQuery, userID)
+	rNotif, err := tx.Query(ctx, notifQuery, userID)
 	sentTypes := make(map[string]bool)
 	if err == nil {
 		for rNotif.Next() {
@@ -349,29 +348,31 @@ func ProcessQuestNotifications(ctx context.Context, userID uuid.UUID) {
 
 		if remainingHours <= 0 {
 			// Failed!
-			configs.DB.Exec(ctx, "UPDATE public.do_quests SET status = 'failed' WHERE user_id = $1 AND quest_id = $2", userID, q.ID)
+			tx.Exec(ctx, "UPDATE public.do_quests SET status = 'failed' WHERE user_id = $1 AND quest_id = $2", userID, q.ID)
 			
 			typeKey := fmt.Sprintf("quest_fail_%d", q.ID)
 			if !sentTypes[typeKey] {
-				createQuestNotification(ctx, userID, "ภารกิจล้มเหลว ❌", fmt.Sprintf("หมดเวลาทำภารกิจ '%s' แล้ว ไว้รอบหน้าลองใหม่นะ", q.Name), typeKey, notifDueDate)
+				createQuestNotificationTx(ctx, tx, userID, "ภารกิจล้มเหลว ❌", fmt.Sprintf("หมดเวลาทำภารกิจ '%s' แล้ว ไว้รอบหน้าลองใหม่นะ", q.Name), typeKey, notifDueDate)
 			}
 		} else if remainingHours <= 1 {
 			// 1 hour
 			typeKey := fmt.Sprintf("quest_1h_%d", q.ID)
 			if !sentTypes[typeKey] {
-				createQuestNotification(ctx, userID, "เหลือเวลาไม่ถึง 1 ชั่วโมง! ⏳", fmt.Sprintf("ภารกิจ '%s' ใกล้จะหมดเวลาทำภารกิจแล้ว รีบหน่อยนะ!", q.Name), typeKey, notifDueDate)
+				createQuestNotificationTx(ctx, tx, userID, "เหลือเวลาไม่ถึง 1 ชั่วโมง! ⏳", fmt.Sprintf("ภารกิจ '%s' ใกล้จะหมดเวลาทำภารกิจแล้ว รีบหน่อยนะ!", q.Name), typeKey, notifDueDate)
 			}
 		} else if remainingHours <= 24 {
 			// 1 day
 			typeKey := fmt.Sprintf("quest_1d_%d", q.ID)
 			if !sentTypes[typeKey] {
-				createQuestNotification(ctx, userID, "เหลือเวลาไม่ถึง 1 วัน! ⏰", fmt.Sprintf("อย่าลืมทำภารกิจ '%s' นะ เหลือเวลาอีกไม่มากแล้ว", q.Name), typeKey, notifDueDate)
+				createQuestNotificationTx(ctx, tx, userID, "เหลือเวลาไม่ถึง 1 วัน! ⏰", fmt.Sprintf("อย่าลืมทำภารกิจ '%s' นะ เหลือเวลาอีกไม่มากแล้ว", q.Name), typeKey, notifDueDate)
 			}
 		}
 	}
+
+	tx.Commit(ctx)
 }
 
-func createQuestNotification(ctx context.Context, userID uuid.UUID, title, detail, notifType string, dueDate time.Time) {
+func createQuestNotificationTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, title, detail, notifType string, dueDate time.Time) {
 	imgArg := "assets/images/icon/iconQuest.png"
 
 	// 1. Insert เข้า notifications table (ใช้ CTE ป้องกัน Race Condition)
@@ -388,9 +389,9 @@ func createQuestNotification(ctx context.Context, userID uuid.UUID, title, detai
 		SELECT id FROM public.notifications WHERE type = $3
 		LIMIT 1;
 	`
-	err := configs.DB.QueryRow(ctx, insertNotifQuery, title, detail, notifType, imgArg, dueDate).Scan(&notifID)
+	err := tx.QueryRow(ctx, insertNotifQuery, title, detail, notifType, imgArg, dueDate).Scan(&notifID)
 	if err != nil {
-		fmt.Printf("❌ [createQuestNotification] Failed to insert/find notification: %v\n", err)
+		fmt.Printf("❌ [createQuestNotificationTx] Failed to insert/find notification: %v\n", err)
 		return
 	}
 
@@ -400,8 +401,8 @@ func createQuestNotification(ctx context.Context, userID uuid.UUID, title, detai
 		VALUES ($1, $2, 'unread', NULL, false)
 		ON CONFLICT (user_id, notification_id) DO NOTHING
 	`
-	_, err = configs.DB.Exec(ctx, linkQuery, userID, notifID)
+	_, err = tx.Exec(ctx, linkQuery, userID, notifID)
 	if err != nil {
-		fmt.Printf("❌ [createQuestNotification] Failed to link user-notification: %v\n", err)
+		fmt.Printf("❌ [createQuestNotificationTx] Failed to link user-notification: %v\n", err)
 	}
 }
