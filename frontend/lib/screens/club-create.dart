@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../widgets/custom_top_bar.dart';
 import '../widgets/club/club_form_fields.dart';
 import 'club_room_head.dart';
+import '../api_service.dart' as api; // 🌟 1. เพิ่ม Import ApiService
 
 // ============================================================
 // หน้าสร้างชมรม
@@ -51,40 +52,44 @@ class _ClubCreateScreenState extends State<ClubCreateScreen> {
 
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('กรุณากรอกชื่อชมรม'),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text('กรุณากรอกชื่อชมรม'), backgroundColor: Colors.red),
       );
       return;
     }
-    if (_generatedCode == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('กรุณาสร้างรหัสชมรมก่อน'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
+    // 🌟 2. หมายเหตุ: ลบการเช็ค _generatedCode ออก เพราะ Backend จะสุ่มโค้ดให้เราเอง 
+    // ตัว _generatedCode ที่เราสุ่มในแอปตอนนี้มีไว้แค่ประดับตกแต่ง UI ไม่ได้ส่งไปให้ Backend ครับ
 
     setState(() => _isSubmitting = true);
-    // TODO: ส่งข้อมูลไป API { name, desc, code: _generatedCode }
-    debugPrint('Creating club: name=$name, desc=$desc, code=$_generatedCode');
-    await Future.delayed(const Duration(milliseconds: 800));
+
+    // 🌟 3. ยิง API ของจริง
+    final result = await api.ApiService.createClub(name, desc);
+
     setState(() => _isSubmitting = false);
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('สร้างชมรมสำเร็จ!'),
-          backgroundColor: Color(0xFF2374B5),
-        ),
-      );
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const ClubRoomHeadScreen()),
-      );
+      if (result != null && result['success'] == true) {
+        // 🎉 สร้างสำเร็จ
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('สร้างชมรมสำเร็จ! รหัสเชิญของคุณคือ: ${result['invite_code']}'),
+            backgroundColor: const Color(0xFF2374B5),
+          ),
+        );
+
+        // TODO: (ถ้ามีหน้า ClubRoomHead) ส่ง club_id หรือข้อมูลไปให้หน้านั้นด้วย
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ClubRoomHeadScreen()),
+        );
+      } else {
+        // ❌ สร้างไม่สำเร็จ (เช่น มีชมรมอยู่แล้ว)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result?['error'] ?? 'ไม่สามารถสร้างชมรมได้'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

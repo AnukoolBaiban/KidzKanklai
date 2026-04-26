@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_application_1/screens/club_detail_member.dart';
 import 'package:flutter_application_1/widgets/club/club_room_components.dart';
 import 'package:flutter_application_1/screens/all_quest.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // 🌟 อย่าลืม import
 
 class ClubRoomMemberScreen extends StatefulWidget {
   const ClubRoomMemberScreen({super.key});
@@ -14,6 +15,40 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
   int _selectedIndex = 3;
   bool _isDetailPressed = false;
 
+  // 🌟 1. เพิ่มตัวแปรเก็บข้อมูล
+  String _clubName = "กำลังโหลด...";
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchClubName(); // 🌟 2. สั่งโหลดข้อมูลตอนเปิดหน้า
+  }
+
+  // 🌟 3. ฟังก์ชันดึงชื่อชมรม
+  Future<void> _fetchClubName() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser!.id;
+
+      // หา club_id ของตัวเอง
+      final profile = await supabase.from('user_profiles').select('club_id').eq('id', userId).single();
+      
+      if (profile['club_id'] != null) {
+        // นำ club_id ไปหาชื่อชมรม
+        final club = await supabase.from('clubs').select('name').eq('id', profile['club_id']).single();
+        if (mounted) {
+          setState(() {
+            _clubName = club['name'];
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching club name: $e");
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -54,7 +89,10 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
           ClubTopBar(topPadding: topPadding, height: topBarHeight),
 
           // Header ───────────
-          ClubBlueHeader(topOffset: topBarHeight, title: 'ชื่อชมรม'),
+          ClubBlueHeader(
+             topOffset: topBarHeight, 
+             title: _clubName, // 🌟 เปลี่ยนตรงนี้
+          ),
 
           // ── Bottom Nav Bar ──────────────────────────
           ClubBottomNavBar(

@@ -79,5 +79,9 @@ func main() {
 	auth.DELETE("/notifications/:id", handlers.DeleteNotification)
 	auth.DELETE("/notifications", handlers.DeleteAllNotifications)
 
+	// --- Clubs ---
+	auth.POST("/clubs/create", handlers.CreateClub)
+	auth.POST("/clubs/join", handlers.JoinClub)
+	
 	r.Run(":8080")
 }

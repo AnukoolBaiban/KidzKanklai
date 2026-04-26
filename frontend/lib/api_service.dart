@@ -5,8 +5,6 @@ import 'package:flutter_application_1/globals.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 
-// --- Data Models ---
-
 class User {
   final int id;
   final String username;
@@ -717,6 +715,63 @@ class ApiService {
     } catch (e) {
       print("Delete All Notifications Error: $e");
       return false;
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // API: สร้างชมรม (Create Club)
+  // ------------------------------------------------------------------------
+  static Future<Map<String, dynamic>?> createClub(String name, String description) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/clubs/create'),
+        headers: _headers, // 🌟 ใช้ _headers ที่มี Token ของคุณอยู่แล้ว
+        body: jsonEncode({
+          "name": name,
+          "description": description,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        // สำเร็จ จะคืนค่า success, message, club_id, invite_code
+        return jsonDecode(response.body);
+      } else {
+        // ล้มเหลว (เช่น มีชมรมอยู่แล้ว)
+        final errorData = jsonDecode(response.body);
+        print("Create Club Failed: ${errorData['error']}");
+        return {"success": false, "error": errorData['error'] ?? "เกิดข้อผิดพลาด"};
+      }
+    } catch (e) {
+      print("Create Club Error: $e");
+      return {"success": false, "error": "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"};
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // API: เข้าร่วมชมรม (Join Club)
+  // ------------------------------------------------------------------------
+  static Future<Map<String, dynamic>?> joinClub(String inviteCode) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/clubs/join'),
+        headers: _headers,
+        body: jsonEncode({
+          "invite_code": inviteCode,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        // สำเร็จ จะคืนค่า success, message, club_id
+        return jsonDecode(response.body);
+      } else {
+        // ล้มเหลว (เช่น รหัสผิด, ชมรมเต็ม, มีชมรมอยู่แล้ว)
+        final errorData = jsonDecode(response.body);
+        print("Join Club Failed: ${errorData['error']}");
+        return {"success": false, "error": errorData['error'] ?? "เกิดข้อผิดพลาด"};
+      }
+    } catch (e) {
+      print("Join Club Error: $e");
+      return {"success": false, "error": "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"};
     }
   }
 }

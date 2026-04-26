@@ -38,6 +38,7 @@ type Club struct {
 	ID          int64      `json:"id"`
 	Name        string     `json:"name"`
 	Description *string    `json:"description"`
+	InviteCode  string     `json:"invite_code"` // 🌟 เพิ่มใหม่: รหัสเข้าร่วมชมรม (e.g., ABCDEF)
 	CreatedAt   *time.Time `json:"created_at"`
 }
 
