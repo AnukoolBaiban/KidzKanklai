@@ -523,9 +523,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       break;
                   }
                 },
-                onAvatarTapped: () {
-                  Navigator.pushNamed(context, '/profile');
-                },
+                onAvatarTapped: () {},
               ),
             ),
           ),

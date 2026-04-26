@@ -28,6 +28,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   void _onReturnFromOtherPage() {
     if (mounted) {
       setState(() {
+        _selectedIndex = 1;
         _topBarKey = UniqueKey();
       });
       _loadUserData();
@@ -191,6 +192,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 child: CustomBottomNavigationBar(
                   selectedIndex: _selectedIndex,
                   onItemTapped: (index) {
+                    if (index == 1) return;
+
                     setState(() {
                       _selectedIndex = index;
                     });
@@ -198,9 +201,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     switch (index) {
                       case 0:
                         Navigator.pushNamed(context, '/fashion').then((_) => _onReturnFromOtherPage());
-                        break;
-                      case 1:
-                        Navigator.pushNamed(context, '/lobby').then((_) => _onReturnFromOtherPage());
                         break;
                       case 2:
                         Navigator.pushNamed(context, '/map').then((_) => _onReturnFromOtherPage());

@@ -384,13 +384,7 @@ class _FashionPageState extends State<FashionPage> {
                 top: false,
                 child: CustomBottomNavigationBar(
                   selectedIndex: 0,
-                  onItemTapped: (index) {
-                     if (index == 0) Navigator.pushReplacementNamed(context, '/profile');
-                     if (index == 1) {} 
-                     if (index == 2) Navigator.pushReplacementNamed(context, '/lobby');
-                     if (index == 3) Navigator.pushReplacementNamed(context, '/map');
-                     if (index == 4) Navigator.pushReplacementNamed(context, '/club');
-                  },
+                  onItemTapped: (index) {},
                   onAvatarTapped: () => Navigator.pushReplacementNamed(context, '/profile'),
                   onFashionTapped: () {},
                   onRoomTapped: () => Navigator.pushReplacementNamed(context, '/lobby'),
