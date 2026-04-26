@@ -95,6 +95,7 @@ class _CustomBottomNavigationBarState extends State<CustomBottomNavigationBar> {
     super.initState();
     if (widget.user != null) {
       _user = widget.user;
+      _updateLevelUI(_user!.level, _user!.exp);
     }
     _setupRealtimeCharacter(); // 🌟 3. สั่งรันตัวดักฟังตอนเปิด UI
     if (widget.user == null) {
@@ -108,15 +109,17 @@ class _CustomBottomNavigationBarState extends State<CustomBottomNavigationBar> {
     if (widget.user != oldWidget.user && widget.user != null) {
       setState(() {
         _user = widget.user;
+        _updateLevelUI(_user!.level, _user!.exp);
       });
     }
   }
 
   Future<void> _fetchUserAvatar() async {
     final user = await ApiService.getProfile(0); // Fetch to get the latest bodyType and outfits
-    if (mounted) {
+    if (mounted && user != null) {
       setState(() {
         _user = user;
+        _updateLevelUI(_user!.level, _user!.exp);
       });
     }
   }

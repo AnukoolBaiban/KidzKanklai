@@ -183,12 +183,23 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
     // 🎉 เล่นท่า Win ก่อนยิง API
     _characterKey.currentState?.triggerWin();
 
+    // 🌟 ดึง Profile ก่อนเรียก API เพื่อบันทึก Level เดิม
+    final profileBefore = await ApiService.getProfile(0);
+    final oldLevel = profileBefore?.level ?? 0;
+
     setState(() => _isLoadingAPI = true);
     final result = await ApiService.completeInstantQuest(_currentQuestId!);
     setState(() => _isLoadingAPI = false);
 
     // 🌟 เช็คว่า API ทำงานสำเร็จ (ไม่เป็น null)
     if (result != null && mounted) {
+      // 🌟 ดึง Profile ใหม่หลัง API เพื่อเปรียบเทียบ Level
+      final freshProfile = await ApiService.getProfile(0);
+      final actualNewLevel = freshProfile?.level ?? oldLevel;
+      final didLevelUp = actualNewLevel > oldLevel;
+
+      debugPrint('📋 [Countdown] oldLevel=$oldLevel, actualNewLevel=$actualNewLevel, didLevelUp=$didLevelUp');
+
       final rewards = (result['rewards'] as List?) ?? [];
 
       // 🌟 เช็คว่ามีของรางวัลให้แจกจริงๆ หรือไม่ (ป้องกันกรณีสร้างตอนตั๋วหมด)
@@ -205,6 +216,10 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
         await RewardPopup.show(
           context, 
           rewards: popupRewards,
+          leveledUp: didLevelUp,
+          baseLevel: oldLevel,
+          newLevel: actualNewLevel,
+          user: freshProfile ?? _loadedUser ?? widget.user,
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -214,41 +229,16 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
           ),
         );
         await Future.delayed(const Duration(seconds: 1));
-      }
-
-      // 🌟 แสดง Level Up Popup ถ้าต้องการ
-      print("[DEBUG] Quest result: leveled_up=${result['leveled_up']}, base=${result['base_level']}, new=${result['new_level']}");
-      if (mounted && result['leveled_up'] == true) {
-        final baseLv = result['base_level'] as int? ?? 0;
-        final newLv  = result['new_level']  as int? ?? 0;
         
-        // 🌟 ตรวสอบการเปลี่ยนร่างโดยใช้ Model Group (Kid: 0, Teen: 1, Adult: 2)
-        int getModelGroup(int lv) {
-          if (lv >= 30) return 2;
-          if (lv >= 15) return 1;
-          return 0;
-        }
-        final isEvolution = getModelGroup(newLv) > getModelGroup(baseLv);
-
-        // 🌟 รีเฟรช Profile ล่วงหน้า เพื่อให้ร่างวิวัฒนาการมีข้อมูลล่าสุด
-        final freshUser = await ApiService.getProfile(0);
-
-        if (isEvolution && mounted) {
-          // 1. ถ้าถึงเกณฑ์วิวัฒนาการ โชว์ CharacterUpPopup ทันที (มีข้อมูลเลเวลด้านบนอยู่แล้ว)
-          await CharacterUpPopup.show(
-            context,
-            baseLevel: baseLv,
-            newLevel: newLv,
-            user: freshUser ?? widget.user,
-            onTapContinue: () {},
-          );
-        } else if (mounted) {
-          // 2. ถ้าเลเวลอัปปกติ ค่อยโชว์ LevelUpPopup แบบเดิม
-          await LevelUpPopup.show(
-            context,
-            baseLevel: baseLv,
-            newLevel: newLv,
-            onTapContinue: () {},
+        // 🌟 กรณีไม่มีของรางวัล แต่มีการเลเวลอัพ
+        if (mounted && didLevelUp) {
+          await RewardPopup.show(
+            context, 
+            rewards: [],
+            leveledUp: true,
+            baseLevel: oldLevel,
+            newLevel: actualNewLevel,
+            user: freshProfile ?? _loadedUser ?? widget.user,
           );
         }
       }
