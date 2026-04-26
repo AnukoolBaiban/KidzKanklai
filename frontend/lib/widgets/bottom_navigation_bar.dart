@@ -60,6 +60,7 @@ class CustomBottomNavigationBar extends StatefulWidget {
   final VoidCallback? onClubTapped;
 
   final String? avatarUrl;
+  final User? user;
 
   const CustomBottomNavigationBar({
     Key? key,
@@ -71,6 +72,7 @@ class CustomBottomNavigationBar extends StatefulWidget {
     this.onMapTapped,
     this.onClubTapped,
     this.avatarUrl,
+    this.user,
   }) : super(key: key);
 
   @override
@@ -91,8 +93,23 @@ class _CustomBottomNavigationBarState extends State<CustomBottomNavigationBar> {
   @override
   void initState() {
     super.initState();
+    if (widget.user != null) {
+      _user = widget.user;
+    }
     _setupRealtimeCharacter(); // 🌟 3. สั่งรันตัวดักฟังตอนเปิด UI
-    _fetchUserAvatar();
+    if (widget.user == null) {
+      _fetchUserAvatar();
+    }
+  }
+
+  @override
+  void didUpdateWidget(CustomBottomNavigationBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.user != oldWidget.user && widget.user != null) {
+      setState(() {
+        _user = widget.user;
+      });
+    }
   }
 
   Future<void> _fetchUserAvatar() async {

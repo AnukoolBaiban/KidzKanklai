@@ -384,6 +384,7 @@ class _FashionPageState extends State<FashionPage> {
                 top: false,
                 child: CustomBottomNavigationBar(
                   selectedIndex: 0,
+                  user: _user,
                   onItemTapped: (index) {},
                   onAvatarTapped: () => Navigator.pushReplacementNamed(context, '/profile'),
                   onFashionTapped: () {},
@@ -522,7 +523,7 @@ class _AgeSelector extends StatelessWidget {
     );
 
     return GestureDetector(
-      onTap: isUnlocked ? () => onAgeSelected(ageType) : null,
+      onTap: (isUnlocked && !isSelected) ? () => onAgeSelected(ageType) : null,
       child: circle,
     );
   }
@@ -816,7 +817,7 @@ class _FashionGrid extends StatelessWidget {
         return _ItemCard(
           item: item,
           isSelected: isSelected,
-          onTap: () => onItemSelected(item),
+          onTap: isSelected ? null : () => onItemSelected(item),
         );
       },
     );
@@ -826,12 +827,12 @@ class _FashionGrid extends StatelessWidget {
 class _ItemCard extends StatelessWidget {
   final InventoryItem item;
   final bool isSelected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _ItemCard({
     required this.item,
     required this.isSelected,
-    required this.onTap,
+    this.onTap,
   });
 
   String get _itemImagePath {
@@ -872,7 +873,7 @@ class _ItemCard extends StatelessWidget {
         ),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isSelected ? Colors.grey.shade300 : Colors.white,
             borderRadius: BorderRadius.circular(1),
           ),
           child: Stack(
@@ -1034,7 +1035,7 @@ class _SkinColorSelector extends StatelessWidget {
           if (index < colors.length) displayColor = colors[index];
           
           return GestureDetector(
-            onTap: () {
+            onTap: isSelected ? null : () {
                onColorSelected(index);
                onInventoryItemSelected(item);
             },
