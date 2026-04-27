@@ -10,7 +10,7 @@ class AudioManager {
 
   // 2. ตัวเล่นเสียง
   final AudioPlayer _musicPlayer = AudioPlayer(); // สำหรับ BGM
-  final AudioPlayer _sfxPlayer = AudioPlayer();   // สำหรับ SFX
+  final AudioPlayer _sfxPlayer = AudioPlayer(); // สำหรับ SFX
 
   // 3. ค่า Config เริ่มต้น
   double _musicVolume = 0.7;
@@ -31,20 +31,20 @@ class AudioManager {
 
     // ตั้งค่าเริ่มต้นให้ Player
     await _updatePlayersVolume();
-    
+
     // ตั้งค่า Mode ให้เล่นทับกันได้ (Low Latency)
     await _musicPlayer.setReleaseMode(ReleaseMode.loop); // BGM วนซ้ำ
     await _sfxPlayer.setReleaseMode(ReleaseMode.stop);
   }
 
   // เพิ่มตัวแปรเก็บชื่อเพลงที่กำลังเล่นอยู่
-  String? _currentBGM; 
+  String? _currentBGM;
 
   // 5. ฟังก์ชันเล่นเพลง BGM (ฉบับอัปเดต)
   Future<void> playBGM(String fileName) async {
     // ถ้าไฟล์ที่จะเล่น เป็นไฟล์เดียวกับที่กำลังเล่นอยู่ ให้ข้ามคำสั่งไปเลย เพลงจะได้เล่นต่อเนื่อง
-    if (_currentBGM == fileName) return; 
-    
+    if (_currentBGM == fileName) return;
+
     _currentBGM = fileName; // อัปเดตชื่อเพลงปัจจุบัน
     await _musicPlayer.play(AssetSource('audio/$fileName'));
   }
@@ -97,31 +97,140 @@ class AudioManager {
 }
 
 class MusicRouteObserver extends NavigatorObserver {
-  // ฟังก์ชันส่วนกลางสำหรับเช็คว่าควรเล่นเพลงอะไร
-  void _updateMusic(Route<dynamic>? route) {
-    // ดึงชื่อหน้าจอออกมา
-    final routeName = route?.settings.name;
+  // 1. สร้าง Stack เพื่อเก็บประวัติเพลงของแต่ละหน้า
+  final List<String> _musicHistory = [];
 
-    // เทียบชื่อหน้าจอแล้วสั่งเล่นเพลงที่ต้องการเลย!
-    if (routeName == '/lobby') {
-      AudioManager().playBGM('lobby.mp3');
-    } else if (routeName == '/profile') {
-      AudioManager().playBGM('profile.mp3');
-    } 
-    // ถ้าหน้าไหนไม่มีเพลงเฉพาะ จะปล่อยให้เล่นเพลงเดิมต่อไป หรือจะสั่ง pause() ก็ได้
+  // ฟังก์ชันสำหรับเช็คว่าแต่ละหน้าควรใช้เพลงอะไร
+  String? _getMusicForRoute(String? routeName) {
+    switch (routeName) {
+      case '/lobby':
+      case '/achievement':
+        return 'lobby.mp3';
+      case '/profile':
+        return 'profile.mp3';
+      case '/all_quest':
+      case '/allquest':
+      case '/createnormalquest':
+      case '/questdetail':
+      case '/countdown':
+        return 'quest.mp3';
+      case '/map':
+        return 'map.mp3';
+      case '/fashion':
+        return 'fashion.mp3';
+      case '/gacha':
+      case '/gasha':
+        return 'gacha.mp3';
+      case '/club':
+      case '/club-create':
+      case '/createclubquest':
+      case '/clubquestdetail':
+      case '/clubroom':
+        return 'club.mp3';
+      default:
+        return null;
+    }
+  }
+
+  // ฟังก์ชันดึงชื่อหน้าจอ (รองรับกรณี MaterialPageRoute ไม่ได้ระบุชื่อ)
+  String? _extractRouteName(Route<dynamic>? route) {
+    if (route == null) return null;
+    
+    // 1. ใช้ชื่อจาก settings.name (จากการใช้ Navigator.pushNamed)
+    if (route.settings.name != null) {
+      return route.settings.name;
+    }
+    
+    // 2. กรณีไม่มีชื่อ (จากการใช้ Navigator.push + MaterialPageRoute)
+    // ให้ใช้การตรวจสอบจาก runtimeType ของ builder
+    if (route is MaterialPageRoute) {
+      final builderStr = route.builder.runtimeType.toString();
+      if (builderStr.contains('LobbyScreen')) return '/lobby';
+      if (builderStr.contains('Quest') || builderStr.contains('Countdown')) return '/all_quest';
+      if (builderStr.contains('Club')) return '/club';
+      if (builderStr.contains('Achievement')) return '/achievement';
+      if (builderStr.contains('Map') || builderStr.contains('LocationUpgrade')) return '/map';
+      if (builderStr.contains('Fashion')) return '/fashion';
+      if (builderStr.contains('Gasha') || builderStr.contains('Gacha')) return '/gacha';
+      if (builderStr.contains('Profile')) return '/profile';
+    }
+    return null;
   }
 
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPush(route, previousRoute);
-    // เมื่อเปิดหน้าใหม่ ให้เช็คว่าต้องเปลี่ยนเพลงไหม
-    _updateMusic(route);
+    
+    final routeName = _extractRouteName(route);
+    final newMusic = _getMusicForRoute(routeName);
+
+    if (newMusic != null) {
+      // ถ้าหน้านี้มีเพลงเฉพาะของมัน ให้บันทึกลงประวัติและเล่นเพลงนั้น
+      _musicHistory.add(newMusic);
+      AudioManager().playBGM(newMusic);
+    } else {
+      // ถ้าหน้าใหม่ไม่มีชื่อ route ชัดเจน (เช่น Dialog)
+      // ให้คัดลอกเพลงล่าสุดใส่ประวัติเพิ่มไป เพื่อให้ตอนกดย้อนกลับ (Pop) ลบออกได้อย่างถูกต้อง
+      if (_musicHistory.isNotEmpty) {
+        _musicHistory.add(_musicHistory.last);
+      } else {
+        _musicHistory.add('lobby.mp3');
+        AudioManager().playBGM('lobby.mp3');
+      }
+    }
   }
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPop(route, previousRoute);
-    // เมื่อกดย้อนกลับ ให้เช็คเพลงของหน้าจอ "ที่กำลังจะกลับไปแสดง (previousRoute)"
-    _updateMusic(previousRoute);
+    
+    // เมื่อกดย้อนกลับ ให้ลบเพลงของหน้าปัจจุบันที่กำลังจะปิด ออกจากประวัติ
+    if (_musicHistory.isNotEmpty) {
+      _musicHistory.removeLast();
+    }
+
+    // 1. ตรวจสอบชื่อ Route ของหน้าที่เรากำลังจะย้อนกลับไปแบบเจาะลึก
+    final routeName = _extractRouteName(previousRoute);
+    final explicitMusic = _getMusicForRoute(routeName);
+
+    if (explicitMusic != null) {
+      AudioManager().playBGM(explicitMusic);
+      if (_musicHistory.isNotEmpty) {
+        _musicHistory[_musicHistory.length - 1] = explicitMusic;
+      } else {
+        _musicHistory.add(explicitMusic);
+      }
+    } else {
+      if (_musicHistory.isNotEmpty) {
+        AudioManager().playBGM(_musicHistory.last);
+      } else {
+        AudioManager().playBGM('lobby.mp3');
+      }
+    }
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+    
+    if (_musicHistory.isNotEmpty) {
+      _musicHistory.removeLast();
+    }
+
+    final routeName = _extractRouteName(newRoute);
+    final newMusic = _getMusicForRoute(routeName);
+
+    if (newMusic != null) {
+      _musicHistory.add(newMusic);
+      AudioManager().playBGM(newMusic);
+    } else {
+      if (_musicHistory.isNotEmpty) {
+        _musicHistory.add(_musicHistory.last);
+        AudioManager().playBGM(_musicHistory.last);
+      } else {
+        _musicHistory.add('lobby.mp3');
+        AudioManager().playBGM('lobby.mp3');
+      }
+    }
   }
 }
