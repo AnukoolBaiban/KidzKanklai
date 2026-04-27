@@ -60,6 +60,7 @@ class CustomBottomNavigationBar extends StatefulWidget {
   final VoidCallback? onClubTapped;
 
   final String? avatarUrl;
+  final User? user;
 
   const CustomBottomNavigationBar({
     Key? key,
@@ -71,6 +72,7 @@ class CustomBottomNavigationBar extends StatefulWidget {
     this.onMapTapped,
     this.onClubTapped,
     this.avatarUrl,
+    this.user,
   }) : super(key: key);
 
   @override
@@ -91,15 +93,33 @@ class _CustomBottomNavigationBarState extends State<CustomBottomNavigationBar> {
   @override
   void initState() {
     super.initState();
+    if (widget.user != null) {
+      _user = widget.user;
+      _updateLevelUI(_user!.level, _user!.exp);
+    }
     _setupRealtimeCharacter(); // 🌟 3. สั่งรันตัวดักฟังตอนเปิด UI
-    _fetchUserAvatar();
+    if (widget.user == null) {
+      _fetchUserAvatar();
+    }
+  }
+
+  @override
+  void didUpdateWidget(CustomBottomNavigationBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.user != oldWidget.user && widget.user != null) {
+      setState(() {
+        _user = widget.user;
+        _updateLevelUI(_user!.level, _user!.exp);
+      });
+    }
   }
 
   Future<void> _fetchUserAvatar() async {
     final user = await ApiService.getProfile(0); // Fetch to get the latest bodyType and outfits
-    if (mounted) {
+    if (mounted && user != null) {
       setState(() {
         _user = user;
+        _updateLevelUI(_user!.level, _user!.exp);
       });
     }
   }
@@ -161,7 +181,10 @@ class _CustomBottomNavigationBarState extends State<CustomBottomNavigationBar> {
           final dbLevel = charData['level'] as int? ?? 1;
           final totalExp = charData['experience'] as int? ?? 0;
           
-          _updateLevelUI(dbLevel, totalExp); 
+          // 🌟 ป้องกันกรณีตาราง characters อัปเดตช้ากว่า users table (EXP ลดลง)
+          if (dbLevel > _level || (dbLevel == _level && totalExp >= _user!.exp)) {
+            _updateLevelUI(dbLevel, totalExp); 
+          }
         }
       }, onError: (error) {
         debugPrint('Error fetching realtime character: $error');

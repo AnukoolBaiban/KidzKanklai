@@ -60,6 +60,7 @@ class _ExamScreenState extends State<ExamScreen> {
   StateMachineController? _controller;
   api.User? _user;
   bool _isRiveLoaded = false;
+  bool _didPassExam = false; // ตัวแปรบอกว่าสอบผ่านหรือยัง เพื่อส่งค่ากลับไปหน้า location_upgrade
 
   // ค่า Requirements สำหรับแต่ละอาคาร
   // 🌟 2. ลบ Mockup เดิมออก ให้เหลือแค่วงเล็บปีกกาว่างๆ
@@ -226,9 +227,9 @@ class _ExamScreenState extends State<ExamScreen> {
           String dbName = exam['name'] ?? '';
           String examKey = '';
           
-          if (dbName.contains('วิทย์')) {
+          if (dbName.contains('วิทยาศาสตร์')) {
             examKey = 'ทดสอบวิทยาศาสตร์';
-          } else if (dbName.contains('คณิต')) {
+          } else if (dbName.contains('คณิตศาสตร์')) {
             examKey = 'ทดสอบคณิตศาสตร์';
           } else if (dbName.contains('อังกฤษ')) {
             examKey = 'ทดสอบอังกฤษ';
@@ -357,6 +358,19 @@ class _ExamScreenState extends State<ExamScreen> {
     }
   }
 
+  String _getModelAsset() {
+    if (_user != null) {
+      final bt = _user!.bodyType.toUpperCase();
+      if (bt == 'ADULT') return 'assets/animation/adult.riv';
+      if (bt == 'TEEN') return 'assets/animation/teen.riv';
+      return 'assets/animation/kid.riv';
+    }
+    int lvl = _level;
+    if (lvl >= 30) return 'assets/animation/adult.riv';
+    if (lvl >= 15) return 'assets/animation/teen.riv';
+    return 'assets/animation/kid.riv';
+  }
+
   // ฟังก์ชันตรวจสอบว่าค่าสถานะเพียงพอหรือไม่
   bool _meetsRequirement(StatType type, int required) {
     switch (type) {
@@ -421,9 +435,15 @@ class _ExamScreenState extends State<ExamScreen> {
     final topPadding = MediaQuery.of(context).padding.top;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    final topBarHeight = 75.0 + topPadding;
+    final topBarHeight = 60.0 + topPadding;
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        Navigator.pop(context, _didPassExam);
+      },
+      child: Scaffold(
       body: Stack(
         children: [
           /// Background (แยกตามสถานที่)
@@ -484,6 +504,7 @@ class _ExamScreenState extends State<ExamScreen> {
           _buildBlueHeader(topBarHeight),
         ],
       ),
+    ),
     );
   }
 
@@ -492,8 +513,8 @@ class _ExamScreenState extends State<ExamScreen> {
   Widget _buildRequirementsBox(String rawExamName) {
     // แปลงชื่อให้ตรงกับ _examRequirements เสมอ
     String examName = rawExamName;
-    if (rawExamName.contains('วิทย์')) examName = 'ทดสอบวิทยาศาสตร์';
-    if (rawExamName.contains('คณิต')) examName = 'ทดสอบคณิตศาสตร์';
+    if (rawExamName.contains('วิทยาศาสตร์')) examName = 'ทดสอบวิทยาศาสตร์';
+    if (rawExamName.contains('คณิตศาสตร์')) examName = 'ทดสอบคณิตศาสตร์';
     if (rawExamName.contains('อังกฤษ')) examName = 'ทดสอบอังกฤษ';
 
     final requirements = _examRequirements[examName] ?? {};
@@ -758,14 +779,18 @@ class _ExamScreenState extends State<ExamScreen> {
           height: 48,
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF556AEB), Color(0xFF59ABEC)],
+              colors: isPassed 
+                ? [Color(0xFF9E9E9E), Color(0xFFBDBDBD)] // สีเทาเมื่อสอบผ่านแล้ว
+                : [Color(0xFF556AEB), Color(0xFF59ABEC)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
             borderRadius: BorderRadius.circular(25),
             boxShadow: [
               BoxShadow(
-                color: Color(0xFF556AEB).withOpacity(0.4),
+                color: isPassed 
+                  ? Colors.grey.withOpacity(0.3) 
+                  : Color(0xFF556AEB).withOpacity(0.4),
                 blurRadius: 8,
                 offset: Offset(0, 4),
               ),
@@ -788,6 +813,10 @@ class _ExamScreenState extends State<ExamScreen> {
                 builder: (ctx) => const Center(child: CircularProgressIndicator()),
               );
 
+              // 🌟 เก็บ Level เดิมไว้เปรียบเทียบก่อนยิง API
+              final profileBefore = await api.ApiService.getProfile(0);
+              final oldLevel = profileBefore?.level ?? 0;
+
               final result = await api.ApiService.startExam(currentExamId);
 
               if (mounted) Navigator.pop(context);
@@ -796,12 +825,22 @@ class _ExamScreenState extends State<ExamScreen> {
                 if (result['success'] == true) {
                   bool resultPassed = result['is_passed'] ?? false;
                   
+                  // บันทึกว่าสอบผ่านเพื่อส่งกลับไปหน้า location_upgrade
+                  if (resultPassed) {
+                    _didPassExam = true;
+                  }
+                  
                   Map<String, int> finalRewards = {};
                   if (resultPassed && result['rewards'] != null) {
                     for (var r in result['rewards']) {
                       finalRewards[r['name']] = r['amount']; 
                     }
                   }
+
+                  // 🌟 ดึงข้อมูลโปรไฟล์ใหม่ เพื่อดูว่าเลเวลอัพไหม
+                  final newProfile = await api.ApiService.getProfile(0);
+                  final actualNewLevel = newProfile?.level ?? oldLevel;
+                  final didLevelUp = actualNewLevel > oldLevel;
 
                   _fetchUserProfile();
                   
@@ -812,7 +851,12 @@ class _ExamScreenState extends State<ExamScreen> {
                       MaterialPageRoute(
                         builder: (_) => ResultExamScreen(
                           statusRewards: finalRewards,
+                          rawRewards: (result['rewards'] as List?) ?? [], // 🌟 ส่งของรางวัลดิบไปทำ Popup
+                          leveledUp: didLevelUp, // 🌟 ส่งสถานะอัพเลเวล
+                          baseLevel: oldLevel,
+                          newLevel: actualNewLevel,
                           isPassed: resultPassed,
+                          user: newProfile ?? _user, // 🌟 ส่ง user ไปให้โชว์ตัวละคร Rive
                         ),
                       ),
                     );
@@ -839,13 +883,23 @@ class _ExamScreenState extends State<ExamScreen> {
                 borderRadius: BorderRadius.circular(25),
               ),
             ),
-            child: Text(
-              isPassed ? 'สอบผ่านแล้ว' : 'เริ่มสอบ', // 🌟 3.5 เปลี่ยนข้อความตามสถานะ
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isPassed) ...[
+                  const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                  const SizedBox(width: 6),
+                ],
+                Text(
+                  isPassed ? 'สอบผ่านแล้ว' : 'เริ่มสอบ',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -894,7 +948,7 @@ class _ExamScreenState extends State<ExamScreen> {
         await Future.delayed(const Duration(milliseconds: 200));
         if (!mounted) return;
         setState(() => _isPressed = false);
-        Navigator.pop(context);
+        Navigator.pop(context, _didPassExam);
       },
       child: Image.asset(
         _isPressed
@@ -1389,13 +1443,30 @@ class _ExamScreenState extends State<ExamScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.all(8),
-                child: const CircleAvatar(
-                  radius: 54,
-                  backgroundImage: AssetImage(
-                    'assets/images/profile/profile_img.png',
-                  ),
-                ),
+                width: 114,
+                height: 114,
+                clipBehavior: Clip.antiAlias,
+                decoration: const BoxDecoration(shape: BoxShape.circle),
+                child: _user == null 
+                  ? const Center(child: CircularProgressIndicator()) 
+                  : Transform.scale(
+                      scale: 1.6,
+                      alignment: Alignment.center,
+                      child: Transform.translate(
+                        offset: Offset(1, _user!.bodyType.toUpperCase() == 'KID' ? 15 : 15),
+                        child: (RiveCache().getFile(_getModelAsset()) != null 
+                            ? RiveAnimation.direct(
+                                RiveCache().getFile(_getModelAsset())!,
+                                fit: BoxFit.contain,
+                                onInit: _onRiveInit,
+                              )
+                            : RiveAnimation.asset(
+                                _getModelAsset(), 
+                                fit: BoxFit.contain,
+                                onInit: _onRiveInit,
+                              )),
+                      ),
+                    ),
               ),
             ],
           ),
@@ -1478,14 +1549,17 @@ class _ExamScreenState extends State<ExamScreen> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.black,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.black,
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 8),
@@ -1551,10 +1625,8 @@ class _ExamScreenState extends State<ExamScreen> {
       left: 0,
       right: 0,
       child: Container(
-        height: height,
         padding: EdgeInsets.only(top: topPadding),
         color: Colors.black.withOpacity(0.4),
-        alignment: Alignment.bottomCenter,
         child: CustomTopBar(
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),

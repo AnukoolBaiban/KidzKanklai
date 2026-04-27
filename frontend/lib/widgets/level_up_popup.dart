@@ -38,6 +38,8 @@ class LevelUpPopup extends StatefulWidget {
 
 class _LevelUpPopupState extends State<LevelUpPopup>
     with SingleTickerProviderStateMixin {
+  bool _canClose = false; // ป้องกัน ghost tap จาก RewardPopup
+
   // Animations & State Initialization
   late final AnimationController _controller = AnimationController(
     duration: const Duration(milliseconds: 350),
@@ -55,6 +57,17 @@ class _LevelUpPopupState extends State<LevelUpPopup>
   );
 
   @override
+  void initState() {
+    super.initState();
+    // อนุญาตให้ปิดได้หลังจาก 1 วินาที เพื่อให้ผู้ใช้เห็น popup ก่อน
+    Future.delayed(const Duration(milliseconds: 1000), () {
+      if (mounted) {
+        setState(() => _canClose = true);
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
@@ -64,10 +77,12 @@ class _LevelUpPopupState extends State<LevelUpPopup>
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        widget.onTapContinue();
-        Navigator.pop(context); // ปิด Popup เมื่อกดหน้าจอ
-      },
+      onTap: _canClose
+          ? () {
+              widget.onTapContinue();
+              Navigator.pop(context); // ปิด Popup เมื่อกดหน้าจอ
+            }
+          : null,
       behavior: HitTestBehavior.opaque,
       child: Dialog(
         backgroundColor: Colors.transparent,
@@ -278,11 +293,15 @@ class _LevelUpPopupState extends State<LevelUpPopup>
   }
 
   Widget _buildTapToContinue(bool isSmall) {
-    return Text(
-      'แตะเพื่อดำเนินการต่อ',
-      style: GoogleFonts.kanit(
-        color: Colors.white70,
-        fontSize: isSmall ? 14.0 : 16.0,
+    return AnimatedOpacity(
+      opacity: _canClose ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 300),
+      child: Text(
+        'แตะเพื่อดำเนินการต่อ',
+        style: GoogleFonts.kanit(
+          color: Colors.white70,
+          fontSize: isSmall ? 14.0 : 16.0,
+        ),
       ),
     );
   }

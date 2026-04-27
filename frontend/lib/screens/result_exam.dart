@@ -1,17 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/api_service.dart';
 import 'package:flutter_application_1/widgets/custom_top_bar.dart';
+import 'package:rive/rive.dart' hide LinearGradient, Image;
+import 'package:flutter_application_1/config/rive_cache.dart';
+import 'package:flutter_application_1/widgets/reward_popup.dart'; // 🌟 นำเข้า RewardPopup
 
 class ResultExamScreen extends StatefulWidget {
   final Map<String, int> statusRewards;
   final User? user;
   final bool isPassed;
+  // 🌟 เพิ่มตัวแปรสำหรับรับข้อมูลรางวัลและเลเวลอัพ
+  final List<dynamic> rawRewards;
+  final bool leveledUp;
+  final int baseLevel;
+  final int newLevel;
 
   const ResultExamScreen({
     Key? key,
     required this.statusRewards,
     this.user,
     required this.isPassed,
+    this.rawRewards = const [],
+    this.leveledUp = false,
+    this.baseLevel = 0,
+    this.newLevel = 0,
   }) : super(key: key);
 
   @override
@@ -19,10 +31,124 @@ class ResultExamScreen extends StatefulWidget {
 }
 
 class _ResultExamScreenState extends State<ResultExamScreen> {
+  SMINumber? _poseInput;
+  SMINumber? _hairInput;
+  SMINumber? _faceInput;
+  SMINumber? _skinInput;
+  SMINumber? _clothInput;
+  StateMachineController? _controller;
+  bool _isRiveLoaded = false;
+
+  void _onRiveInit(Artboard artboard) {
+    var controller = StateMachineController.fromArtboard(
+      artboard,
+      'State Machine 1',
+    );
+    if (controller == null && artboard.stateMachines.isNotEmpty) {
+      controller = StateMachineController.fromArtboard(
+        artboard,
+        artboard.stateMachines.first.name,
+      );
+    }
+
+    if (controller != null) {
+      artboard.addController(controller);
+      _controller = controller;
+
+      for (var input in controller.inputs) {
+        if (input.name == 'Pose') _poseInput = input as SMINumber;
+        if (input.name == 'HairID') _hairInput = input as SMINumber;
+        if (input.name == 'FaceID') _faceInput = input as SMINumber;
+        if (input.name == 'SkinID') _skinInput = input as SMINumber;
+        if (input.name == 'OutfitID') {
+          _clothInput = input as SMINumber;
+        }
+      }
+
+      _syncRiveToEquipped();
+
+      if (_poseInput != null) {
+        _poseInput!.value = widget.isPassed ? 2.0 : 1.0; // 2=ดีใจ, 1=เศร้า
+      }
+    }
+    if (mounted) setState(() => _isRiveLoaded = true);
+  }
+
+  double _parseId(String s) {
+    if (s.isEmpty) return 0;
+    if (s.contains('_')) {
+      try {
+        return double.parse(s.split('_').last);
+      } catch (_) {}
+    }
+    if (s.contains(' ')) {
+      try {
+        return double.parse(s.split(' ').last);
+      } catch (_) {}
+    }
+    try {
+      return double.parse(s);
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  void _syncRiveToEquipped() {
+    if (_controller == null || widget.user == null) return;
+
+    try {
+      if (_hairInput != null) _hairInput!.value = _parseId(widget.user!.equippedHair);
+      if (_faceInput != null) _faceInput!.value = _parseId(widget.user!.equippedFace);
+      if (_skinInput != null) _skinInput!.value = _parseId(widget.user!.equippedSkin);
+      if (_clothInput != null) {
+        _clothInput!.value = _parseId(widget.user!.equippedOutfit);
+      }
+      if (_poseInput != null) {
+        _poseInput!.value = widget.isPassed ? 2.0 : 1.0;
+      }
+    } catch (e) {
+      print("Error syncing Rive Profile: $e");
+    }
+  }
+
+  String _getModelAsset() {
+    if (widget.user != null) {
+      final bt = widget.user!.bodyType.toUpperCase();
+      if (bt == 'ADULT') return 'assets/animation/adult.riv';
+      if (bt == 'TEEN') return 'assets/animation/teen.riv';
+      return 'assets/animation/kid.riv';
+    }
+    return 'assets/animation/kid.riv';
+  }
+
+  double _getTopSpacing() {
+    if (widget.user == null) return 40;
+    final bt = widget.user!.bodyType.toUpperCase();
+    if (bt == 'ADULT') return 100; // ผู้ใหญ่ตัวสูง ลดช่องว่างด้านบน
+    if (bt == 'TEEN') return 80; // วัยรุ่นปานกลาง
+    return 40; // เด็กตัวเล็ก เพิ่มช่องว่างด้านบน
+  }
+
+  double _getCharacterScale() {
+    if (widget.user == null) return 1.5;
+    final bt = widget.user!.bodyType.toUpperCase();
+    if (bt == 'ADULT') return 1.4;
+    if (bt == 'TEEN') return 1.4;
+    return 1.5;
+  }
+
+  Offset _getCharacterOffset() {
+    if (widget.user == null) return const Offset(0, 10);
+    final bt = widget.user!.bodyType.toUpperCase();
+    if (bt == 'ADULT') return const Offset(0, -35);
+    if (bt == 'TEEN') return const Offset(0, -35);
+    return const Offset(0, 10);
+  }
+
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
-    final topBarHeight = 75.0 + topPadding;
+    final topBarHeight = 60.0 + topPadding;
     final screenWidth = MediaQuery.of(context).size.width;
     final scale = (screenWidth / 375).clamp(0.8, 1.2);
 
@@ -100,34 +226,58 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
                             ],
                           ),
 
-                          SizedBox(height: 20 * scale),
+                          SizedBox(height: _getTopSpacing()), // 🌟 ปรับช่องว่างตามวัยของตัวละคร
 
-                          // ✅ รูปตัวละครพร้อมแสง Glow ข้างหลัง
-                          Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              if (widget.isPassed)
-                                Container(
-                                  width: 150 * scale,
-                                  height: 150 * scale,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.yellow.withOpacity(0.5),
-                                        blurRadius: 40,
-                                        spreadRadius: 20,
-                                      ),
-                                    ],
+                          // ✅ รูปตัวละคร Rive พร้อมแสง Glow ข้างหลัง
+                          SizedBox(
+                            height: 200,
+                            width: 200,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                if (widget.isPassed)
+                                  Container(
+                                    width: 150 * scale,
+                                    height: 150 * scale,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.yellow.withOpacity(0.5),
+                                          blurRadius: 40,
+                                          spreadRadius: 20,
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              Image.asset(
-                                widget.isPassed
-                                    ? 'assets/images/profile/profile-character.png'
-                                    : 'assets/images/profile/sad-character.png',
-                                height: 230 * scale,
-                              ),
-                            ],
+                                // ตัวละคร Rive
+                                widget.user == null
+                                    ? Image.asset(
+                                        widget.isPassed
+                                            ? 'assets/images/profile/profile-character.png'
+                                            : 'assets/images/profile/sad-character.png',
+                                        height: 230 * scale,
+                                      )
+                                    : Transform.scale(
+                                        scale: _getCharacterScale(),
+                                        alignment: Alignment.center,
+                                        child: Transform.translate(
+                                          offset: _getCharacterOffset(),
+                                          child: (RiveCache().getFile(_getModelAsset()) != null
+                                              ? RiveAnimation.direct(
+                                                  RiveCache().getFile(_getModelAsset())!,
+                                                  fit: BoxFit.contain,
+                                                  onInit: _onRiveInit,
+                                                )
+                                              : RiveAnimation.asset(
+                                                  _getModelAsset(),
+                                                  fit: BoxFit.contain,
+                                                  onInit: _onRiveInit,
+                                                )),
+                                        ),
+                                      ),
+                              ],
+                            ),
                           ),
 
                           SizedBox(height: 20 * scale),
@@ -231,8 +381,35 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
                         ],
                       ),
                       child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
+                        onPressed: () async {
+                          if (widget.isPassed && (widget.rawRewards.isNotEmpty || widget.leveledUp)) {
+                            // 🌟 แปลง rawRewards เป็น RewardData สำหรับ Popup
+                            List<RewardData> popupRewards = widget.rawRewards.map<RewardData>((rw) {
+                              return RewardData(
+                                type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM',
+                                amount: rw['added'] ?? rw['amount'] ?? 0,
+                                itemName: rw['name'],
+                                itemImage: rw['image'],
+                              );
+                            }).toList();
+                            
+                            // 🌟 แสดง RewardPopup (ซึ่งจะจัดการแสดง LevelUpPopup ต่อให้อัตโนมัติถ้าอัพเลเวล)
+                            await RewardPopup.show(
+                              context,
+                              rewards: popupRewards,
+                              leveledUp: widget.leveledUp,
+                              baseLevel: widget.baseLevel,
+                              newLevel: widget.newLevel,
+                              user: widget.user,
+                            );
+                            
+                            // ปิด ResultExamScreen หลังจากรับรางวัลเสร็จแล้ว
+                            if (mounted) {
+                              Navigator.pop(context);
+                            }
+                          } else {
+                            Navigator.pop(context);
+                          }
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
@@ -348,10 +525,8 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
       left: 0,
       right: 0,
       child: Container(
-        height: height,
         padding: EdgeInsets.only(top: topPadding),
         color: Colors.black.withOpacity(0.4),
-        alignment: Alignment.bottomCenter,
         child: CustomTopBar(
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),

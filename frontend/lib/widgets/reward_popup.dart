@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/api_service.dart';
+import 'package:flutter_application_1/widgets/level_up_popup.dart';
+import 'package:flutter_application_1/widgets/character_up_popup.dart';
 
 class RewardPopup extends StatefulWidget {
   // 🌟 เปลี่ยนมารับข้อมูลเป็น List ของ RewardData แทน
@@ -14,21 +17,78 @@ class RewardPopup extends StatefulWidget {
   @override
   State<RewardPopup> createState() => _RewardPopupState();
 
-  // Static method อัปเดตให้รับ List
   static Future<void> show(
     BuildContext context, {
     required List<RewardData> rewards,
+    bool leveledUp = false,
+    int baseLevel = 0,
+    int newLevel = 0,
+    User? user,
     VoidCallback? onClose,
-  }) {
-    return showDialog(
+  }) async {
+    debugPrint('🎁 [RewardPopup.show] START — leveledUp=$leveledUp, baseLv=$baseLevel, newLv=$newLevel');
+
+    await showDialog(
       context: context,
-      barrierDismissible: true,
+      barrierDismissible: false,
       barrierColor: Colors.black.withOpacity(0.7),
-      builder: (context) => RewardPopup(
+      builder: (dialogContext) => RewardPopup(
         rewards: rewards,
-        onClose: onClose,
+        onClose: () {
+          debugPrint('🎁 [RewardPopup.show] onClose called — popping dialog');
+          Navigator.pop(dialogContext);
+          onClose?.call();
+        },
       ),
     );
+
+    debugPrint('🎁 [RewardPopup.show] RewardPopup closed — leveledUp=$leveledUp, context.mounted=${context.mounted}');
+
+    if (leveledUp && context.mounted) {
+      // หน่วงเวลาเล็กน้อยเพื่อป้องกัน ghost tap จาก RewardPopup ตกทะลุไปยัง LevelUpPopup
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      debugPrint('🎁 [RewardPopup.show] After delay — context.mounted=${context.mounted}');
+      if (!context.mounted) return;
+
+      int getModelGroup(int lv) {
+        if (lv >= 30) return 2;
+        if (lv >= 15) return 1;
+        return 0;
+      }
+      
+      final isEvolution = getModelGroup(newLevel) > getModelGroup(baseLevel);
+      debugPrint('🎁 [RewardPopup.show] isEvolution=$isEvolution (baseGroup=${getModelGroup(baseLevel)}, newGroup=${getModelGroup(newLevel)})');
+
+      if (isEvolution) {
+        debugPrint('🎁 [RewardPopup.show] Showing CharacterUpPopup...');
+        final freshUser = await ApiService.getProfile(0);
+        if (context.mounted) {
+          await CharacterUpPopup.show(
+            context,
+            baseLevel: baseLevel,
+            newLevel: newLevel,
+            user: freshUser ?? user,
+            onTapContinue: () {},
+          );
+        }
+      } else {
+        debugPrint('🎁 [RewardPopup.show] Showing LevelUpPopup...');
+        if (context.mounted) {
+          await LevelUpPopup.show(
+            context,
+            baseLevel: baseLevel,
+            newLevel: newLevel,
+            onTapContinue: () {},
+          );
+        }
+      }
+      debugPrint('🎁 [RewardPopup.show] LevelUp/CharacterUp popup finished');
+    } else {
+      debugPrint('🎁 [RewardPopup.show] SKIPPED level up popup — leveledUp=$leveledUp, mounted=${context.mounted}');
+    }
+
+    debugPrint('🎁 [RewardPopup.show] END');
   }
 }
 
@@ -36,6 +96,7 @@ class _RewardPopupState extends State<RewardPopup> with SingleTickerProviderStat
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
+  bool _canClose = false; // ป้องกันการกดปิดเร็วเกินไป
 
   @override
   void initState() {
@@ -58,6 +119,13 @@ class _RewardPopupState extends State<RewardPopup> with SingleTickerProviderStat
     );
 
     _controller.forward();
+
+    // อนุญาตให้ปิดได้หลังจาก animation เล่นเสร็จ (800ms)
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted) {
+        setState(() => _canClose = true);
+      }
+    });
   }
 
   @override
@@ -68,106 +136,119 @@ class _RewardPopupState extends State<RewardPopup> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: ScaleTransition(
-          scale: _scaleAnimation,
-          child: Container(
-            width: MediaQuery.of(context).size.width * 0.85,
-            // ลบ height แบบ fix ออก เพื่อให้กล่องยืดตามจำนวนไอเทม
-            constraints: const BoxConstraints(maxHeight: 500, minHeight: 180),
-            decoration: const BoxDecoration(color: Colors.transparent),
-            child: Stack(
-              clipBehavior: Clip.none,
-              alignment: Alignment.center,
-              children: [
-                // แสงฟุ้งพื้นหลัง
-                Container(  
-                  width: 140,
-                  height: 140,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.0),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.white.withOpacity(0.4),
-                        blurRadius: 100,
-                        spreadRadius: 60,
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Main Container
-                Container(
-                  padding: const EdgeInsets.fromLTRB(20, 30, 20, 20), // เพิ่ม padding ด้านบนนิดหน่อย
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [
-                        Color.fromARGB(5, 0, 0, 0),
-                        Color.fromARGB(50, 0, 0, 0),
-                        Color.fromARGB(5, 0, 0, 0),
+    return GestureDetector(
+      onTap: _canClose
+          ? () {
+              widget.onClose?.call();
+            }
+          : null,
+      behavior: HitTestBehavior.opaque,
+      child: Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        insetPadding: EdgeInsets.zero,
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: ScaleTransition(
+            scale: _scaleAnimation,
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.85,
+              // ลบ height แบบ fix ออก เพื่อให้กล่องยืดตามจำนวนไอเทม
+              constraints: const BoxConstraints(maxHeight: 500, minHeight: 180),
+              decoration: const BoxDecoration(color: Colors.transparent),
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.center,
+                children: [
+                  // แสงฟุ้งพื้นหลัง
+                  Container(  
+                    width: 140,
+                    height: 140,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(0.0),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.white.withOpacity(0.4),
+                          blurRadius: 100,
+                          spreadRadius: 60,
+                        ),
                       ],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
                     ),
-                    border: Border(
-                      top: BorderSide(color: Colors.white.withOpacity(0.5), width: 1),
-                      bottom: BorderSide(color: Colors.white.withOpacity(0.5), width: 1),
+                  ),
+
+                  // Main Container
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(20, 30, 20, 20), // เพิ่ม padding ด้านบนนิดหน่อย
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [
+                          Color.fromARGB(5, 0, 0, 0),
+                          Color.fromARGB(50, 0, 0, 0),
+                          Color.fromARGB(5, 0, 0, 0),
+                        ],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                      border: Border(
+                        top: BorderSide(color: Colors.white.withOpacity(0.5), width: 1),
+                        bottom: BorderSide(color: Colors.white.withOpacity(0.5), width: 1),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        'ได้รับรางวัล',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFFFFFFFF),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'ได้รับรางวัล',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFFFFFFF),
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
-                      // 🌟 ส่วนที่แสดงไอเทมทั้งหมดพร้อมกันโดยใช้ Wrap
-                      Wrap(
-                        spacing: 16, // ระยะห่างแนวนอนระหว่างไอเทม
-                        runSpacing: 16, // ระยะห่างแนวตั้ง (กรณีไอเทมเยอะจนปัดบรรทัดใหม่)
-                        alignment: WrapAlignment.center,
-                        children: widget.rewards.map((reward) {
-                          return _buildRewardIcon(reward);
-                        }).toList(),
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      const Text(
-                        'แตะหน้าจอเพื่อดำเนินการต่อ',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.normal,
-                          color: Color(0xFFFFFFFF),
+                        // 🌟 ส่วนที่แสดงไอเทมทั้งหมดพร้อมกันโดยใช้ Wrap
+                        Wrap(
+                          spacing: 16, // ระยะห่างแนวนอนระหว่างไอเทม
+                          runSpacing: 16, // ระยะห่างแนวตั้ง (กรณีไอเทมเยอะจนปัดบรรทัดใหม่)
+                          alignment: WrapAlignment.center,
+                          children: widget.rewards.map((reward) {
+                            return _buildRewardIcon(reward);
+                          }).toList(),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
 
-                // Header Title (รับรางวัลสำเร็จ)
-                _buildHeader(),
-              ],
+                        const SizedBox(height: 20),
+
+                        AnimatedOpacity(
+                          opacity: _canClose ? 1.0 : 0.3,
+                          duration: const Duration(milliseconds: 300),
+                          child: const Text(
+                            'แตะหน้าจอเพื่อดำเนินการต่อ',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.normal,
+                              color: Color(0xFFFFFFFF),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Header Title (รับรางวัลสำเร็จ)
+                  _buildHeader(),
+                ],
+              ),
             ),
           ),
         ),
