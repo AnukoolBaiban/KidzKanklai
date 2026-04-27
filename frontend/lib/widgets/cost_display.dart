@@ -36,12 +36,21 @@ class CostDisplayWidget extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // 🌟 เพิ่มคำว่า "ใช้ " ไว้ข้างหน้า
+            Text(
+              'ใช้ ',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
             // Energy Box
             if (showEnergy)
               _buildCostItem(
                 icon: 'assets/images/item/energy.png',
-                // 🌟 3. เช็คว่ามีข้อความส่งมาไหม ถ้ามีใช้ข้อความ ถ้าไม่มีใช้ตัวเลขแบบเดิม
-                value: energyCostText != null ? '-$energyCostText' : '-$energyCost',
+                // 🌟 ลบเครื่องหมายลบออก
+                value: energyCostText != null ? energyCostText! : '$energyCost',
                 fallbackIcon: Icons.flash_on,
                 fallbackColor: Colors.yellow,
               ),
@@ -52,9 +61,9 @@ class CostDisplayWidget extends StatelessWidget {
                 Text(
                   'และ',
                   style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
                   ),
                 ),
                 SizedBox(width: 8),
@@ -62,7 +71,7 @@ class CostDisplayWidget extends StatelessWidget {
 
               _buildCostItem(
                 icon: 'assets/images/item/Ticket_energy_img.png',
-                value: '-$ticketCost',
+                value: ' $ticketCost',
                 fallbackIcon: Icons.confirmation_number,
                 fallbackColor: Colors.green,
               ),

@@ -42,6 +42,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
   int _currentExp = 0;
   int _nextLevelExp = 40;
   double _expPercent = 0.0;
+  int _energyBarKey = 0; // 🌟 1. เพิ่มตัวแปร key สำหรับ EnergyBar
 
   String _intStat = "10";
   String _strStat = "10";
@@ -343,7 +344,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
 
                   if (widget.locationName != 'สนามสอบ') ...[
                     SizedBox(height: 20),
-                    EnergyBar(),
+                    EnergyBar(key: ValueKey(_energyBarKey)), // 🌟 2. ใส่ key ให้ EnergyBar
                     SizedBox(height: 20),
                     /// Stat Box
                     _buildStatBox(),
@@ -582,7 +583,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
     final isPark = widget.locationName == 'สวนสาธารณะ';
 
     return Container(
-      padding: EdgeInsets.all(20),
+      padding: EdgeInsets.fromLTRB(20,20,20,20),
       child: Column(
         children: [
           // Cost Display
@@ -591,7 +592,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
             children: [
               Center(
                 child: CostDisplayWidget(
-                  energyCostText: '20', // 🌟 ส่งข้อความไปโชว์แทน
+                  energyCostText: '10-20', // 🌟 ส่งข้อความไปโชว์แทน
                   ticketCost: 1,
                   showTicket: true,
                   showEnergy: !isPark,
@@ -600,7 +601,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
             ],
           ),
 
-          SizedBox(height: 20),
+          SizedBox(height: 8),
 
           // ✅ ปุ่ม Start (แก้ตรงนี้)
           Container(
@@ -672,7 +673,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                         );
                       }
 
-                      _fetchUserProfile(); // รีเฟรชข้อมูลตัวละคร
+                      // _fetchUserProfile(); // รีเฟรชข้อมูลตัวละคร (ย้ายไปทำตอนกลับมาจาก popup)
 
                       if (mounted) {
                         // 🌟 เตรียมของรางวัลที่จะส่งไปโชว์
@@ -685,16 +686,25 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                            correctRewards = {'พลังงาน': result['stamina_change'] ?? 0};
                         }
 
-                        Navigator.push(
+                        await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => ResultStatScreen(
                               isSuccess: true, // บอกว่าสำเร็จ
                               statusRewards: correctRewards,
                               oldStats: oldStatsData,
+                              user: _user, // 🌟 ส่ง user ไปให้โชว์แอนิเมชัน
                             ),
                           ),
                         );
+                        
+                        // 🌟 ดึงข้อมูลใหม่หลังจากปิดหน้า ResultStatScreen (เพื่อให้เรียลไทม์)
+                        if (mounted) {
+                          setState(() {
+                            _energyBarKey++; // บังคับให้ EnergyBar รีโหลดใหม่
+                          });
+                          _fetchUserProfile(); // อัปเดต state ตัวละคร
+                        }
                       }
                     } else {
                       // ❌ กรณีล้มเหลว (เช่น พลังงานไม่พอตอนฝึกฝนจนเหลือ 0)
@@ -704,7 +714,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                         );
                       }
 
-                      _fetchUserProfile(); // รีเฟรชให้เห็นหลอดพลังงานลด
+                      // _fetchUserProfile(); // รีเฟรชให้เห็นหลอดพลังงานลด (ย้ายไปทำด้านล่าง)
 
                       // 🌟 เช็คว่าถ้าไม่ใช่สวนสาธารณะ ให้โชว์หน้าจอฝึกไม่สำเร็จ
                       if (widget.locationName != 'สวนสาธารณะ' && mounted) {
@@ -715,7 +725,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                         if (widget.locationName == 'โรงยิม') failedStat = {'ความแข็งแรง': 0};
                         if (widget.locationName == 'สวนสนุก') failedStat = {'ความคิดสร้างสรรค์': 0};
 
-                        Navigator.push(
+                        await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => ResultStatScreen(
@@ -724,9 +734,18 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                               // 🌟 2. ส่ง stat ที่พยายามฝึก ไปแทนคำว่าพลังงาน!
                               statusRewards: failedStat, 
                               oldStats: oldStatsData,
+                              user: _user, // 🌟 ส่ง user ไปให้โชว์แอนิเมชัน
                             ),
                           ),
                         );
+                      }
+                      
+                      // 🌟 ดึงข้อมูลใหม่หลังจากแสดงผลล้มเหลว หรือกลับมาจากหน้า popup
+                      if (mounted) {
+                        setState(() {
+                          _energyBarKey++;
+                        });
+                        _fetchUserProfile();
                       }
                     }
                   }
@@ -839,7 +858,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
   Widget _buildExamMap() {
     return SizedBox(
       key: ValueKey('exam-map-${_examStatuses.values.join('-')}'),
-      height: 420,
+      height: 580,
       width: double.infinity,
       child: Stack(
         clipBehavior: Clip.none,

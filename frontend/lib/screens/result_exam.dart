@@ -22,7 +22,7 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
-    final topBarHeight = 75.0 + topPadding;
+    final topBarHeight = 60.0 + topPadding;
     final screenWidth = MediaQuery.of(context).size.width;
     final scale = (screenWidth / 375).clamp(0.8, 1.2);
 
@@ -348,10 +348,8 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
       left: 0,
       right: 0,
       child: Container(
-        height: height,
         padding: EdgeInsets.only(top: topPadding),
         color: Colors.black.withOpacity(0.4),
-        alignment: Alignment.bottomCenter,
         child: CustomTopBar(
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),

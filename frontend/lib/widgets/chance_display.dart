@@ -54,7 +54,7 @@ class ChanceDisplay extends StatelessWidget {
   if (chancePercent < 40) {
     return Color(0xFFE94444); // 🔴 ต่ำ
   } else if (chancePercent < 70) {
-    return Color(0xFFFFC300); // 🟡 กลาง
+    return Color(0xFFFF8C00); // 🟠 กลาง (เปลี่ยนเป็นสีส้มเพื่อให้อ่านง่าย)
   } else {
     return Color(0xFF48BA05); // 🟢 สูง
   }
