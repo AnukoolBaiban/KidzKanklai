@@ -181,7 +181,10 @@ class _CustomBottomNavigationBarState extends State<CustomBottomNavigationBar> {
           final dbLevel = charData['level'] as int? ?? 1;
           final totalExp = charData['experience'] as int? ?? 0;
           
-          _updateLevelUI(dbLevel, totalExp); 
+          // 🌟 ป้องกันกรณีตาราง characters อัปเดตช้ากว่า users table (EXP ลดลง)
+          if (dbLevel > _level || (dbLevel == _level && totalExp >= _user!.exp)) {
+            _updateLevelUI(dbLevel, totalExp); 
+          }
         }
       }, onError: (error) {
         debugPrint('Error fetching realtime character: $error');

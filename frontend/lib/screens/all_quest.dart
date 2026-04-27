@@ -30,6 +30,7 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
   int _selectedTabIndex = 0;
   final List<String> _tabs = ["ทั้งหมด", "ระบบ", "ส่วนตัว", "ประวัติ"];
   Key _topBarKey = UniqueKey(); // 🌟 สำหรับรีเฟรชแถบด้านบน
+  Key _bottomBarKey = UniqueKey(); // 🌟 สำหรับรีเฟรชแถบด้านล่าง
 
   // 🌟 ลบ Mock Data ออก และสร้างตัวแปรรับข้อมูลจริงจาก DB
   List<Map<String, dynamic>> _allQuests = [];
@@ -395,6 +396,7 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
       child: SafeArea(
         top: false,
         child: CustomBottomNavigationBar(
+          key: _bottomBarKey,
           selectedIndex: -1,
           avatarUrl: null,
           user: _user, // 🌟 เพิ่มบรรทัดนี้เพื่อให้ BottomNav อัปเดตตาม State
@@ -500,8 +502,15 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
                         Navigator.pop(dialogContext);
                         // เมื่อกลับมาจากการสร้างเควส ให้ Refresh ดึงข้อมูลใหม่ด้วย
                         Navigator.pushNamed(context, '/createnormalquest').then(
-                          (_) {
+                          (_) async {
                             _fetchQuestsFromDB();
+                            final freshProfile = await ApiService.getProfile(0);
+                            if (freshProfile != null && mounted) {
+                              setState(() {
+                                _user = freshProfile;
+                                _bottomBarKey = UniqueKey();
+                              });
+                            }
                           },
                         );
                       }),
@@ -509,8 +518,15 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
                       _buildPopupButton("ภารกิจทันที", () {
                         Navigator.pop(dialogContext);
 
-                        Navigator.pushNamed(context, '/countdown').then((_) {
+                        Navigator.pushNamed(context, '/countdown').then((_) async {
                           _fetchQuestsFromDB();
+                          final freshProfile = await ApiService.getProfile(0);
+                          if (freshProfile != null && mounted) {
+                            setState(() {
+                              _user = freshProfile;
+                              _bottomBarKey = UniqueKey();
+                            });
+                          }
                         });
                       }),
                     ],
