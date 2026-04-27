@@ -16,9 +16,30 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   int _selectedIndex = 2;
+  User? _currentUser; // 🌟 1. เพิ่มตัวแปรสำหรับเก็บข้อมูลผู้ใช้
 
-  // 🌟 1. เพิ่มตัวแปรนี้เพื่อเอาไว้บังคับรีโหลด EnergyBar
+  // 🌟 2. เพิ่มตัวแปรนี้เพื่อเอาไว้บังคับรีโหลด EnergyBar
   Key _energyKey = UniqueKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _currentUser = widget.user;
+    // ดึงข้อมูลใหม่เผื่อมีการอัปเดตก่อนหน้านี้
+    if (_currentUser == null) {
+      _fetchUserProfile();
+    }
+  }
+
+  // 🌟 3. ฟังก์ชันดึงข้อมูลโปรไฟล์ใหม่
+  Future<void> _fetchUserProfile() async {
+    final updatedUser = await ApiService.getProfile(0);
+    if (mounted && updatedUser != null) {
+      setState(() {
+        _currentUser = updatedUser;
+      });
+    }
+  }
 
   // ค่าสถานะที่ได้รับจากแต่ละสถานที่
   final Map<String, Map<String, int>> _locationRewards = {
@@ -247,7 +268,8 @@ class _MapScreenState extends State<MapScreen> {
           context,
           MaterialPageRoute(
             builder: (context) => LocationUpgradeScreen(
-              user: widget.user,
+              user: _currentUser, // 🌟 ส่ง _currentUser ที่เป็น state ปัจจุบันไป
+
               locationName: label,
               locationImage: imagePath,
               statusRewards: _locationRewards[label] ?? {},
@@ -255,11 +277,13 @@ class _MapScreenState extends State<MapScreen> {
           ),
         );
 
-        // 🌟 3. พอกลับมาถึงหน้านี้ สั่งเปลี่ยน Key เพื่อบังคับให้ EnergyBar รีโหลดข้อมูลใหม่ทันที
+        // 🌟 4. พอกลับมาถึงหน้านี้ สั่งเปลี่ยน Key เพื่อบังคับให้ EnergyBar รีโหลดข้อมูลใหม่ทันที
         if (mounted) {
           setState(() {
             _energyKey = UniqueKey();
           });
+          // 🌟 5. รีเฟรชโปรไฟล์เพื่อให้ BottomNavigationBar อัปเดตเลเวลล่าสุด
+          _fetchUserProfile();
         }
       },
     );
@@ -291,6 +315,7 @@ class _MapScreenState extends State<MapScreen> {
       right: 0,
       child: CustomBottomNavigationBar(
         selectedIndex: 2,
+        user: _currentUser, // 🌟 ส่ง _currentUser ไปเพื่อให้หลอด EXP อัปเดต
         onItemTapped: (index) {},
         onAvatarTapped: () =>
             Navigator.pushReplacementNamed(context, '/profile'),

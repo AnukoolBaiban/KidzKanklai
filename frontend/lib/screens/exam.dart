@@ -813,6 +813,10 @@ class _ExamScreenState extends State<ExamScreen> {
                 builder: (ctx) => const Center(child: CircularProgressIndicator()),
               );
 
+              // 🌟 เก็บ Level เดิมไว้เปรียบเทียบก่อนยิง API
+              final profileBefore = await api.ApiService.getProfile(0);
+              final oldLevel = profileBefore?.level ?? 0;
+
               final result = await api.ApiService.startExam(currentExamId);
 
               if (mounted) Navigator.pop(context);
@@ -833,6 +837,11 @@ class _ExamScreenState extends State<ExamScreen> {
                     }
                   }
 
+                  // 🌟 ดึงข้อมูลโปรไฟล์ใหม่ เพื่อดูว่าเลเวลอัพไหม
+                  final newProfile = await api.ApiService.getProfile(0);
+                  final actualNewLevel = newProfile?.level ?? oldLevel;
+                  final didLevelUp = actualNewLevel > oldLevel;
+
                   _fetchUserProfile();
                   
                   if (mounted) {
@@ -842,7 +851,12 @@ class _ExamScreenState extends State<ExamScreen> {
                       MaterialPageRoute(
                         builder: (_) => ResultExamScreen(
                           statusRewards: finalRewards,
+                          rawRewards: (result['rewards'] as List?) ?? [], // 🌟 ส่งของรางวัลดิบไปทำ Popup
+                          leveledUp: didLevelUp, // 🌟 ส่งสถานะอัพเลเวล
+                          baseLevel: oldLevel,
+                          newLevel: actualNewLevel,
                           isPassed: resultPassed,
+                          user: newProfile ?? _user, // 🌟 ส่ง user ไปให้โชว์ตัวละคร Rive
                         ),
                       ),
                     );
