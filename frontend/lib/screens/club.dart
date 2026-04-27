@@ -194,7 +194,7 @@ class _ClubState extends State<Club> with TickerProviderStateMixin {
       animation: _bgAnim,
       builder: (_, __) => SizedBox.expand(
         child: Image.asset(
-          'assets/images/background/bg7.png',
+          'assets/images/background/bg-club.png',
           fit: BoxFit.cover,
           alignment: Alignment(_bgAnim.value, 0.0),
         ),
