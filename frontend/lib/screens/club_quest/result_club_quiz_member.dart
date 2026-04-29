@@ -3,19 +3,21 @@ import 'package:flutter_application_1/api_service.dart';
 import 'package:flutter_application_1/widgets/custom_top_bar.dart';
 
 class ResultExamScreen extends StatefulWidget {
-  final Map<String, int> statusRewards;
   final User? user;
   final bool isPassed;
   final int score;
   final int total;
+  
+  // 🌟 1. เปลี่ยนการรับค่า StatusRewards จาก Map ธรรมดา เป็น List ที่มาจาก API
+  final List<dynamic>? rewardsList;
 
   const ResultExamScreen({
     Key? key,
-    required this.statusRewards,
     this.user,
     required this.isPassed,
     required this.score,
     required this.total,
+    this.rewardsList, // 🌟 รับ List รางวัล
   }) : super(key: key);
 
   @override
@@ -179,6 +181,7 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
 
                           SizedBox(height: 20 * scale),
 
+                          // 🌟 2. แสดงของรางวัลจริงจาก API
                           SizedBox(
                             height: 130 * scale,
                             child: widget.isPassed
@@ -196,23 +199,7 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
                                       Row(
                                         mainAxisAlignment:
                                             MainAxisAlignment.center,
-                                        children: [
-                                          _buildRewardItem(
-                                            'assets/images/item/EXP.png',
-                                            Icons.stars_rounded,
-                                            Colors.orange,
-                                            '+59',
-                                            scale,
-                                          ),
-                                          SizedBox(width: 16 * scale),
-                                          _buildRewardItem(
-                                            'assets/images/item/Gasha.png',
-                                            Icons.card_giftcard,
-                                            Colors.purple,
-                                            '+1',
-                                            scale,
-                                          ),
-                                        ],
+                                        children: _buildRewardList(scale),
                                       ),
                                     ],
                                   )
@@ -220,7 +207,7 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
                                     children: [
                                       SizedBox(height: 12 * scale),
                                       Text(
-                                        'โปรดตอบคำถามใหม่อีกครั้ง',
+                                        'โปรดตอบคำถามใหม่อีกครั้ง\n(ติดคูลดาวน์ 10 นาที)', // เพิ่มข้อความคูลดาวน์ให้ชัดเจนขึ้น
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
                                           fontSize: 16 * scale,
@@ -262,7 +249,12 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
                       ),
                       child: ElevatedButton(
                         onPressed: () {
-                          Navigator.pop(context);
+                          // 🌟 3. กลับไปหน้าห้องชมรมหลัก เพื่อให้มันโหลด API สถานะเควสใหม่
+                          Navigator.pushNamedAndRemoveUntil(
+                            context,
+                            '/club', // ชื่อ Route หน้า Lobby/คลับ ของคุณ
+                            (route) => route.isFirst,
+                          );
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
@@ -292,6 +284,48 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
         ],
       ),
     );
+  }
+
+  // 🌟 ฟังก์ชันสร้างรายการของรางวัล
+  List<Widget> _buildRewardList(double scale) {
+    if (widget.rewardsList == null || widget.rewardsList!.isEmpty) {
+      return [const Text("ไม่มีรางวัล")];
+    }
+
+    List<Widget> rewardWidgets = [];
+    for (int i = 0; i < widget.rewardsList!.length; i++) {
+      final reward = widget.rewardsList![i];
+      final String name = reward['name'] ?? 'Item';
+      final int amount = reward['amount'] ?? 1;
+
+      // จัดการรูปภาพและสีแบบฉุกเฉิน (เหมือนที่คุณทำในหน้าคลับ)
+      bool isExp = name.toUpperCase().contains('EXP');
+      bool isCoin = name.toUpperCase().contains('COIN');
+      
+      String imagePath = 'assets/images/item/Gasha.png';
+      IconData icon = Icons.card_giftcard;
+      Color color = Colors.purple;
+
+      if (isExp) {
+        imagePath = 'assets/images/item/EXP.png';
+        icon = Icons.stars_rounded;
+        color = Colors.orange;
+      } else if (isCoin) {
+        imagePath = 'assets/images/item/coin.png'; // สมมติว่ามีรูปเหรียญ
+        icon = Icons.monetization_on;
+        color = Colors.yellow;
+      }
+
+      rewardWidgets.add(
+        _buildRewardItem(imagePath, icon, color, '+$amount', scale),
+      );
+
+      // เว้นช่องว่างระหว่างไอเทม
+      if (i < widget.rewardsList!.length - 1) {
+        rewardWidgets.add(SizedBox(width: 16 * scale));
+      }
+    }
+    return rewardWidgets;
   }
 
   Widget _buildRewardItem(

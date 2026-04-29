@@ -8,6 +8,8 @@ import 'package:flutter_application_1/widgets/exit_edit_club_quest_popup.dart';
 import 'package:flutter_application_1/widgets/club_confirm_save_popup.dart';
 import 'package:flutter_application_1/widgets/annotation_normal.dart';
 import 'create_club_quest_quiz.dart';
+import 'dart:io'; // 🌟 1. นำเข้า dart:io
+import 'package:image_picker/image_picker.dart'; // 🌟 2. นำเข้า image_picker
 
 class QuizQuestion {
   TextEditingController textController = TextEditingController();
@@ -57,14 +59,25 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
   List<QuizQuestion> _questions = [QuizQuestion()];
   int _minScore = 1;
 
-  void _handleImagePick() {
-    setState(() {
-      _hasImage = true;
-    });
+  // 🌟 เพิ่มตัวแปรเก็บไฟล์รูปภาพ
+  File? _selectedImage;
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('เลือกรูปภาพแล้ว')));
+  // 🌟 แก้ไขฟังก์ชันเลือกรูปภาพ
+  Future<void> _handleImagePick() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    
+    if (pickedFile != null) {
+      setState(() {
+        _selectedImage = File(pickedFile.path); // เก็บไฟล์ที่เลือก
+        _hasImage = true;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('เลือกรูปภาพแล้ว')));
+      }
+    }
   }
 
   @override
@@ -354,22 +367,16 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
           ExitEditClubQuestPopup.show(
             context,
             onConfirm: () {
-              Navigator.pop(context);
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => ClubQuestDetailLeaderScreen()),
-              );
+              Navigator.pop(context); // ปิด popup
+              Navigator.pop(context); // 🌟 แก้เป็น .pop() เพื่อย้อนกลับไปหน้าเดิม (Detail Leader)
             },
           );
         } else {
           ConfirmExitPopup.show(
             context,
             onConfirm: () {
-              Navigator.pop(context);
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => ClubRoomHeadScreen()),
-              );
+              Navigator.pop(context); // ปิด popup
+              Navigator.pop(context); // 🌟 แก้เป็น .pop() เพื่อย้อนกลับไปหน้าเดิม (Room Head)
             },
           );
         }
@@ -728,20 +735,17 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
                     onTap: () {
                       setState(() {
                         _hasImage = false;
+                        _selectedImage = null; // 🌟 เคลียร์ไฟล์ทิ้งด้วย
                       });
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
+                        const SnackBar(
                           content: Text('ลบรูปภาพแล้ว'),
                           backgroundColor: Colors.orange,
                           duration: Duration(seconds: 1),
                         ),
                       );
                     },
-                    child: Icon(
-                      Icons.close,
-                      color: Color(0xFF447199),
-                      size: 28,
-                    ),
+                    child: const Icon(Icons.close, color: Color(0xFF447199), size: 28),
                   ),
                 ],
               ),
@@ -787,10 +791,16 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
                 user: widget.user,
                 isEditing: widget.isEditing,
                 initialData: {
+                  // 🌟 เพิ่ม ID และรูปเดิม เพื่อให้หน้าถัดไปเอาไปยิง API Update ได้ถูกข้อ
+                  'id': widget.initialData?['id'], 
+                  'imageUrl': widget.initialData?['imageUrl'], 
+                  
                   'name': _nameController.text,
                   'detail': _detailController.text,
                   'date': _selectedDate,
-                  'image': _hasImage,
+                  'imageFile': _selectedImage, 
+                  
+                  // 🌟 ส่งคำถามเดิมและคะแนนผ่านไปยังหน้า Quiz ต่อ
                   'questions': widget.initialData?['questions'],
                   'minScore': widget.initialData?['minScore'],
                 },

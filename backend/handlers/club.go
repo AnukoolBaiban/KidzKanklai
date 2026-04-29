@@ -223,3 +223,234 @@ func JoinClub(c *gin.Context) {
 		"club_id": targetClubID,
 	})
 }
+
+// ------------------------------------------------------------------------
+// API 3: ลาออกจากชมรม (Leave Club)
+// ------------------------------------------------------------------------
+// POST /clubs/leave
+func LeaveClub(c *gin.Context) {
+	userIdVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	userIDStr := fmt.Sprintf("%v", userIdVal)
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	ctx := context.Background()
+	tx, err := configs.DB.Begin(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction failed"})
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// ตรวจสอบว่าผู้เล่นเป็นสมาชิกชมรมจริงหรือไม่ และไม่ใช่หัวหน้า
+	var clubRole *string
+	err = tx.QueryRow(ctx, `SELECT club_role FROM public.user_profiles WHERE id = $1`, userID).Scan(&clubRole)
+	
+	if err != nil || clubRole == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "คุณไม่ได้อยู่ในชมรมใดเลย"})
+		return
+	}
+
+	if *clubRole == "owner" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "เจ้าของชมรมไม่สามารถลาออกได้ ต้องยุบชมรมเท่านั้น"})
+		return
+	}
+
+	// อัปเดตข้อมูล ลบ club_id, club_role, และ club_join_date ทิ้ง
+	updateUserQuery := `
+		UPDATE public.user_profiles 
+		SET club_id = NULL, club_role = NULL, club_join_date = NULL 
+		WHERE id = $1
+	`
+	_, err = tx.Exec(ctx, updateUserQuery, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถลาออกจากชมรมได้"})
+		return
+	}
+
+	// ยืนยัน Transaction
+	if err := tx.Commit(ctx); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction commit failed"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "ลาออกจากชมรมสำเร็จ",
+	})
+}
+
+// ------------------------------------------------------------------------
+// API 4: ไล่สมาชิกออกจากชมรม (Kick Member) - เฉพาะหัวหน้าชมรม
+// ------------------------------------------------------------------------
+type KickMemberInput struct {
+	TargetUserID string `json:"target_user_id" binding:"required"`
+}
+
+// POST /clubs/kick
+func KickMember(c *gin.Context) {
+	// 1. ดึง ID ของคนที่กดส่งคำสั่ง (คนเตะ)
+	userIdVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	ownerIDStr := fmt.Sprintf("%v", userIdVal)
+	ownerID, err := uuid.Parse(ownerIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	// 2. รับค่า ID ของคนที่โดนเตะจาก Body
+	var input KickMemberInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุ ID ของสมาชิกที่ต้องการไล่ออก"})
+		return
+	}
+
+	targetUserID, err := uuid.Parse(input.TargetUserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid target user ID"})
+		return
+	}
+
+	// ป้องกันการเตะตัวเอง
+	if ownerID == targetUserID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "คุณไม่สามารถไล่ตัวเองออกจากชมรมได้"})
+		return
+	}
+
+	ctx := context.Background()
+	tx, err := configs.DB.Begin(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction failed"})
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// 3. ตรวจสอบสิทธิ์คนเตะ (ต้องเป็นเจ้าของชมรม)
+	var ownerClubID *int64
+	var ownerRole *string
+	err = tx.QueryRow(ctx, `SELECT club_id, club_role FROM public.user_profiles WHERE id = $1`, ownerID).Scan(&ownerClubID, &ownerRole)
+	if err != nil || ownerClubID == nil || ownerRole == nil || *ownerRole != "owner" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "เฉพาะหัวหน้าชมรมเท่านั้นที่สามารถไล่สมาชิกออกได้"})
+		return
+	}
+
+	// 4. ตรวจสอบคนโดนเตะ (ต้องอยู่ในชมรมเดียวกันกับ Owner)
+	var targetClubID *int64
+	var targetRole *string
+	err = tx.QueryRow(ctx, `SELECT club_id, club_role FROM public.user_profiles WHERE id = $1 FOR UPDATE`, targetUserID).Scan(&targetClubID, &targetRole)
+	if err != nil || targetClubID == nil || *targetClubID != *ownerClubID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ไม่พบผู้เล่นนี้ในชมรมของคุณ"})
+		return
+	}
+
+	// (ป้องกันเหนียวไว้อีกชั้น: Target ไม่ควรเป็น owner)
+	if targetRole != nil && *targetRole == "owner" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ไม่สามารถไล่หัวหน้าชมรมได้"})
+		return
+	}
+
+	// 5. เตะออกจากชมรม (เคลียร์ค่า club_id, club_role, และ club_join_date เป็น NULL)
+	updateUserQuery := `
+		UPDATE public.user_profiles 
+		SET club_id = NULL, club_role = NULL, club_join_date = NULL 
+		WHERE id = $1
+	`
+	_, err = tx.Exec(ctx, updateUserQuery, targetUserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถไล่สมาชิกออกได้"})
+		return
+	}
+
+	// ยืนยัน Transaction
+	if err := tx.Commit(ctx); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction commit failed"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "ไล่สมาชิกออกจากชมรมเรียบร้อยแล้ว",
+	})
+}
+
+// ------------------------------------------------------------------------
+// API 5: ยุบชมรม (Delete/Disband Club) - เฉพาะหัวหน้าชมรม
+// ------------------------------------------------------------------------
+
+// POST /clubs/delete
+func DeleteClub(c *gin.Context) {
+	// 1. ดึง ID ของผู้ใช้งาน
+	userIdVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	userIDStr := fmt.Sprintf("%v", userIdVal)
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	ctx := context.Background()
+	tx, err := configs.DB.Begin(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction failed"})
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// 2. ตรวจสอบสิทธิ์ (ต้องเป็นเจ้าของชมรมเท่านั้น)
+	var clubID *int64
+	var clubRole *string
+	err = tx.QueryRow(ctx, `SELECT club_id, club_role FROM public.user_profiles WHERE id = $1 FOR UPDATE`, userID).Scan(&clubID, &clubRole)
+	if err != nil || clubID == nil || clubRole == nil || *clubRole != "owner" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "เฉพาะหัวหน้าชมรมเท่านั้นที่สามารถยุบชมรมได้"})
+		return
+	}
+
+	// 3. ปลดสมาชิกทุกคนออกจากชมรมนี้ (เซ็ต club_id, club_role, club_join_date เป็น NULL)
+	// หมายเหตุ: รวมตัวหัวหน้าเองด้วย จึงไม่ต้อง Where ยกเว้นใคร
+	clearMembersQuery := `
+		UPDATE public.user_profiles 
+		SET club_id = NULL, club_role = NULL, club_join_date = NULL 
+		WHERE club_id = $1
+	`
+	_, err = tx.Exec(ctx, clearMembersQuery, *clubID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถปลดสมาชิกออกจากชมรมได้"})
+		return
+	}
+
+	// 4. ลบชมรมออกจากตาราง clubs
+	// 💡 หมายเหตุ: หากตาราง quests มีการเชื่อม FK club_id ไว้ ต้องมั่นใจว่าตั้งค่าเป็น ON DELETE CASCADE
+	// หรือไม่ก็ต้องเขียนคำสั่งลบ quests ของชมรมนี้ทิ้งก่อนลบคลับครับ
+	deleteClubQuery := `DELETE FROM public.clubs WHERE id = $1`
+	_, err = tx.Exec(ctx, deleteClubQuery, *clubID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ลบข้อมูลชมรมล้มเหลว กรุณาตรวจสอบว่ามีข้อมูลค้างในระบบหรือไม่"})
+		return
+	}
+
+	// 5. ยืนยัน Transaction
+	if err := tx.Commit(ctx); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction commit failed"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "ยุบชมรมเรียบร้อยแล้ว",
+	})
+}

@@ -3,36 +3,68 @@ import '../../widgets/custom_top_bar.dart';
 import '../../api_service.dart';
 import 'result_club_quiz_member.dart';
 import '../../widgets/exit_edit_club_quest_popup.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // 🌟 อย่าลืม import
 
 class ClubQuestQuizMemberScreen extends StatefulWidget {
-  final User? user;
+  final int questId; // 🌟 1. เพิ่มตัวแปรรับ ID ภารกิจ
 
-  const ClubQuestQuizMemberScreen({Key? key, this.user}) : super(key: key);
+  const ClubQuestQuizMemberScreen({
+    Key? key, 
+    required this.questId, // 🌟 บังคับรับค่า ID
+  }) : super(key: key);
 
   @override
   State<ClubQuestQuizMemberScreen> createState() =>
       _ClubQuestQuizMemberScreenState();
 }
 
-class _ClubQuestQuizMemberScreenState
-    extends State<ClubQuestQuizMemberScreen> {
+class _ClubQuestQuizMemberScreenState extends State<ClubQuestQuizMemberScreen> {
   bool _isBackPressed = false;
 
-  // Mock Questions Data (correctAnswer = index ของคำตอบที่ถูก)
-  final List<Map<String, dynamic>> _questions = [
-    {
-      'question': 'ก๋วยเตี๋ยวเนื้อพิเศษราคาเท่าไหร่',
-      'choices': ['50 บาท', '40 บาท', '60 บาท', '45 บาท'],
-      'selected': null,
-      'correctAnswer': 0, // 50 บาท
-    },
-    {
-      'question': 'เจ้าของร้านชื่ออะไร',
-      'choices': ['กุ้ง', 'แก้ว', 'เก่ง', 'กบ'],
-      'selected': null,
-      'correctAnswer': 0, // กุ้ง
-    },
-  ];
+  // 🌟 2. ลบ Mock Data ออก และใช้ตัวแปรเก็บข้อมูลจริง
+  List<Map<String, dynamic>> _questions = [];
+  bool _isLoading = true; // โชว์โหลดตอนดึงคำถาม
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchQuestions(); // 🌟 ดึงคำถามจาก Database ทันทีที่เปิดหน้า
+  }
+
+  // 🌟 ฟังก์ชันดึงคำถามจาก Supabase
+  Future<void> _fetchQuestions() async {
+    try {
+      final supabase = Supabase.instance.client;
+      // ดึงเฉพาะคำถามและตัวเลือก (ไม่ดึง correct_answer มาเพื่อป้องกันแฮกเกอร์ดูเฉลย)
+      final response = await supabase
+          .from('quest_questions')
+          .select('id, question_text, choice_a, choice_b, choice_c, choice_d')
+          .eq('quest_id', widget.questId);
+
+      final List<Map<String, dynamic>> loadedQuestions = [];
+      for (var q in response) {
+        loadedQuestions.add({
+          'id': q['id'],
+          'question': q['question_text'],
+          'choices': [q['choice_a'], q['choice_b'], q['choice_c'], q['choice_d']],
+          'selected': null, // ยังไม่ได้เลือก
+        });
+      }
+
+      if (mounted) {
+        setState(() {
+          _questions = loadedQuestions;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching questions: $e");
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ดึงคำถามล้มเหลว'), backgroundColor: Colors.red));
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +90,9 @@ class _ClubQuestQuizMemberScreenState
               right: size.width * 0.05,
               bottom: bottomPadding + 100,
             ),
-            child: Column(
+            child: _isLoading 
+                ? const Center(child: CircularProgressIndicator()) // 🌟 โชว์ Loading ระหว่างดึงคำถาม
+                : Column(
               children: [
                 // Back Button
                 Row(children: [_buildBackButton()]),
@@ -109,14 +143,14 @@ class _ClubQuestQuizMemberScreenState
             ),
           ),
 
-          // Bottom Button
-          _buildBottomButton(bottomPadding),
+          // Bottom Button (ซ่อนปุ่มถ้ายังโหลดคำถามไม่เสร็จ)
+          if (!_isLoading) _buildBottomButton(bottomPadding),
         ],
       ),
     );
   }
 
-  // ==================== Components ====================
+  // ==================== Components (UI คงเดิม) ====================
 
   Widget _buildBackground() {
     return Container(
@@ -317,30 +351,72 @@ class _ClubQuestQuizMemberScreenState
           ],
         ),
         child: ElevatedButton(
-          onPressed: () {
-            // คำนวณคะแนน
-            int score = 0;
-            final int total = _questions.length;
-            for (final q in _questions) {
-              if (q['selected'] != null &&
-                  q['selected'] == q['correctAnswer']) {
-                score++;
+          // 🌟 3. แก้ไขปุ่มเพื่อเชื่อมต่อ API ส่งคำตอบ
+          onPressed: () async {
+            // ก. เช็คว่าตอบครบทุกข้อหรือไม่
+            bool allAnswered = _questions.every((q) => q['selected'] != null);
+            if (!allAnswered) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('กรุณาตอบคำถามให้ครบทุกข้อ'), backgroundColor: Colors.orange),
+              );
+              return;
+            }
+
+            // โชว์ Loading หมุนๆ
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (ctx) => const Center(child: CircularProgressIndicator()),
+            );
+
+            // ข. จัดเตรียมคำตอบเพื่อส่งให้ API
+            const optionsMap = ['A', 'B', 'C', 'D']; // แปลง Index เป็น A,B,C,D
+            List<Map<String, dynamic>> answers = [];
+            for (var q in _questions) {
+              answers.add({
+                "question_id": q['id'],
+                "answer": optionsMap[q['selected']],
+              });
+            }
+
+            final requestData = {
+              "quest_id": widget.questId,
+              "answers": answers,
+            };
+
+            // ค. ส่ง API
+            final result = await ApiService.submitClubQuest(requestData);
+
+            if (mounted) Navigator.pop(context); // ปิด Loading
+
+            if (mounted) {
+            if (result != null && result['success'] == true) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ResultExamScreen(
+                    isPassed: result['is_passed'],
+                    score: result['score'],
+                    total: _questions.length,
+                    rewardsList: result['rewards'], // 🌟 ส่งของรางวัลที่ได้จาก API มาตรงนี้เลย!
+                  ),
+                ),
+              );
+            } else {
+                // ❌ เกิดข้อผิดพลาด หรือ ติด Cooldown อยู่
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(result?['error'] ?? 'เกิดข้อผิดพลาด'), 
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                
+                // ถ้าติด Cooldown ให้เด้งกลับไปหน้า Detail หลัก
+                if (result?['cooldown_seconds'] != null) {
+                  Navigator.pop(context); 
+                }
               }
             }
-            final bool isPassed = score >= (total / 2).ceil();
-
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ResultExamScreen(
-                  user: widget.user,
-                  isPassed: isPassed,
-                  score: score,
-                  total: total,
-                  statusRewards: {'exp': 59, 'item': 1},
-                ),
-              ),
-            );
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.transparent,

@@ -52,6 +52,10 @@ type DoQuest struct {
 	Status        *string    `json:"status"`
 	CompletedDate *time.Time `json:"completed_date"`
 	Progress      *int       `json:"progress"` // 🌟 เพิ่มบรรทัดนี้
+
+	// 🌟 เพิ่มบรรทัดด้านล่างนี้
+    Score           *int       `json:"score"`             // เก็บขะแนนที่ทำได้ล่าสุด
+    LastAttemptDate *time.Time `json:"last_attempt_date"` // เวลาที่กดทำเควสครั้งล่าสุด (ใช้คำนวณ Cooldown 10 นาที)
 }
 
 // Table: collect (User <-> Item - Inventory)

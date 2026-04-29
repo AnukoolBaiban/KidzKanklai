@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_application_1/screens/club_detail_head.dart';
 import 'package:flutter_application_1/widgets/club/club_room_components.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; // 🌟 อย่าลืม import
+// 🌟 นำเข้าหน้า Detail (ปรับ Path ให้ตรงกับโปรเจกต์ของคุณ)
+import 'package:flutter_application_1/screens/all_quest.dart';
+import 'package:flutter_application_1/screens/club_quest/club_quest_detail_leader.dart';
+
 
 class ClubRoomHeadScreen extends StatefulWidget {
   const ClubRoomHeadScreen({super.key});
@@ -18,34 +22,80 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
   // 🌟 1. เพิ่มตัวแปรเก็บข้อมูล
   String _clubName = "กำลังโหลด...";
   bool _isLoading = true;
+  List<dynamic> _quests = []; // 🌟 เก็บ List ภารกิจ
 
   @override
   void initState() {
     super.initState();
-    _fetchClubName(); // 🌟 2. สั่งโหลดข้อมูลตอนเปิดหน้า
+    _fetchClubData(); // 🌟 2. สั่งโหลดข้อมูลตอนเปิดหน้า
   }
 
-  // 🌟 3. ฟังก์ชันดึงชื่อชมรม
-  Future<void> _fetchClubName() async {
+  // 🌟 ฟังก์ชันคำนวณเวลาสัปดาห์นี้ (จันทร์ 00:00 - จันทร์หน้า 00:00)
+  Map<String, String> _getThisWeekTimeRangeUTC() {
+    DateTime now = DateTime.now().toUtc();
+    DateTime nowUtc7 = now.add(const Duration(hours: 7));
+    
+    int daysSinceMonday = nowUtc7.weekday - DateTime.monday;
+    DateTime startOfWeekUtc7 = DateTime(nowUtc7.year, nowUtc7.month, nowUtc7.day)
+        .subtract(Duration(days: daysSinceMonday));
+    DateTime endOfWeekUtc7 = startOfWeekUtc7.add(const Duration(days: 7));
+
+    String formatNaiveLocal(DateTime dt) {
+      String y = dt.year.toString().padLeft(4, '0');
+      String m = dt.month.toString().padLeft(2, '0');
+      String d = dt.day.toString().padLeft(2, '0');
+      return '$y-$m-${d}T00:00:00'; 
+    }
+
+    return {
+      'start': formatNaiveLocal(startOfWeekUtc7),
+      'end': formatNaiveLocal(endOfWeekUtc7),
+    };
+  }
+
+  // 🌟 3. ฟังก์ชันดึงข้อมูลชมรมและเควส (เหมือนฝั่ง Member)
+  Future<void> _fetchClubData() async {
     try {
       final supabase = Supabase.instance.client;
       final userId = supabase.auth.currentUser!.id;
 
-      // หา club_id ของตัวเอง
       final profile = await supabase.from('user_profiles').select('club_id').eq('id', userId).single();
       
       if (profile['club_id'] != null) {
-        // นำ club_id ไปหาชื่อชมรม
-        final club = await supabase.from('clubs').select('name').eq('id', profile['club_id']).single();
+        final clubId = profile['club_id'];
+        final club = await supabase.from('clubs').select('name').eq('id', clubId).single();
+        final timeRange = _getThisWeekTimeRangeUTC();
+
+        // ดึงเควส พร้อม Join ตาราง Receive และ Items
+        final questsResponse = await supabase
+            .from('quests')
+            .select('''
+              *,
+              receive (
+                quantity,
+                items (
+                  name,
+                  image
+                )
+              )
+            ''')
+            .eq('club_id', clubId)
+            .gte('start_date', timeRange['start']!)
+            .lt('start_date', timeRange['end']!)
+            .order('start_date', ascending: true);
+
         if (mounted) {
           setState(() {
             _clubName = club['name'];
+            _quests = questsResponse;
             _isLoading = false;
           });
         }
+      } else {
+        if (mounted) setState(() => _isLoading = false);
       }
     } catch (e) {
-      debugPrint("Error fetching club name: $e");
+      debugPrint("Error fetching club data: $e");
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -67,7 +117,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
           Padding(
             padding: EdgeInsets.only(
               top: topBarHeight + headerHeight + 20,
-              bottom: 110, // พื้นที่สำหรับ Bottom Nav Bar
+              bottom: 110,
               left: size.width * 0.05,
               right: size.width * 0.05,
             ),
@@ -80,8 +130,8 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
                   children: [_buildMissionTitle(), _buildActionButtonsRow()],
                 ),
                 const SizedBox(height: 10),
-                Expanded(flex: 5, child: _buildEmptyMissionBox()),
-                const Spacer(flex: 3), // พื้นที่ว่างสำหรับตัวละครด้านล่าง
+                Expanded(flex: 5, child: _buildMissionBox()), // 🌟 เปลี่ยนมาใช้ Box ที่มี Data
+                const Spacer(flex: 3),
               ],
             ),
           ),
@@ -92,7 +142,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
           // Header ───────────
           ClubBlueHeader(
              topOffset: topBarHeight, 
-             title: _clubName, // 🌟 เปลี่ยนตรงนี้
+             title: _clubName,
           ),
 
           // ── Bottom Nav Bar ──────────────────────────
@@ -130,8 +180,17 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
           imagePath: "assets/images/button/bt-create.png",
           isPressed: _isCreatePressed,
           onTap: () {
+            // 🌟 เช็คโควตาก่อนกดสร้าง
+            if (_quests.length >= 3) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('คุณสร้างภารกิจครบ 3 ครั้งในสัปดาห์นี้แล้ว'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+              return;
+            }
             Navigator.pushNamed(context, '/createclubquest');
-            debugPrint("Create mission tapped");
           },
           onPressedChanged: (val) => setState(() => _isCreatePressed = val),
         ),
@@ -153,9 +212,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
       child: Container(
         width: 50,
         height: 50,
-        padding: const EdgeInsets.all(
-          2,
-        ), // ความหนาของเส้นขอบปกติต้องน้อยกว่านี้หน่อย ลอง 2px
+        padding: const EdgeInsets.all(2),
         decoration: const BoxDecoration(
           shape: BoxShape.circle,
           color: Color(0xFF002A50),
@@ -193,7 +250,6 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
     );
   }
 
-  // รูปแบบปุ่มกลมเหมือนใน all_quest.dart
   Widget _buildCircularIconButton({
     required String imagePath,
     required VoidCallback onTap,
@@ -243,8 +299,23 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
     );
   }
 
-  // กล่องภารกิจชมรม (สถานะ: ยังไม่มีภารกิจ)
-  Widget _buildEmptyMissionBox() {
+  // 🌟 กล่องภารกิจชมรม (คำนวณโควตา และแสดงข้อมูลจริง)
+  Widget _buildMissionBox() {
+    if (_isLoading) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: const Color(0xFF9DD0E7), width: 2),
+        ),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // คำนวณสิทธิ์คงเหลือ
+    int questsLeft = 3 - _quests.length;
+    if (questsLeft < 0) questsLeft = 0;
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -252,28 +323,228 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: const Color(0xFF9DD0E7), width: 2),
       ),
-      child: Stack(
+      padding: const EdgeInsets.all(10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Positioned(
-            top: 12,
-            right: 16,
-            child: Text(
-              "จำนวนภารกิจที่สร้างได้ 3/3",
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
+          // 🌟 Header: โชว์จำนวนโควตาที่สร้างได้
+          Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 6, bottom: 8),
+              child: Text(
+                "จำนวนภารกิจที่สร้างได้ $questsLeft/3",
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
             ),
           ),
-          const Align(
-            alignment: Alignment.center,
-            child: Text(
-              "ยังไม่มีภารกิจในตอนนี้",
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
+          
+          // 🌟 Mission List หรือ ข้อความว่างเปล่า
+          Expanded(
+            child: _quests.isEmpty
+                ? const Center(
+                    child: Text(
+                      "ยังไม่มีภารกิจในสัปดาห์นี้",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  )
+                : Column(
+                    children: List.generate(_quests.length, (index) {
+                      final quest = _quests[index];
+                      final isLast = index == _quests.length - 1;
+                      return Expanded(
+                        child: Column(
+                          children: [
+                            Expanded(child: _buildMissionCard(quest, isLast: isLast)),
+                            if (!isLast) const SizedBox(height: 8),
+                          ],
+                        ),
+                      );
+                    }),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🌟 การ์ดแสดงภารกิจแต่ละอัน
+  Widget _buildMissionCard(Map<String, dynamic> quest, {required bool isLast}) {
+    final String title = quest['name'] ?? 'ไม่มีชื่อภารกิจ';
+
+    String timeLeftText = "ไม่มีกำหนด";
+    Color timeTextColor = Colors.red;
+
+    if (quest['due_date'] != null) {
+      final dueDate = DateTime.parse(quest['due_date']).toLocal();
+      final difference = dueDate.difference(DateTime.now());
+      if (difference.isNegative) {
+        timeLeftText = "หมดเวลา";
+        timeTextColor = Colors.grey;
+      } else if (difference.inDays > 0) {
+        timeLeftText = "เหลืออีก ${difference.inDays} วัน";
+      } else {
+        timeLeftText = "เหลืออีก ${difference.inHours} ชั่วโมง";
+      }
+    }
+
+    final receives = quest['receive'] as List<dynamic>? ?? [];
+    List<Widget> badges = receives.map((r) {
+      final item = r['items'] ?? {};
+      final itemName = item['name'] ?? "Item";
+      final quantity = r['quantity'] ?? 1;
+      
+      final String imagePath = item['image'] ?? 'assets/images/item/Gasha.png';
+      final bool isExp = itemName.toString().toUpperCase().contains("EXP");
+      final Color color = isExp ? const Color(0xFFC8E6C9) : const Color(0xFFFFE0B2);
+      final String valueText = isExp ? "+$quantity" : "x$quantity";
+
+      return RewardBadge(
+        label: itemName,
+        value: valueText,
+        color: color,
+        iconPath: imagePath,
+      );
+    }).toList();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF9DD0E7), width: 2),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 4,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFFB775), Color(0xFFFFD4A9)],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.black, width: 1),
+                        ),
+                        child: const Text(
+                          'ชมรม',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: badges.isNotEmpty ? badges : [const SizedBox.shrink()],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Container(width: 1, color: const Color(0xFF9DD0E7)),
+          Expanded(
+            flex: 2,
+            child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Center(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          // 🌟 หัวหน้ากดเพื่อดูรายละเอียด จะไปหน้า Leader แทน
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ClubQuestDetailLeaderScreen(
+                                questData: quest, // ส่งข้อมูลเควสไป
+                              ),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF536DFE),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: const FittedBox(
+                          child: Text(
+                            'รายละเอียด',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  FittedBox(
+                    child: Text(
+                      timeLeftText,
+                      style: TextStyle(
+                        color: timeTextColor,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
