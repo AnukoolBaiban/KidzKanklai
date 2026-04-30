@@ -171,6 +171,8 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
 
   // ปุ่ม 2 ปุ่ม: รายละเอียดชมรม และสร้างภารกิจ
   Widget _buildActionButtonsRow() {
+    bool isQuotaFull = _quests.length >= 3;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
@@ -179,9 +181,10 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
         _buildCircularIconButton(
           imagePath: "assets/images/button/bt-create.png",
           isPressed: _isCreatePressed,
+          isDisabled: isQuotaFull,
           onTap: () {
             // 🌟 เช็คโควตาก่อนกดสร้าง
-            if (_quests.length >= 3) {
+            if (isQuotaFull) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('คุณสร้างภารกิจครบ 3 ครั้งในสัปดาห์นี้แล้ว'),
@@ -255,6 +258,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
     required VoidCallback onTap,
     required bool isPressed,
     required ValueChanged<bool> onPressedChanged,
+    bool isDisabled = false,
   }) {
     return GestureDetector(
       onTapDown: (_) => onPressedChanged(true),
@@ -271,27 +275,32 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
                 color: Colors.black.withValues(alpha: 0.15),
               )
             : null,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: LinearGradient(
-            colors: [Color(0xFF68E2FA), Color(0xFF2374B5)],
+            colors: isDisabled 
+                ? [Colors.grey.shade400, Colors.grey.shade600] 
+                : const [Color(0xFF68E2FA), Color(0xFF2374B5)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
         ),
         child: Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.white,
+            color: isDisabled ? Colors.grey.shade300 : Colors.white,
           ),
           child: Center(
-            child: Image.asset(
-              imagePath,
-              width: 28,
-              height: 28,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) =>
-                  const Icon(Icons.image_not_supported, size: 20),
+            child: Opacity(
+              opacity: isDisabled ? 0.5 : 1.0,
+              child: Image.asset(
+                imagePath,
+                width: 28,
+                height: 28,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) =>
+                    const Icon(Icons.image_not_supported, size: 20),
+              ),
             ),
           ),
         ),
@@ -342,8 +351,8 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
               ),
             ),
           ),
-          
-          // 🌟 Mission List หรือ ข้อความว่างเปล่า
+
+          // 🌟 Mission List แบบ scroll ได้
           Expanded(
             child: _quests.isEmpty
                 ? const Center(
@@ -356,19 +365,17 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
                       ),
                     ),
                   )
-                : Column(
-                    children: List.generate(_quests.length, (index) {
+                : ListView.builder(
+                    padding: EdgeInsets.zero,
+                    itemCount: _quests.length,
+                    itemBuilder: (context, index) {
                       final quest = _quests[index];
                       final isLast = index == _quests.length - 1;
-                      return Expanded(
-                        child: Column(
-                          children: [
-                            Expanded(child: _buildMissionCard(quest, isLast: isLast)),
-                            if (!isLast) const SizedBox(height: 8),
-                          ],
-                        ),
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: isLast ? 0 : 8),
+                        child: _buildMissionCard(quest),
                       );
-                    }),
+                    },
                   ),
           ),
         ],
@@ -377,7 +384,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
   }
 
   // 🌟 การ์ดแสดงภารกิจแต่ละอัน
-  Widget _buildMissionCard(Map<String, dynamic> quest, {required bool isLast}) {
+  Widget _buildMissionCard(Map<String, dynamic> quest) {
     final String title = quest['name'] ?? 'ไม่มีชื่อภารกิจ';
 
     String timeLeftText = "ไม่มีกำหนด";
@@ -401,7 +408,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
       final item = r['items'] ?? {};
       final itemName = item['name'] ?? "Item";
       final quantity = r['quantity'] ?? 1;
-      
+
       final String imagePath = item['image'] ?? 'assets/images/item/Gasha.png';
       final bool isExp = itemName.toString().toUpperCase().contains("EXP");
       final Color color = isExp ? const Color(0xFFC8E6C9) : const Color(0xFFFFE0B2);
@@ -421,93 +428,86 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFF9DD0E7), width: 2),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 4,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFFFB775), Color(0xFFFFD4A9)],
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              flex: 4,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 2,
                           ),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.black, width: 1),
-                        ),
-                        child: const Text(
-                          'ชมรม',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFFB775), Color(0xFFFFD4A9)],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.black, width: 1),
+                          ),
+                          child: const Text(
+                            'ชมรม',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 4,
-                          children: badges.isNotEmpty ? badges : [const SizedBox.shrink()],
-                        ),
-                      ),
+                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: badges.isNotEmpty ? badges : [const SizedBox.shrink()],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          Container(width: 1, color: const Color(0xFF9DD0E7)),
-          Expanded(
-            flex: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(6),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Center(
+            Container(width: 1, color: const Color(0xFF9DD0E7)),
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      height: 36,
                       child: ElevatedButton(
                         onPressed: () {
-                          // 🌟 หัวหน้ากดเพื่อดูรายละเอียด จะไปหน้า Leader แทน
                           Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (context) => ClubQuestDetailLeaderScreen(
-                                questData: quest, // ส่งข้อมูลเควสไป
+                                questData: quest,
                               ),
                             ),
                           );
@@ -532,23 +532,23 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  FittedBox(
-                    child: Text(
-                      timeLeftText,
-                      style: TextStyle(
-                        color: timeTextColor,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                    const SizedBox(height: 4),
+                    FittedBox(
+                      child: Text(
+                        timeLeftText,
+                        style: TextStyle(
+                          color: timeTextColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

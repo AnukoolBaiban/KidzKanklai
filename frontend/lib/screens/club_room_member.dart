@@ -267,53 +267,75 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.85),
           borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: const Color(0xFF9DD0E7), width: 2),
         ),
         child: const Center(child: CircularProgressIndicator()),
       );
     }
 
-    if (_quests.isEmpty) {
-      return Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.85),
-          borderRadius: BorderRadius.circular(15),
-        ),
-        child: const Center(
-          child: Text(
-            "ไม่มีภารกิจในสัปดาห์นี้", 
-            style: TextStyle(color: Colors.grey, fontSize: 16)
-          )
-        ),
-      );
-    }
+    // นับจำนวนภารกิจที่ user ทำสำเร็จแล้ว
+    int completedCount = _completedQuestIds.length;
 
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.85),
         borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: const Color(0xFF9DD0E7), width: 2),
       ),
       padding: const EdgeInsets.all(10),
       child: Column(
-        // โครงสร้างเดิมใช้ Expanded ใน Column เพื่อให้กินพื้นที่เต็มและเท่ากัน
-        children: List.generate(_quests.length, (index) {
-          final quest = _quests[index];
-          final isLast = index == _quests.length - 1;
-          return Expanded(
-            child: Column(
-              children: [
-                Expanded(child: _buildMissionCard(quest, isLast: isLast)),
-                if (!isLast) const SizedBox(height: 8),
-              ],
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header: โชว์จำนวนภารกิจที่ทำได้
+          Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 6, bottom: 8),
+              child: Text(
+                "ภารกิจที่ทำได้ $completedCount/3",
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
             ),
-          );
-        }),
+          ),
+
+          // Mission List แบบ scroll ได้
+          Expanded(
+            child: _quests.isEmpty
+                ? const Center(
+                    child: Text(
+                      "ไม่มีภารกิจในสัปดาห์นี้",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.zero,
+                    itemCount: _quests.length,
+                    itemBuilder: (context, index) {
+                      final quest = _quests[index];
+                      final isLast = index == _quests.length - 1;
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: isLast ? 0 : 8),
+                        child: _buildMissionCard(quest),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
   }
 
   // รับข้อมูลแบบ Map เพื่อแสดงผล
-  Widget _buildMissionCard(Map<String, dynamic> quest, {required bool isLast}) {
+  Widget _buildMissionCard(Map<String, dynamic> quest) {
     // 1. ดึงข้อมูลพื้นฐาน
     final String title = quest['name'] ?? 'ไม่มีชื่อภารกิจ';
     final int questId = quest['id'] ?? 0;
@@ -371,117 +393,111 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
         color: isCompleted ? Colors.grey.shade100 : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isCompleted ? Colors.grey.shade400 : const Color(0xFF9DD0E7), 
-          width: 2
+          color: isCompleted ? Colors.grey.shade400 : const Color(0xFF9DD0E7),
+          width: 2,
         ),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 4,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: isCompleted 
-                              ? const LinearGradient(
-                                  colors: [Color(0xFFE0E0E0), Color(0xFFBDBDBD)],
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                )
-                              : const LinearGradient(
-                                  colors: [Color(0xFFFFB775), Color(0xFFFFD4A9)],
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                ),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: isCompleted ? Colors.grey.shade600 : Colors.black, 
-                            width: 1
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              flex: 4,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: isCompleted
+                                ? const LinearGradient(
+                                    colors: [Color(0xFFE0E0E0), Color(0xFFBDBDBD)],
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                  )
+                                : const LinearGradient(
+                                    colors: [Color(0xFFFFB775), Color(0xFFFFD4A9)],
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                  ),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isCompleted ? Colors.grey.shade600 : Colors.black,
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            'ชมรม',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: isCompleted ? Colors.black54 : Colors.black,
+                            ),
                           ),
                         ),
-                        child: Text(
-                          'ชมรม',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: isCompleted ? Colors.black54 : Colors.black,
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: isCompleted ? Colors.grey.shade600 : Colors.black87,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: isCompleted ? Colors.grey.shade600 : Colors.black87, 
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 4,
-                          children: badges.isNotEmpty ? badges : [const SizedBox.shrink()],
-                        ),
-                      ),
+                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: badges.isNotEmpty ? badges : [const SizedBox.shrink()],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          Container(
-            width: 1, 
-            color: isCompleted ? Colors.grey.shade400 : const Color(0xFF9DD0E7)
-          ),
-          Expanded(
-            flex: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(6),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Center(
+            Container(
+              width: 1,
+              color: isCompleted ? Colors.grey.shade400 : const Color(0xFF9DD0E7),
+            ),
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      height: 36,
                       child: ElevatedButton(
-                        // 🌟 ตอนกดปุ่มรายละเอียด ให้ส่งค่า isCompleted ข้ามไปด้วย
                         onPressed: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (context) => ClubQuestDetailScreen(
-                                questData: quest, 
-                                isCompleted: isCompleted, // 🌟 เพิ่มบรรทัดนี้!
+                                questData: quest,
+                                isCompleted: isCompleted,
                               ),
                             ),
                           );
                         },
                         style: ElevatedButton.styleFrom(
-                          // 🌟 ใช้สีเทาเข้มๆ เพื่อให้ดูรู้ว่าทำเสร็จแล้วแต่มองเห็นว่าเป็นปุ่ม หรือถ้าชอบสีน้ำเงินเดิมให้เปลี่ยนเป็น const Color(0xFF536DFE)
-                          backgroundColor: isCompleted ? Colors.grey.shade500 : const Color(0xFF536DFE),
+                          backgroundColor: isCompleted
+                              ? Colors.grey.shade500
+                              : const Color(0xFF536DFE),
                           padding: const EdgeInsets.symmetric(horizontal: 10),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
@@ -490,34 +506,35 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
                         ),
                         child: const FittedBox(
                           child: Text(
-                            'รายละเอียด', // 🌟 กลับมาใช้คำเดิม
+                            'รายละเอียด',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white, // 🌟 สีขาวให้ดูเด่นขึ้น
+                              color: Colors.white,
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  FittedBox(
-                    child: Text(
-                      timeLeftText,
-                      style: TextStyle(
-                        color: timeTextColor,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                    const SizedBox(height: 4),
+                    FittedBox(
+                      child: Text(
+                        timeLeftText,
+                        style: TextStyle(
+                          color: timeTextColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
+
