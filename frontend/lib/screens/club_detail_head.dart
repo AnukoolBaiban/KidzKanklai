@@ -295,6 +295,17 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
         children: [
           const ClubBackground(),
 
+          // ── Top Bar & Header ───────────────────────
+          Column(
+            children: [
+              ClubTopBar(topPadding: topPadding),
+              ClubBlueHeader(
+                title: _clubName, // 🌟 ใช้ชื่อชมรมจริง
+                onBackPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+
           Padding(
             padding: EdgeInsets.only(
               top: topBarHeight + headerHeight + 16,
@@ -320,14 +331,6 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
                 ],
               ],
             ),
-          ),
-
-          ClubTopBar(topPadding: topPadding, height: topBarHeight),
-
-          ClubBlueHeader(
-            topOffset: topBarHeight,
-            title: _clubName, // 🌟 ใช้ชื่อชมรมจริง
-            onBackPressed: () => Navigator.pop(context),
           ),
 
           ClubBottomNavBar(

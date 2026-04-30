@@ -127,7 +127,7 @@ class _ClubState extends State<Club> with TickerProviderStateMixin {
           _buildBackground(),
 
           // ── Top Bar ────────────────────────────────────────
-          _buildTopBar(topPadding, topBarHeight),
+          _buildTopBar(topPadding),
 
           // ── Header + Welcome (ด้านบน) ──────────────────────
           Padding(
@@ -256,16 +256,14 @@ class _ClubState extends State<Club> with TickerProviderStateMixin {
   }
 
   // ── Top Bar ─────────────────────────────────────────────────
-  Widget _buildTopBar(double topPadding, double height) {
+  Widget _buildTopBar(double topPadding) {
     return Positioned(
       top: 0,
       left: 0,
       right: 0,
       child: Container(
-        height: height,
         padding: EdgeInsets.only(top: topPadding),
         color: Colors.black.withValues(alpha: 0.4),
-        alignment: Alignment.bottomCenter,
         child: CustomTopBar(
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),

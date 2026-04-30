@@ -140,6 +140,14 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
           // ── Background ──────────────────────────────
           const ClubBackground(),
 
+          // ── Top Bar & Header ───────────────────────
+          Column(
+            children: [
+              ClubTopBar(topPadding: topPadding),
+              ClubBlueHeader(title: _clubName),
+            ],
+          ),
+
           // ── Main Content ────────────────────────────
           Padding(
             padding: EdgeInsets.only(
@@ -161,15 +169,6 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
                 const Spacer(flex: 3), // พื้นที่ว่างสำหรับตัวละครด้านล่าง
               ],
             ),
-          ),
-
-          // ── Top Bar ─────────────────────────────────
-          ClubTopBar(topPadding: topPadding, height: topBarHeight),
-
-          // Header ───────────
-          ClubBlueHeader(
-             topOffset: topBarHeight, 
-             title: _clubName, // 🌟 เปลี่ยนตรงนี้
           ),
 
           // ── Bottom Nav Bar ──────────────────────────

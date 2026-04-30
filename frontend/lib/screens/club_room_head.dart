@@ -113,6 +113,14 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
           // ── Background ──────────────────────────────
           const ClubBackground(),
 
+          // ── Top Bar & Header ───────────────────────
+          Column(
+            children: [
+              ClubTopBar(topPadding: topPadding),
+              ClubBlueHeader(title: _clubName),
+            ],
+          ),
+
           // ── Main Content ────────────────────────────
           Padding(
             padding: EdgeInsets.only(
@@ -134,15 +142,6 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
                 const Spacer(flex: 3),
               ],
             ),
-          ),
-
-          // ── Top Bar ─────────────────────────────────
-          ClubTopBar(topPadding: topPadding, height: topBarHeight),
-
-          // Header ───────────
-          ClubBlueHeader(
-             topOffset: topBarHeight, 
-             title: _clubName,
           ),
 
           // ── Bottom Nav Bar ──────────────────────────

@@ -179,11 +179,13 @@ class _ClubCreateScreenState extends State<ClubCreateScreen> {
             ),
           ),
 
-          // ── Top Bar ───────────────────────────
-          _buildTopBar(topPadding, topBarHeight),
-
-          // Header ───────────
-          _buildBlueHeader(topBarHeight),
+          // ── Top Bar & Header ───────────────────────────
+          Column(
+            children: [
+              _buildTopBar(topPadding),
+              _buildBlueHeader(),
+            ],
+          ),
         ],
       ),
     );
@@ -212,39 +214,28 @@ class _ClubCreateScreenState extends State<ClubCreateScreen> {
   }
 
   // ── Top Bar ───────────────────────────────────
-  Widget _buildTopBar(double topPadding, double height) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: height,
-        padding: EdgeInsets.only(top: topPadding),
-        color: Colors.black.withValues(alpha: 0.4),
-        alignment: Alignment.bottomCenter,
-        child: CustomTopBar(
-          onNotificationTapped: () =>
-              Navigator.pushNamed(context, '/notification'),
-          onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
-        ),
+  Widget _buildTopBar(double topPadding) {
+    return Container(
+      padding: EdgeInsets.only(top: topPadding),
+      color: Colors.black.withValues(alpha: 0.4),
+      child: CustomTopBar(
+        onNotificationTapped: () =>
+            Navigator.pushNamed(context, '/notification'),
+        onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
       ),
     );
   }
 
   // Header
-  Widget _buildBlueHeader(double topOffset) {
-    return Positioned(
-      top: topOffset,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: 80,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF015496), Color(0xFF2273B4)],
-          ),
+  Widget _buildBlueHeader() {
+    return Container(
+      height: 80,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF015496), Color(0xFF2273B4)],
         ),
-        child: Stack(
+      ),
+      child: Stack(
           alignment: Alignment.center,
           children: [
             // ── หัวข้อ "สร้างชมรม" ────────
@@ -301,7 +292,6 @@ class _ClubCreateScreenState extends State<ClubCreateScreen> {
             ),
           ],
         ),
-      ),
     );
   }
 
