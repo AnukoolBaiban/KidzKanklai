@@ -148,7 +148,9 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
           // Background
           Positioned.fill(
             child: Image.asset(
-              'assets/images/background/bg11.png',
+              widget.isSuccess
+                  ? 'assets/images/background/bg11.png'
+                  : 'assets/images/background/bg13.png',
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
                 return Container(color: Color(0xFFE8F5E9));
