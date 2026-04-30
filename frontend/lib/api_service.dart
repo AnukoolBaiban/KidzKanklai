@@ -5,8 +5,6 @@ import 'package:flutter_application_1/globals.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 
-// --- Data Models ---
-
 class User {
   final int id;
   final String username;
@@ -717,6 +715,230 @@ class ApiService {
     } catch (e) {
       print("Delete All Notifications Error: $e");
       return false;
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // API: สร้างชมรม (Create Club)
+  // ------------------------------------------------------------------------
+  static Future<Map<String, dynamic>?> createClub(String name, String description) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/clubs/create'),
+        headers: _headers, // 🌟 ใช้ _headers ที่มี Token ของคุณอยู่แล้ว
+        body: jsonEncode({
+          "name": name,
+          "description": description,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        // สำเร็จ จะคืนค่า success, message, club_id, invite_code
+        return jsonDecode(response.body);
+      } else {
+        // ล้มเหลว (เช่น มีชมรมอยู่แล้ว)
+        final errorData = jsonDecode(response.body);
+        print("Create Club Failed: ${errorData['error']}");
+        return {"success": false, "error": errorData['error'] ?? "เกิดข้อผิดพลาด"};
+      }
+    } catch (e) {
+      print("Create Club Error: $e");
+      return {"success": false, "error": "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"};
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // API: เข้าร่วมชมรม (Join Club)
+  // ------------------------------------------------------------------------
+  static Future<Map<String, dynamic>?> joinClub(String inviteCode) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/clubs/join'),
+        headers: _headers,
+        body: jsonEncode({
+          "invite_code": inviteCode,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        // สำเร็จ จะคืนค่า success, message, club_id
+        return jsonDecode(response.body);
+      } else {
+        // ล้มเหลว (เช่น รหัสผิด, ชมรมเต็ม, มีชมรมอยู่แล้ว)
+        final errorData = jsonDecode(response.body);
+        print("Join Club Failed: ${errorData['error']}");
+        return {"success": false, "error": errorData['error'] ?? "เกิดข้อผิดพลาด"};
+      }
+    } catch (e) {
+      print("Join Club Error: $e");
+      return {"success": false, "error": "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"};
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // API: ลาออกจากชมรม (Leave Club)
+  // ------------------------------------------------------------------------
+  static Future<Map<String, dynamic>?> leaveClub() async {
+    try {
+      final uri = Uri.parse('$baseUrl/clubs/leave');
+      final request = http.MultipartRequest('POST', uri);
+
+      final token = Supabase.instance.client.auth.currentSession?.accessToken;
+      request.headers['Authorization'] = 'Bearer $token';
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final errorData = jsonDecode(response.body);
+        print("Leave Club Failed: ${errorData['error']}");
+        return {"success": false, "error": errorData['error'] ?? "เกิดข้อผิดพลาด"};
+      }
+    } catch (e) {
+      print("Leave Club Error: $e");
+      return {"success": false, "error": "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"};
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // API: ไล่สมาชิกออกจากชมรม (Kick Member)
+  // ------------------------------------------------------------------------
+  static Future<Map<String, dynamic>?> kickClubMember(String targetUserId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/clubs/kick'),
+        headers: _headers,
+        body: jsonEncode({"target_user_id": targetUserId}),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final errorData = jsonDecode(response.body);
+        return {"success": false, "error": errorData['error'] ?? "เกิดข้อผิดพลาด"};
+      }
+    } catch (e) {
+      return {"success": false, "error": "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"};
+    }
+  }
+  
+  // ------------------------------------------------------------------------
+  // API: ลบ/ยุบชมรม (Delete Club) 
+  // (ถ้าคุณเขียน Backend รองรับแล้ว ให้เปลี่ยน URL ตามจริงนะครับ)
+  // ------------------------------------------------------------------------
+  static Future<Map<String, dynamic>?> deleteClub() async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/clubs/delete'), // เปลี่ยน Route ให้ตรงกับ Backend
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final errorData = jsonDecode(response.body);
+        return {"success": false, "error": errorData['error'] ?? "เกิดข้อผิดพลาด"};
+      }
+    } catch (e) {
+      return {"success": false, "error": "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"};
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // API: สร้างภารกิจชมรม (Create Club Quest) แบบรองรับรูปภาพ
+  // ------------------------------------------------------------------------
+  static Future<Map<String, dynamic>?> createClubQuest(Map<String, dynamic> questData, {File? imageFile}) async {
+    try {
+      final uri = Uri.parse('$baseUrl/clubs/quests/create');
+      final request = http.MultipartRequest('POST', uri);
+
+      // ใส่ Token Authorization (อย่าลืมเรียก _getAuthHeader() แบบในฟังก์ชันอื่นๆ)
+      final token = Supabase.instance.client.auth.currentSession?.accessToken;
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // 🌟 ใส่ข้อมูลแบบ Form-Data
+      request.fields['name'] = questData['name'].toString();
+      request.fields['detail'] = questData['detail']?.toString() ?? '';
+      request.fields['passing_score'] = questData['passing_score'].toString();
+
+      // 🌟 แปลงข้อมูลชุดคำถามให้กลายเป็นข้อความ String ก่อนส่ง
+      request.fields['questions'] = jsonEncode(questData['questions']);
+
+      // 🌟 แนบไฟล์รูปภาพ (ถ้ามี)
+      if (imageFile != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath('image', imageFile.path),
+        );
+      }
+
+      // ยิง API
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final errorData = jsonDecode(response.body);
+        print("Create Quest Failed: ${errorData['error']}");
+        return {"success": false, "error": errorData['error'] ?? "เกิดข้อผิดพลาด"};
+      }
+    } catch (e) {
+      print("Create Quest Error: $e");
+      return {"success": false, "error": "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"};
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // API: ส่งคำตอบและตรวจภารกิจชมรม (Submit Club Quest)
+  // ------------------------------------------------------------------------
+  static Future<Map<String, dynamic>?> submitClubQuest(Map<String, dynamic> data) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/clubs/quests/submit'),
+        headers: _headers, // ใช้ headers ที่มี Token
+        body: jsonEncode(data),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final errorData = jsonDecode(response.body);
+        print("Submit Quest Failed: ${errorData['error']}");
+        return {"success": false, "error": errorData['error'] ?? "เกิดข้อผิดพลาด", "cooldown_seconds": errorData['cooldown_seconds']};
+      }
+    } catch (e) {
+      print("Submit Quest Error: $e");
+      return {"success": false, "error": "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"};
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // API: ดึงรายการภารกิจของชมรม (Get Club Quests)
+  // ------------------------------------------------------------------------
+  static Future<Map<String, dynamic>?> getClubQuests() async {
+    try {
+      final uri = Uri.parse('$baseUrl/clubs/quests');
+      final token = Supabase.instance.client.auth.currentSession?.accessToken;
+      
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        print("Get Club Quests Failed: ${response.body}");
+        return null;
+      }
+    } catch (e) {
+      print("Get Club Quests Error: $e");
+      return null;
     }
   }
 }

@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // 🌟 1. นำเข้า Supabase
 import '../../widgets/custom_top_bar.dart';
 import '../../api_service.dart';
 
 class ClubQuestQuizAnswerScreen extends StatefulWidget {
-  final User? user;
+  final int questId; // 🌟 2. รับค่า questId เข้ามา
 
-  const ClubQuestQuizAnswerScreen({Key? key, this.user}) : super(key: key);
+  const ClubQuestQuizAnswerScreen({
+    Key? key, 
+    required this.questId, // 🌟 บังคับใส่ questId
+  }) : super(key: key);
 
   @override
   State<ClubQuestQuizAnswerScreen> createState() =>
@@ -15,20 +19,68 @@ class ClubQuestQuizAnswerScreen extends StatefulWidget {
 class _ClubQuestQuizAnswerScreenState
     extends State<ClubQuestQuizAnswerScreen> {
   bool _isBackPressed = false;
+  bool _isLoading = true; // 🌟 ตัวแปรเช็คสถานะ Loading
 
-  // Mock Questions Data พร้อมเฉลย (correctAnswer = index ของตัวเลือกที่ถูก)
-  final List<Map<String, dynamic>> _questions = [
-    {
-      'question': 'ก๋วยเตี๋ยวเนื้อพิเศษราคาเท่าไหร่',
-      'choices': ['50 บาท', '40 บาท', '60 บาท', '45 บาท'],
-      'correctAnswer': 0, // 50 บาท
-    },
-    {
-      'question': 'เจ้าของร้านชื่ออะไร',
-      'choices': ['กุ้ง', 'แก้ว', 'เก่ง', 'กบ'],
-      'correctAnswer': 0, // กุ้ง
-    },
-  ];
+  // ข้อมูลคำถามจริงที่จะดึงมา
+  List<Map<String, dynamic>> _questions = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchQuizQuestions(); // 🌟 ดึงข้อมูลตอนเปิดหน้า
+  }
+
+  // 🌟 ฟังก์ชันดึงข้อมูลจาก Supabase
+  Future<void> _fetchQuizQuestions() async {
+    try {
+      final supabase = Supabase.instance.client;
+
+      // ดึงข้อมูลคำถามจากตาราง quest_questions
+      final response = await supabase
+          .from('quest_questions')
+          .select('question_text, choice_a, choice_b, choice_c, choice_d, correct_answer')
+          .eq('quest_id', widget.questId);
+
+      // แปลงข้อมูลให้อยู่ในรูปแบบที่ UI ต้องการ
+      List<Map<String, dynamic>> loadedQuestions = [];
+      for (var item in response) {
+        // หาว่าข้อไหนคือข้อที่ถูก (A=0, B=1, C=2, D=3)
+        int correctIndex = 0;
+        switch (item['correct_answer'].toString().toUpperCase()) {
+          case 'A': correctIndex = 0; break;
+          case 'B': correctIndex = 1; break;
+          case 'C': correctIndex = 2; break;
+          case 'D': correctIndex = 3; break;
+        }
+
+        loadedQuestions.add({
+          'question': item['question_text'] ?? 'ไม่มีคำถาม',
+          'choices': [
+            item['choice_a'] ?? '-',
+            item['choice_b'] ?? '-',
+            item['choice_c'] ?? '-',
+            item['choice_d'] ?? '-',
+          ],
+          'correctAnswer': correctIndex,
+        });
+      }
+
+      if (mounted) {
+        setState(() {
+          _questions = loadedQuestions;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching quiz questions: $e");
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('เกิดข้อผิดพลาดในการโหลดคำถาม'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,53 +128,57 @@ class _ClubQuestQuizAnswerScreenState
                         // Scrollable Content
                         Padding(
                           padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
-                          child: SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Notice Banner
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
-                                  margin: const EdgeInsets.only(bottom: 16),
-                                  decoration: BoxDecoration(
-                                    color: Color(0xFFE3F2FD),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: Color(0xFF90CAF9),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.info_outline,
-                                        size: 16,
-                                        color: Color(0xFF1976D2),
-                                      ),
-                                      SizedBox(width: 6),
-                                      Text(
-                                        'ข้อที่เป็นเครื่องหมายถูกสีน้ำเงินคือเฉลยที่ถูกต้อง',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Color(0xFF1976D2),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                          child: _isLoading 
+                              ? const Center(child: CircularProgressIndicator()) // 🌟 โชว์ Loading
+                              : _questions.isEmpty
+                                  ? const Center(child: Text("ไม่มีคำถามสำหรับภารกิจนี้", style: TextStyle(color: Colors.grey)))
+                                  : SingleChildScrollView(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          // Notice Banner
+                                          Container(
+                                            width: double.infinity,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 8,
+                                            ),
+                                            margin: const EdgeInsets.only(bottom: 16),
+                                            decoration: BoxDecoration(
+                                              color: Color(0xFFE3F2FD),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: Color(0xFF90CAF9),
+                                                width: 1,
+                                              ),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.info_outline,
+                                                  size: 16,
+                                                  color: Color(0xFF1976D2),
+                                                ),
+                                                SizedBox(width: 6),
+                                                Text(
+                                                  'ข้อที่เป็นเครื่องหมายถูกสีน้ำเงินคือเฉลยที่ถูกต้อง',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Color(0xFF1976D2),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
 
-                                // Questions List
-                                ...List.generate(_questions.length, (qIndex) {
-                                  final q = _questions[qIndex];
-                                  return _buildQuestionBlock(qIndex, q);
-                                }),
-                              ],
-                            ),
-                          ),
+                                          // Questions List
+                                          ...List.generate(_questions.length, (qIndex) {
+                                            final q = _questions[qIndex];
+                                            return _buildQuestionBlock(qIndex, q);
+                                          }),
+                                        ],
+                                      ),
+                                    ),
                         ),
 
                         // Header "คำถาม"

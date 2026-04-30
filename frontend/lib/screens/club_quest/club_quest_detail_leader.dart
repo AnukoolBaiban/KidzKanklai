@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import '../../widgets/custom_top_bar.dart';
 import '../../api_service.dart';
-import '../../screens/lobby.dart';
 import 'club_quest_quiz_answer.dart';
 import 'create_club_quest.dart';
 
 class ClubQuestDetailLeaderScreen extends StatefulWidget {
   final User? user;
+  final Map<String, dynamic> questData; // 🌟 รับข้อมูลเควส
 
-  const ClubQuestDetailLeaderScreen({Key? key, this.user}) : super(key: key);
+  const ClubQuestDetailLeaderScreen({
+    Key? key, 
+    this.user, 
+    required this.questData, // 🌟 บังคับใส่ข้อมูล
+  }) : super(key: key);
 
   @override
   State<ClubQuestDetailLeaderScreen> createState() => _ClubQuestDetailLeaderScreenState();
@@ -17,12 +21,43 @@ class ClubQuestDetailLeaderScreen extends StatefulWidget {
 class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScreen> {
   bool _isPressed = false;
 
-  // Mock Data
-  final String mockTitle = "สรุปคณิตบทที่ 11111111111111111ttttttttttrrrrrrrrrrrrrr";
-  final String mockDescription = "อ่านวันละ 2 บท และทำการบ้านบทที่ 1 หน้า 75";
-  final String mockStartDate = "25/06/68";
-  final String mockEndDate = "27/06/68";
-  final String? mockImagePath = "assets/images/achievement/achievement1.png";
+  // 🌟 ตัวแปรสำหรับเก็บข้อมูลจริง
+  late String _title;
+  late String _description;
+  late String _endDate;
+  String? _imagePath;
+
+  @override
+  void initState() {
+    super.initState();
+    // 🌟 ดึงข้อมูลจาก widget.questData มาเซ็ตค่า
+    final q = widget.questData;
+    _title = q['name'] ?? 'ไม่มีชื่อภารกิจ';
+    _description = q['detail'] ?? 'ไม่มีรายละเอียด';
+
+    // จัดการวันที่สิ้นสุดให้อยู่ในรูปแบบ วว/ดด/ปป (พ.ศ.)
+    if (q['due_date'] != null) {
+      try {
+        DateTime parsed = DateTime.parse(q['due_date']).toLocal();
+        String dd = parsed.day.toString().padLeft(2, '0');
+        String mm = parsed.month.toString().padLeft(2, '0');
+        String yy = (parsed.year + 543).toString().substring(2);
+        _endDate = "$dd/$mm/$yy";
+      } catch (e) {
+        _endDate = "--/--/--";
+      }
+    } else {
+      _endDate = "--/--/--";
+    }
+
+    // ตรวจสอบรูปภาพ
+    String? img = q['image'];
+    if (img != null && img.isNotEmpty) {
+      _imagePath = img;
+    } else {
+      _imagePath = null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,12 +111,11 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
                               children: [
                                 // Quest Title and Dates
                                 Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        mockTitle,
+                                        _title, // 🌟 แสดงชื่อจริง
                                         style: TextStyle(
                                           fontSize: 24,
                                           fontWeight: FontWeight.bold,
@@ -91,18 +125,10 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
                                     ),
                                     SizedBox(width: 8),
                                     Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
+                                      crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
                                         Text(
-                                          'สร้าง $mockStartDate',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                        ),
-                                        Text(
-                                          'วันที่สิ้นสุด $mockEndDate',
+                                          'วันที่สิ้นสุด $_endDate', // 🌟 แสดงวันที่จริง
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: Colors.grey.shade600,
@@ -119,7 +145,7 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
                                 SizedBox(height: 20),
 
                                 // รูปภาพ Section
-                                if (mockImagePath != null) ...[
+                                if (_imagePath != null) ...[
                                   Container(
                                     width: double.infinity,
                                     padding: EdgeInsets.all(16),
@@ -140,10 +166,8 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
                                     ),
 
                                     child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        // Title อยู่ในกล่อง
                                         Text(
                                           'รูปภาพ',
                                           style: TextStyle(
@@ -155,50 +179,35 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
 
                                         SizedBox(height: 12),
 
-                                        // Responsive Image
                                         LayoutBuilder(
                                           builder: (context, constraints) {
                                             return Center(
                                               child: Container(
-                                                width:
-                                                    constraints.maxWidth *
-                                                    0.6, // responsive
+                                                width: constraints.maxWidth * 0.6,
                                                 constraints: BoxConstraints(
                                                   maxWidth: 300,
                                                   maxHeight: 300,
                                                 ),
                                                 child: AspectRatio(
-                                                  aspectRatio:
-                                                      1, // ทำให้รูปเป็นสี่เหลี่ยม
+                                                  aspectRatio: 1, 
                                                   child: ClipRRect(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          12,
-                                                        ),
-                                                    child: Image.asset(
-                                                      mockImagePath!,
+                                                    borderRadius: BorderRadius.circular(12),
+                                                    // 🌟 เปลี่ยน Image.asset เป็น Image.network สำหรับดึงภาพจริง
+                                                    child: Image.network(
+                                                      _imagePath!,
                                                       fit: BoxFit.cover,
-                                                      errorBuilder:
-                                                          (
-                                                            context,
-                                                            error,
-                                                            stackTrace,
-                                                          ) {
-                                                            return Container(
-                                                              color: Color(
-                                                                0xFFE8F4F8,
-                                                              ),
-                                                              child: Center(
-                                                                child: Icon(
-                                                                  Icons
-                                                                      .broken_image,
-                                                                  size: 60,
-                                                                  color: Colors
-                                                                      .grey,
-                                                                ),
-                                                              ),
-                                                            );
-                                                          },
+                                                      errorBuilder: (context, error, stackTrace) {
+                                                        return Container(
+                                                          color: Color(0xFFE8F4F8),
+                                                          child: Center(
+                                                            child: Icon(
+                                                              Icons.broken_image,
+                                                              size: 60,
+                                                              color: Colors.grey,
+                                                            ),
+                                                          ),
+                                                        );
+                                                      },
                                                     ),
                                                   ),
                                                 ),
@@ -215,7 +224,7 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
 
                                 // Description
                                 Text(
-                                  mockDescription,
+                                  _description, // 🌟 แสดงรายละเอียดจริง
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Color(0xFF313131),
@@ -281,7 +290,6 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
         color: Colors.black.withOpacity(0.4),
         alignment: Alignment.bottomCenter,
         child: CustomTopBar(
-          // user: widget.user,
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
           onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
@@ -297,10 +305,8 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
       onTap: () async {
         await Future.delayed(const Duration(milliseconds: 150));
         if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => LobbyScreen(user: widget.user)),
-          ).then((_) => setState(() => _isPressed = false));
+          // 🌟 ให้ใช้ pop() เพื่อย้อนกลับไปหน้าเดิม
+          Navigator.pop(context);
         }
       },
       child: Image.asset(
@@ -363,7 +369,9 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => ClubQuestQuizAnswerScreen(user: widget.user),
+                    builder: (_) => ClubQuestQuizAnswerScreen(
+                      questId: widget.questData['id'], // 🌟 ส่ง ID ไปยังหน้าดูคำถาม
+                    ),
                   ),
                 );
               },
@@ -384,21 +392,11 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
                           user: widget.user,
                           isEditing: true,
                           initialData: {
-                            'name': mockTitle,
-                            'detail': mockDescription,
-                            'minScore': 2,
-                            'questions': [
-                              {
-                                'question': 'ก๋วยเตี๋ยวเนื้อพิเศษราคาเท่าไหร่',
-                                'options': ['50 บาท', '40 บาท', '60 บาท', '45 บาท'],
-                                'correctOptionIndex': 0,
-                              },
-                              {
-                                'question': 'เจ้าของร้านชื่ออะไร',
-                                'options': ['กุ้ง', 'แก้ว', 'เก่ง', 'กบ'],
-                                'correctOptionIndex': 0,
-                              },
-                            ],
+                            'id': widget.questData['id'],
+                            'name': _title,
+                            'detail': _description,
+                            'minScore': widget.questData['passing_score'] ?? 2,
+                            // 'questions': [] // ข้อมูลคำถามจริงอาจต้องดึงเพิ่ม หรือให้หน้า Edit ไปดึงเอง
                           },
                           onSubmit: (data) {
                             debugPrint('Updated Data: $data');

@@ -3,6 +3,9 @@ import 'package:flutter_application_1/widgets/custom_top_bar.dart';
 import 'package:flutter_application_1/widgets/bottom_navigation_bar.dart';
 import '../widgets/club/club_button.dart';
 import '../widgets/club/join_box.dart';
+import 'package:flutter_application_1/screens/club_room_head.dart'; // เปลี่ยนให้ตรงกับชื่อไฟล์จริง
+import 'package:flutter_application_1/screens/club_room_member.dart'; // เปลี่ยนให้ตรงกับชื่อไฟล์จริง
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 // ============================================================
 // Club - หน้าหลักชมรม (สถานะ: ยังไม่มีชมรม)
@@ -19,6 +22,7 @@ class _ClubState extends State<Club> with TickerProviderStateMixin {
   int _selectedIndex = 3;
   bool _showJoinBox = false;
   bool _isCreatePressed = false;
+  bool _isLoading = true; // 🌟 เพิ่มตัวแปรนี้เพื่อโชว์ Loading
   final TextEditingController _codeController = TextEditingController();
 
   // ── Background Pan Animation ────────────────────────────────
@@ -36,6 +40,55 @@ class _ClubState extends State<Club> with TickerProviderStateMixin {
       begin: -0.45,
       end: 0.45,
     ).animate(CurvedAnimation(parent: _bgController, curve: Curves.easeInOut));
+
+    // 🌟 สั่งให้ตรวจเช็คสถานะทันทีที่โหลดหน้าจอ
+    _checkClubStatus();
+  }
+
+  // 🌟 ฟังก์ชันตรวจสอบว่าผู้เล่นมีชมรมอยู่แล้วหรือยัง
+  Future<void> _checkClubStatus() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
+      // ดึงข้อมูล profile
+      final response = await Supabase.instance.client
+          .from('user_profiles')
+          .select('club_id, club_role')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (response != null && response['club_id'] != null) {
+        // ถ้ามีชมรมแล้ว ให้ไปหน้าชมรมของตัวเองทันที
+        final role = response['club_role'];
+        if (mounted) {
+          if (role == 'owner') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const ClubRoomHeadScreen()),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const ClubRoomMemberScreen()),
+            );
+          }
+        }
+      } else {
+        // ถ้าไม่มีชมรม ก็ปิดโหลด ให้เห็นปุ่ม "สร้าง" กับ "เข้าร่วม"
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Check club error: $e");
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override

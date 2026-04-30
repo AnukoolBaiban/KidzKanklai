@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:flutter_application_1/screens/club_room_member.dart';
+import 'package:flutter_application_1/api_service.dart' as api; // 🌟 1. เพิ่ม Import ApiService
 
 class JoinCodeBox extends StatelessWidget {
   final TextEditingController codeController;
@@ -120,7 +121,7 @@ class JoinCodeBox extends StatelessWidget {
                           ),
                         ),
                         GestureDetector(
-                          onTap: () {
+                          onTap: () async { // 🌟 2. เปลี่ยนเป็น async
                             final code = codeController.text.trim();
                             if (code.isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -131,14 +132,48 @@ class JoinCodeBox extends StatelessWidget {
                               );
                               return;
                             }
-                            // ถ้ากรอกรหัสแล้วให้ไปข้ามไปหน้า Member ทันที
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const ClubRoomMemberScreen(),
-                              ),
+
+                            // 🌟 3. โชว์ Loading (ถ้าต้องการ) เพราะยิง API ต้องรอแปบนึง
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (ctx) => const Center(child: CircularProgressIndicator()),
                             );
+
+                            // 🌟 4. ยิง API เข้าร่วมชมรม
+                            final result = await api.ApiService.joinClub(code);
+
+                            // ปิด Loading
+                            if (context.mounted) Navigator.pop(context);
+
+                            if (context.mounted) {
+                              if (result != null && result['success'] == true) {
+                                // 🎉 เข้าร่วมสำเร็จ
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(result['message'] ?? 'เข้าร่วมชมรมสำเร็จ!'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                                
+                                // ปิดกล่องและไปหน้าต่อไป
+                                onClose(); 
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const ClubRoomMemberScreen(),
+                                  ),
+                                );
+                              } else {
+                                // ❌ ล้มเหลว (เช่น รหัสผิด หรือ เต็ม)
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(result?['error'] ?? 'ไม่สามารถเข้าร่วมชมรมได้'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            }
                           },
                           child: Container(
                             height: 50,

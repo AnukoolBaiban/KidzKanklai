@@ -7,6 +7,7 @@ import 'package:flutter_application_1/widgets/confirm_exit_popup.dart';
 import 'package:flutter_application_1/widgets/edit_club_quest_popup.dart';
 import 'package:flutter_application_1/widgets/club_confirm_save_popup.dart';
 import '../../widgets/exit_edit_club_quest_popup.dart';
+import 'dart:io'; 
 
 class QuizQuestion {
   TextEditingController textController = TextEditingController();
@@ -53,6 +54,8 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
   DateTime? _selectedDate;
   bool _hasImage = false;
 
+  File? _selectedImage;
+
   List<QuizQuestion> _questions = [QuizQuestion()];
   int _minScore = 1;
 
@@ -74,6 +77,8 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
       _detailController.text = widget.initialData!['detail'] ?? '';
       _selectedDate = widget.initialData!['date'];
       _minScore = widget.initialData!['minScore'] ?? 1;
+
+      _selectedImage = widget.initialData!['imageFile'];
 
       if (widget.initialData!['questions'] != null) {
         final List<dynamic> questionsData = widget.initialData!['questions'];
@@ -129,69 +134,76 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
     }
   }
 
-  void _submit() {
+  void _submit() async {
     if (_nameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('กรุณากรอกชื่อภารกิจ'),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text('กรุณากรอกชื่อภารกิจ'), backgroundColor: Colors.red),
       );
       return;
     }
-    Future<void> _selectDate() async {
-    // 🌟 1. คำนวณ "วันพรุ่งนี้" โดยเอาเวลาปัจจุบันมาบวกไป 1 วัน
-    final DateTime tomorrow = DateTime.now().add(const Duration(days: 1));
-    
-    // 🌟 2. เช็คค่าเริ่มต้น ถ้ายังไม่ได้เลือกเวลา หรือเวลาที่เลือกไว้น้อยกว่าวันพรุ่งนี้ ให้ใช้พรุ่งนี้เป็นจุดเริ่มต้น
-    DateTime initial = _selectedDate ?? tomorrow;
-    if (initial.isBefore(tomorrow)) {
-      initial = tomorrow;
+
+    for (int i = 0; i < _questions.length; i++) {
+      if (_questions[i].textController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('กรุณากรอกคำถามที่ ${i + 1}'), backgroundColor: Colors.red));
+        return;
+      }
+      for (int j = 0; j < 4; j++) {
+        if (_questions[i].optionControllers[j].text.trim().isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('กรุณากรอกตัวเลือกที่ ${j + 1} ในคำถามที่ ${i + 1}'), backgroundColor: Colors.red));
+          return;
+        }
+      }
     }
 
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: initial, 
-      firstDate: tomorrow,  // 🌟 3. บังคับให้ปฏิทินเริ่มต้นคลิกได้ตั้งแต่วันพรุ่งนี้เป็นต้นไป (คลิกวันนี้ไม่ได้)
-      lastDate: DateTime(2100),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFF2374B5),
-              onPrimary: Colors.white,
-              onSurface: Colors.black87,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
+    List<Map<String, dynamic>> apiQuestions = [];
+    const optionLetters = ['A', 'B', 'C', 'D'];
+
+    for (var q in _questions) {
+      apiQuestions.add({
+        "question_text": q.textController.text.trim(),
+        "choice_a": q.optionControllers[0].text.trim(),
+        "choice_b": q.optionControllers[1].text.trim(),
+        "choice_c": q.optionControllers[2].text.trim(),
+        "choice_d": q.optionControllers[3].text.trim(),
+        "correct_answer": optionLetters[q.correctOptionIndex],
       });
     }
-  }
 
-    final data = {
-      'name': _nameController.text,
-      'detail': _detailController.text,
-      'date': _selectedDate,
-      'image': _hasImage,
-      'minScore': _minScore,
-      'questions': _questions
-          .map(
-            (q) => {
-              'question': q.textController.text,
-              'options': q.optionControllers.map((c) => c.text).toList(),
-              'correctOptionIndex': q.correctOptionIndex,
-            },
-          )
-          .toList(),
+    Map<String, dynamic> requestData = {
+      "name": _nameController.text.trim(),
+      "detail": _detailController.text.trim(),
+      "passing_score": _minScore,
+      "questions": apiQuestions,
     };
 
-    widget.onSubmit(data);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    final result = await ApiService.createClubQuest(
+      requestData,
+      imageFile: _selectedImage, 
+    );
+
+    if (mounted) Navigator.pop(context); 
+
+    if (mounted) {
+      if (result != null && result['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('สร้างภารกิจและอัปโหลดรูปสำเร็จ!'), backgroundColor: Color(0xFF2374B5)),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const ClubRoomHeadScreen()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result?['error'] ?? 'เกิดข้อผิดพลาด'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   @override
@@ -216,14 +228,9 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
               child: _buildBackground(),
             ),
 
-            // Main Content with boundary
             Padding(
               padding: EdgeInsets.only(
-                top:
-                    topBarHeight +
-                    headerHeight +
-                    10, // เว้นที่ให้ Header ด้านบน
-                // bottom: 110 + bottomPadding, // เว้นที่ให้ Bottom Bar ด้านล่าง
+                top: topBarHeight + headerHeight + 10, 
                 left: size.width * 0.05,
                 right: size.width * 0.05,
               ),
@@ -256,10 +263,7 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
               ),
             ),
 
-            // Top Bar (อยู่บนสุด)
             _buildTopBar(topPadding, topBarHeight),
-
-            // Header Title
             _buildBlueHeader(topBarHeight),
 
             if (_showQuestInfo)
@@ -271,7 +275,7 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
                     });
                   },
                   child: Container(
-                    color: Colors.black.withOpacity(0.0), // 👈 พื้นหลังจาง ๆ
+                    color: Colors.black.withOpacity(0.0), 
                   ),
                 ),
               ),
@@ -281,7 +285,6 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
     );
   }
 
-  // --- Widget: แถบข้อมูลผู้ใช้ (Top Bar Overlay) ---
   Widget _buildTopBar(double topPadding, double height) {
     return Positioned(
       top: 0,
@@ -293,7 +296,6 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
         color: Colors.black.withOpacity(0.4),
         alignment: Alignment.bottomCenter,
         child: CustomTopBar(
-          // user: widget.user,
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
           onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
@@ -302,7 +304,6 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
     );
   }
 
-  // --- Widget: พื้นหลัง (Background Layer) ---
   Widget _buildBackground() {
     return Container(
       color: Colors.white,
@@ -330,7 +331,26 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
 
         setState(() => _isPressed = false);
 
-        Navigator.pop(context);
+        // 🌟 แก้ไข: ใช้ Navigator.pop() 2 ครั้งเพื่อถอยกลับไปหน้าแรก แทนการเรียก Push หน้าใหม่
+        if (widget.isEditing) {
+          ExitEditClubQuestPopup.show(
+            context,
+            onConfirm: () {
+              Navigator.pop(context); // ปิด popup
+              Navigator.pop(context); // ย้อนกลับไปหน้า Detail Leader
+              Navigator.pop(context); // ย้อนกลับไปอีกเพื่อปิดหน้าย่อย
+            },
+          );
+        } else {
+          ConfirmExitPopup.show(
+            context,
+            onConfirm: () {
+              Navigator.pop(context); // ปิด popup
+              Navigator.pop(context); // ย้อนกลับไปหน้าก่อนหน้า (CreateQuestScreen)
+              Navigator.pop(context); // ย้อนกลับไปหน้า Room Head
+            },
+          );
+        }
       },
       child: Image.asset(
         _isPressed
@@ -342,7 +362,6 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
     );
   }
 
-  // Header with Back Button & Title
   Widget _buildBlueHeader(double topOffset) {
     return Positioned(
       top: topOffset,
@@ -359,15 +378,12 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
         ),
         child: Stack(
           children: [
-            /// ปุ่ม Back (ชิดซ้าย)
             Positioned(
               left: 15,
               top: 0,
               bottom: 0,
               child: Center(child: _buildBackButton()),
             ),
-
-            /// Title (อยู่กลางจริง)
             Positioned.fill(
               child: Center(
                 child: Text(
@@ -387,16 +403,6 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: Color(0xFF002A50),
-      ),
-    );
-  }
   Widget _buildScoreButton({
     required IconData icon,
     required bool enabled,
@@ -531,7 +537,6 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // ปุ่ม ลด (-)
                   _buildScoreButton(
                     icon: Icons.remove,
                     enabled: _minScore > 1,
@@ -540,7 +545,6 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
                     },
                   ),
                   SizedBox(width: 16),
-                  // แสดงคะแนน
                   Container(
                     width: 70,
                     height: 50,
@@ -560,7 +564,6 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
                     ),
                   ),
                   SizedBox(width: 16),
-                  // ปุ่ม เพิ่ม (+)
                   _buildScoreButton(
                     icon: Icons.add,
                     enabled: _minScore < _questions.length,
@@ -753,6 +756,7 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
       ],
     );
   }
+
   Widget _buildCancelButton() {
     return Container(
       decoration: BoxDecoration(
@@ -761,26 +765,23 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
       ),
       child: ElevatedButton(
         onPressed: () {
+          // 🌟 แก้ไข: ใช้ Navigator.pop() แทนการ Push หน้าใหม่
           if (widget.isEditing) {
             ExitEditClubQuestPopup.show(
               context,
               onConfirm: () {
-                Navigator.pop(context);
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => ClubQuestDetailLeaderScreen()),
-                );
+                Navigator.pop(context); // ปิด popup
+                Navigator.pop(context); // ย้อนกลับ 1
+                Navigator.pop(context); // ย้อนกลับ 2
               },
             );
           } else {
             ConfirmExitPopup.show(
               context,
               onConfirm: () {
-                Navigator.pop(context);
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => ClubRoomHeadScreen()),
-                );
+                Navigator.pop(context); // ปิด popup
+                Navigator.pop(context); // ย้อนกลับ 1
+                Navigator.pop(context); // ย้อนกลับ 2
               },
             );
           }

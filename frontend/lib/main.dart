@@ -142,7 +142,6 @@ class KidzKanklaiApp extends StatelessWidget {
             );
           },
         ),
-        '/clubquestdetail': (context) => const ClubQuestDetailLeaderScreen(),
         '/clubroom': (context) => const ClubRoomHeadScreen(),
         '/startgame': (context) => const StartGameScreen(),
         '/load': (context) => const LoadingScreen(),

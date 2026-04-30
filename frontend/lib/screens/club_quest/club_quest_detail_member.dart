@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // 🌟 1. อย่าลืม Import Supabase
 import '../../widgets/custom_top_bar.dart';
 import '../../api_service.dart';
 import '../../screens/lobby.dart';
@@ -7,9 +8,14 @@ import '../../widgets/reward_popup.dart';
 import 'club_quest_quiz_member.dart';
 
 class ClubQuestDetailScreen extends StatefulWidget {
-  final User? user;
+  final Map<String, dynamic> questData; 
+  final bool isCompleted; 
 
-  const ClubQuestDetailScreen({Key? key, this.user}) : super(key: key);
+  const ClubQuestDetailScreen({
+    Key? key, 
+    required this.questData,
+    this.isCompleted = false, 
+  }) : super(key: key);
 
   @override
   State<ClubQuestDetailScreen> createState() => _ClubQuestDetailScreenState();
@@ -18,13 +24,119 @@ class ClubQuestDetailScreen extends StatefulWidget {
 class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
   bool _isPressed = false;
 
-  // Mock Data
-  final String mockTitle = "สรุปคณิตบทที่ 11111111111111111";
-  final String mockDescription =
-      "อ่านวันละ 2 บท และทำการบ้านบทที่ 1 หน้า 75";
-  final String mockStartDate = "25/06/68";
-  final String mockEndDate = "27/06/68";
-  final String? mockImagePath = "assets/images/achievement/achievement1.png";
+  late String _title;
+  late String _description;
+  late String _endDate;
+  String? _imagePath;
+
+  @override
+  void initState() {
+    super.initState();
+    final q = widget.questData;
+    _title = q['name'] ?? 'ไม่มีชื่อภารกิจ';
+    _description = q['detail'] ?? 'ไม่มีรายละเอียด';
+
+    if (q['due_date'] != null) {
+      try {
+        DateTime parsed = DateTime.parse(q['due_date']).toLocal();
+        String dd = parsed.day.toString().padLeft(2, '0');
+        String mm = parsed.month.toString().padLeft(2, '0');
+        String yy = (parsed.year + 543).toString().substring(2);
+        _endDate = "$dd/$mm/$yy";
+      } catch (e) {
+        _endDate = "--/--/--";
+      }
+    } else {
+      _endDate = "--/--/--";
+    }
+
+    String? img = q['image'];
+    if (img != null && img.isNotEmpty) {
+      _imagePath = img;
+    } else {
+      _imagePath = null;
+    }
+  }
+
+  // 🌟 2. ฟังก์ชันเช็คคูลดาวน์ก่อนไปหน้าตอบคำถาม
+  Future<void> _checkCooldownAndProceed() async {
+    // แสดง Loading ระหว่างเช็คข้อมูล
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser!.id;
+      final questId = widget.questData['id'];
+
+      // ดึงประวัติการทำเควสนี้ของผู้ใช้
+      final doQuest = await supabase
+          .from('do_quests')
+          .select('status, last_attempt_date')
+          .eq('user_id', userId)
+          .eq('quest_id', questId)
+          .maybeSingle();
+
+      if (mounted) Navigator.pop(context); // ปิด Loading
+
+      if (doQuest != null) {
+        final status = doQuest['status'];
+        final lastAttemptStr = doQuest['last_attempt_date'];
+
+        // ถ้าสถานะคือ failed และมีเวลาครั้งล่าสุดบอกไว้ ให้เช็คว่าครบ 10 นาทีหรือยัง
+        if (status == 'failed' && lastAttemptStr != null) {
+          final lastAttempt = DateTime.parse(lastAttemptStr).toLocal();
+          final now = DateTime.now();
+          final difference = now.difference(lastAttempt);
+          
+          if (difference.inMinutes < 10) {
+            // คำนวณเวลาที่เหลือ
+            final remainingSeconds = 600 - difference.inSeconds;
+            final minutes = remainingSeconds ~/ 60;
+            final seconds = remainingSeconds % 60;
+            
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('คุณตอบผิดไป! โปรดรออีก $minutes นาที $seconds วินาที ถึงจะตอบใหม่ได้'),
+                  backgroundColor: Colors.orange.shade800,
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            }
+            return; // หยุดการทำงาน ไม่ให้ข้ามหน้า
+          }
+        }
+      }
+
+      // 🌟 ถ้าไม่ติดคูลดาวน์ หรือไม่เคยทำมาก่อน ให้ไปหน้าตอบคำถามได้
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ClubQuestQuizMemberScreen(
+              questId: questId,
+            ),
+          ),
+        );
+      }
+
+    } catch (e) {
+      if (mounted) Navigator.pop(context); // ปิด Loading กรณี Error
+      debugPrint("Check cooldown error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('เกิดข้อผิดพลาดในการตรวจสอบข้อมูล'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +160,7 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
               top: topBarHeight + 10,
               left: size.width * 0.05,
               right: size.width * 0.05,
-              bottom: bottomPadding + 100, // เว้นที่ให้ปุ่ม
+              bottom: bottomPadding + 100, 
             ),
             child: Column(
               children: [
@@ -76,14 +188,13 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Quest Title and Dates
                                 Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        mockTitle,
+                                        _title, 
                                         style: TextStyle(
                                           fontSize: 24,
                                           fontWeight: FontWeight.bold,
@@ -97,14 +208,7 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
                                           CrossAxisAlignment.end,
                                       children: [
                                         Text(
-                                          'สร้าง $mockStartDate',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                        ),
-                                        Text(
-                                          'วันที่สิ้นสุด $mockEndDate',
+                                          'วันที่สิ้นสุด $_endDate', 
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: Colors.grey.shade600,
@@ -120,8 +224,7 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
 
                                 SizedBox(height: 20),
 
-                                // รูปภาพ Section
-                                if (mockImagePath != null) ...[
+                                if (_imagePath != null) ...[
                                   Container(
                                     width: double.infinity,
                                     padding: EdgeInsets.all(16),
@@ -140,12 +243,10 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
                                         ),
                                       ],
                                     ),
-
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        // Title อยู่ในกล่อง
                                         Text(
                                           'รูปภาพ',
                                           style: TextStyle(
@@ -154,53 +255,36 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
                                             color: Color(0xFF002A50),
                                           ),
                                         ),
-
                                         SizedBox(height: 12),
-
-                                        // Responsive Image
                                         LayoutBuilder(
                                           builder: (context, constraints) {
                                             return Center(
                                               child: Container(
-                                                width:
-                                                    constraints.maxWidth *
-                                                    0.6, // responsive
+                                                width: constraints.maxWidth * 0.6, 
                                                 constraints: BoxConstraints(
                                                   maxWidth: 300,
                                                   maxHeight: 300,
                                                 ),
                                                 child: AspectRatio(
-                                                  aspectRatio:
-                                                      1, // ทำให้รูปเป็นสี่เหลี่ยม
+                                                  aspectRatio: 1, 
                                                   child: ClipRRect(
                                                     borderRadius:
-                                                        BorderRadius.circular(
-                                                          12,
-                                                        ),
-                                                    child: Image.asset(
-                                                      mockImagePath!,
+                                                        BorderRadius.circular(12),
+                                                    child: Image.network(
+                                                      _imagePath!,
                                                       fit: BoxFit.cover,
-                                                      errorBuilder:
-                                                          (
-                                                            context,
-                                                            error,
-                                                            stackTrace,
-                                                          ) {
-                                                            return Container(
-                                                              color: Color(
-                                                                0xFFE8F4F8,
-                                                              ),
-                                                              child: Center(
-                                                                child: Icon(
-                                                                  Icons
-                                                                      .broken_image,
-                                                                  size: 60,
-                                                                  color: Colors
-                                                                      .grey,
-                                                                ),
-                                                              ),
-                                                            );
-                                                          },
+                                                      errorBuilder: (context, error, stackTrace) {
+                                                        return Container(
+                                                          color: Color(0xFFE8F4F8),
+                                                          child: Center(
+                                                            child: Icon(
+                                                              Icons.broken_image,
+                                                              size: 60,
+                                                              color: Colors.grey,
+                                                            ),
+                                                          ),
+                                                        );
+                                                      },
                                                     ),
                                                   ),
                                                 ),
@@ -211,13 +295,11 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
                                       ],
                                     ),
                                   ),
-
                                   SizedBox(height: 20),
                                 ],
 
-                                // Description
                                 Text(
-                                  mockDescription,
+                                  _description, 
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Color(0xFF313131),
@@ -229,7 +311,6 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
                           ),
                         ),
 
-                        // Header "รายละเอียด"
                         Positioned(
                           top: 0,
                           left: 0,
@@ -283,7 +364,6 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
         color: Colors.black.withOpacity(0.4),
         alignment: Alignment.bottomCenter,
         child: CustomTopBar(
-          // user: widget.user,
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
           onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
@@ -299,10 +379,7 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
       onTap: () async {
         await Future.delayed(const Duration(milliseconds: 150));
         if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => LobbyScreen(user: widget.user)),
-          ).then((_) => setState(() => _isPressed = false));
+          Navigator.pop(context);
         }
       },
       child: Image.asset(
@@ -356,21 +433,32 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
       left: MediaQuery.of(context).size.width * 0.1,
       right: MediaQuery.of(context).size.width * 0.1,
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Expanded(
-            child: _buildButton(
-              text: 'ตอบคำถาม',
-              color: Color(0xFF4A8FE7),
-              useGradient: true,
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ClubQuestQuizMemberScreen(user: widget.user),
+            child: widget.isCompleted
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green, size: 28),
+                      SizedBox(width: 8),
+                      Text(
+                        'ภารกิจสำเร็จ',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green, 
+                        ),
+                      ),
+                    ],
+                  )
+                : _buildButton(
+                    text: 'ตอบคำถาม',
+                    color: Color(0xFF4A8FE7),
+                    useGradient: true,
+                    // 🌟 3. เปลี่ยนจากกดแล้วไปเลย เป็นเรียกฟังก์ชันเช็คคูลดาวน์ก่อน
+                    onPressed: _checkCooldownAndProceed, 
                   ),
-                );
-              },
-            ),
           ),
         ],
       ),
@@ -424,4 +512,3 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
     );
   }
 }
-
