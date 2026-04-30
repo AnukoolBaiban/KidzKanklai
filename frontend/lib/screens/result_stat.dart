@@ -206,7 +206,7 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
                                 style: TextStyle(
                                   fontSize: 32,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black,
+                                  color: widget.isSuccess ? const Color(0xFF4CAF50) : Colors.red,
                                 ),
                               ),
                             ],
@@ -612,7 +612,7 @@ class _AnimatedUpwardArrowState extends State<AnimatedUpwardArrow>
           children: [
             const Icon(
               Icons.arrow_upward_rounded,
-              color: Color(0xFFFFB300), // สีเหลือง
+              color: Color(0xFF4CAF50), // สีเขียว
               size: 50,
             ),
             Text(
@@ -620,7 +620,7 @@ class _AnimatedUpwardArrowState extends State<AnimatedUpwardArrow>
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFFFFB300), // สีเหลือง
+                color: Color(0xFF4CAF50), // สีเขียว
               ),
             ),
           ],

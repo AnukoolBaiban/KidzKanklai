@@ -953,7 +953,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             height: 45,
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: const Color(0xFF2E4C6D),
+              gradient: const LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [Color(0xFF1A3D62), Color(0xFF195290)],
+              ),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Image.asset(iconPath, fit: BoxFit.contain),
