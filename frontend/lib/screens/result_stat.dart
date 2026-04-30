@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/api_service.dart';
 import 'package:flutter_application_1/widgets/custom_top_bar.dart';
+import 'package:rive/rive.dart' hide LinearGradient, Image;
+import 'package:flutter_application_1/config/rive_cache.dart';
 
 class ResultStatScreen extends StatefulWidget {
   final Map<String, int> statusRewards;
@@ -21,10 +23,124 @@ class ResultStatScreen extends StatefulWidget {
 }
 
 class _ResultStatScreenState extends State<ResultStatScreen> {
+  SMINumber? _poseInput;
+  SMINumber? _hairInput;
+  SMINumber? _faceInput;
+  SMINumber? _skinInput;
+  SMINumber? _clothInput;
+  StateMachineController? _controller;
+  bool _isRiveLoaded = false;
+
+  void _onRiveInit(Artboard artboard) {
+    var controller = StateMachineController.fromArtboard(
+      artboard,
+      'State Machine 1',
+    );
+    if (controller == null && artboard.stateMachines.isNotEmpty) {
+      controller = StateMachineController.fromArtboard(
+        artboard,
+        artboard.stateMachines.first.name,
+      );
+    }
+
+    if (controller != null) {
+      artboard.addController(controller);
+      _controller = controller;
+
+      for (var input in controller.inputs) {
+        if (input.name == 'Pose') _poseInput = input as SMINumber;
+        if (input.name == 'HairID') _hairInput = input as SMINumber;
+        if (input.name == 'FaceID') _faceInput = input as SMINumber;
+        if (input.name == 'SkinID') _skinInput = input as SMINumber;
+        if (input.name == 'OutfitID') {
+          _clothInput = input as SMINumber;
+        }
+      }
+
+      _syncRiveToEquipped();
+
+      if (_poseInput != null) {
+        _poseInput!.value = widget.isSuccess ? 2.0 : 1.0; // 2=ดีใจ, 1=เศร้า
+      }
+    }
+    if (mounted) setState(() => _isRiveLoaded = true);
+  }
+
+  double _parseId(String s) {
+    if (s.isEmpty) return 0;
+    if (s.contains('_')) {
+      try {
+        return double.parse(s.split('_').last);
+      } catch (_) {}
+    }
+    if (s.contains(' ')) {
+      try {
+        return double.parse(s.split(' ').last);
+      } catch (_) {}
+    }
+    try {
+      return double.parse(s);
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  void _syncRiveToEquipped() {
+    if (_controller == null || widget.user == null) return;
+
+    try {
+      if (_hairInput != null) _hairInput!.value = _parseId(widget.user!.equippedHair);
+      if (_faceInput != null) _faceInput!.value = _parseId(widget.user!.equippedFace);
+      if (_skinInput != null) _skinInput!.value = _parseId(widget.user!.equippedSkin);
+      if (_clothInput != null) {
+        _clothInput!.value = _parseId(widget.user!.equippedOutfit);
+      }
+      if (_poseInput != null) {
+        _poseInput!.value = widget.isSuccess ? 2.0 : 1.0;
+      }
+    } catch (e) {
+      print("Error syncing Rive Profile: $e");
+    }
+  }
+
+  String _getModelAsset() {
+    if (widget.user != null) {
+      final bt = widget.user!.bodyType.toUpperCase();
+      if (bt == 'ADULT') return 'assets/animation/adult.riv';
+      if (bt == 'TEEN') return 'assets/animation/teen.riv';
+      return 'assets/animation/kid.riv';
+    }
+    return 'assets/animation/kid.riv';
+  }
+
+  double _getTopSpacing() {
+    if (widget.user == null) return 40;
+    final bt = widget.user!.bodyType.toUpperCase();
+    if (bt == 'ADULT') return 100; // ผู้ใหญ่ตัวสูง ลดช่องว่างด้านบน
+    if (bt == 'TEEN') return 80; // วัยรุ่นปานกลาง
+    return 40; // เด็กตัวเล็ก เพิ่มช่องว่างด้านบน
+  }
+
+  double _getCharacterScale() {
+    if (widget.user == null) return 1.5;
+    final bt = widget.user!.bodyType.toUpperCase();
+    if (bt == 'ADULT') return 1.4; // ผู้ใหญ่ตัวใหญ่ ลดสเกลลงนิดนึงเพื่อให้อยู่ในกรอบ
+    if (bt == 'TEEN') return 1.4; // วัยรุ่นกลางๆ
+    return 1.5; // เด็กตัวเล็ก ขยายสเกลให้เห็นชัด
+  }
+
+  Offset _getCharacterOffset() {
+    if (widget.user == null) return const Offset(0, 10);
+    final bt = widget.user!.bodyType.toUpperCase();
+    if (bt == 'ADULT') return const Offset(0, -35); // ผู้ใหญ่ เลื่อนลงมาหน่อยกันหัวขาด
+    if (bt == 'TEEN') return const Offset(0, -35);
+    return const Offset(0, 10); // เด็ก เลื่อนขึ้นไปนิดนึง
+  }
+
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
-    final topBarHeight = 75.0 + topPadding;
+    final topBarHeight = 60.0 + topPadding;
 
     return Scaffold(
       body: Stack(
@@ -96,15 +212,57 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
                             ],
                           ),
 
-                          // ✅ รูปตัวละคร
-                          Image.asset(
-                            widget.isSuccess 
-                                ? 'assets/images/profile/profile-character.png'
-                                : 'assets/images/profile/sad-character.png', // 🌟 เปลี่ยนรูปถ้าไม่สำเร็จ
-                            height: 250,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Icon(Icons.person, size: 100);
-                            },
+                          SizedBox(height: _getTopSpacing()), // 🌟 ปรับช่องว่างตามวัยของตัวละคร
+
+                          // ✅ รูปตัวละคร Rive + ลูกศรเด้งขึ้น
+                          SizedBox(
+                            height: 200,
+                            width: 200,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                // ตัวละคร Rive
+                                widget.user == null 
+                                    ? Image.asset(
+                                        widget.isSuccess 
+                                            ? 'assets/images/profile/profile-character.png'
+                                            : 'assets/images/profile/sad-character.png',
+                                        height: 250,
+                                      )
+                                    : Transform.scale(
+                                        scale: _getCharacterScale(), // ปรับขนาดตามวัย
+                                        alignment: Alignment.center,
+                                        child: Transform.translate(
+                                          offset: _getCharacterOffset(), // ปรับตำแหน่งตามวัย
+                                          child: (RiveCache().getFile(_getModelAsset()) != null 
+                                              ? RiveAnimation.direct(
+                                                  RiveCache().getFile(_getModelAsset())!,
+                                                  fit: BoxFit.contain,
+                                                  onInit: _onRiveInit,
+                                                )
+                                              : RiveAnimation.asset(
+                                                  _getModelAsset(), 
+                                                  fit: BoxFit.contain,
+                                                  onInit: _onRiveInit,
+                                                )),
+                                        ),
+                                      ),
+
+                                // ลูกศรชี้ขึ้นทางขวา
+                                if (widget.isSuccess)
+                                  Positioned(
+                                    right: 20,
+                                    child: const AnimatedUpwardArrow(delayMs: 300),
+                                  ),
+
+                                // ลูกศรชี้ขึ้นทางซ้าย
+                                if (widget.isSuccess)
+                                  Positioned(
+                                    left: 20,
+                                    child: const AnimatedUpwardArrow(delayMs: 600), // โผล่หลังทางขวาแปปนึง
+                                  ),
+                              ],
+                            ),
                           ),
 
                           SizedBox(height: 20),
@@ -211,9 +369,9 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
       }
     }
 
-    // 🌟 4. กำหนดสี: ถ้าสำเร็จและเป็นบวก ให้สีเขียว, ถ้าล้มเหลว (isSuccess เป็น false) ให้สีแดง
+    // 🌟 4. กำหนดสี: ถ้าสำเร็จและเป็นบวก ให้สีเขียว, ถ้าล้มเหลว (isSuccess เป็น false) ให้สีดำ
     // หมายเหตุ: แม้ค่า value จะเป็นลบ (เสียพลังงานตอนฝึกไม่ผ่าน) แต่เราโชว์เลขเดิมแล้ว เลยใช้ตัวแปร isSuccess เช็คสีแทนเลยจะชัวร์สุดครับ
-    Color statColor = widget.isSuccess ? Color(0xFF4CAF50) : Colors.red;
+    Color statColor = widget.isSuccess ? Color(0xFF4CAF50) : Colors.black;
 
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 4),
@@ -289,10 +447,8 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
       left: 0,
       right: 0,
       child: Container(
-        height: height,
         padding: EdgeInsets.only(top: topPadding),
         color: Colors.black.withOpacity(0.4),
-        alignment: Alignment.bottomCenter,
         child: CustomTopBar(
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
@@ -360,15 +516,116 @@ class _AnimatedStatValueState extends State<AnimatedStatValue>
       builder: (context, child) {
         // ปัดเศษทศนิยมทิ้งให้เป็นจำนวนเต็ม
         int currentValue = _animation.value.round();
-        return Text(
-          "$currentValue ${widget.suffix}",
-          style: TextStyle( // 🌟 ลบคำว่า const ออกจากตรงนี้
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: widget.textColor, // 🌟 ตอนนี้จะหาเจอและใช้งานได้ปกติแล้ว
+        
+        // ถ้าค่าไม่เปลี่ยน ให้แสดงเลขเดียวเป็นสีตาม textColor
+        if (widget.startValue == widget.endValue) {
+          return Text(
+            "$currentValue ${widget.suffix}".trim(),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: widget.textColor,
+            ),
+          );
+        }
+
+        // 🌟 ปรับรูปแบบการแสดงผลเป็น "ค่าเก่า -> " (สีดำ) และ "ค่าใหม่" (สีตาม textColor)
+        return RichText(
+          text: TextSpan(
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+            children: [
+              TextSpan(
+                text: "${widget.startValue} -> ",
+                style: const TextStyle(color: Colors.black),
+              ),
+              TextSpan(
+                text: "$currentValue ${widget.suffix}".trim(),
+                style: TextStyle(color: widget.textColor),
+              ),
+            ],
           ),
         );
       },
+    );
+  }
+}
+
+class AnimatedUpwardArrow extends StatefulWidget {
+  final int delayMs;
+  const AnimatedUpwardArrow({Key? key, this.delayMs = 300}) : super(key: key);
+
+  @override
+  State<AnimatedUpwardArrow> createState() => _AnimatedUpwardArrowState();
+}
+
+class _AnimatedUpwardArrowState extends State<AnimatedUpwardArrow>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<Offset> _slideAnimation;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.5), // เริ่มต้นต่ำกว่าเล็กน้อย
+      end: const Offset(0, -1.0),  // ลอยขึ้นไปด้านบน
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _fadeAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0), weight: 20), // ค่อยๆ โผล่
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.0), weight: 40), // ค้างไว้ให้เห็นชัดๆ
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0), weight: 40), // ค่อยๆ จางหายไป
+    ]).animate(_controller);
+
+    // หน่วงเวลาเล็กน้อยให้ตัวละครโผล่มาก่อน แล้วลูกศรค่อยเด้งขึ้นมา
+    Future.delayed(Duration(milliseconds: widget.delayMs), () {
+      if (mounted) _controller.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SlideTransition(
+      position: _slideAnimation,
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.arrow_upward_rounded,
+              color: Color(0xFFFFB300), // สีเหลือง
+              size: 50,
+            ),
+            Text(
+              "UP!",
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFFFFB300), // สีเหลือง
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

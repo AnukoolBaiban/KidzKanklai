@@ -647,14 +647,25 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
           },
         );
 
-        // 🌟 2. ยิง API (ใช้ completeNormalQuest สำหรับเควสทั่วไป)
+        // 🌟 2. ดึง Profile ก่อนเรียก API เพื่อบันทึก Level เดิม
+        final profileBefore = await ApiService.getProfile(0);
+        final oldLevel = profileBefore?.level ?? 0;
+
+        // 🌟 3. ยิง API (ใช้ completeNormalQuest สำหรับเควสทั่วไป)
         final result = await ApiService.completeNormalQuest(widget.questId!);
 
         // ปิด Loading
         if (mounted) Navigator.pop(context);
 
-        // 🌟 3. ถ้า API ทำงานสำเร็จ (result ไม่ใช่ null)
+        // 🌟 4. ถ้า API ทำงานสำเร็จ (result ไม่ใช่ null)
         if (result != null && mounted) {
+          // 🌟 ดึง Profile ใหม่หลัง API เพื่อเปรียบเทียบ Level
+          final freshProfile = await ApiService.getProfile(0);
+          final actualNewLevel = freshProfile?.level ?? oldLevel;
+          final didLevelUp = actualNewLevel > oldLevel;
+
+          debugPrint('📋 [QuestDetail] oldLevel=$oldLevel, actualNewLevel=$actualNewLevel, didLevelUp=$didLevelUp');
+          
           final apiRewards = (result['rewards'] as List?) ?? [];
 
           // 🌟 เช็คว่ามีของรางวัลให้โชว์หรือไม่
@@ -668,7 +679,14 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
               );
             }).toList();
 
-            await RewardPopup.show(context, rewards: popupRewards);
+            await RewardPopup.show(
+              context, 
+              rewards: popupRewards,
+              leveledUp: didLevelUp,
+              baseLevel: oldLevel,
+              newLevel: actualNewLevel,
+              user: freshProfile ?? widget.user,
+            );
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -677,46 +695,18 @@ class _QuestDetailScreenState extends State<QuestDetailScreen> {
               ),
             );
             await Future.delayed(const Duration(seconds: 1));
-          }
-
-          // 🌟 แสดง Level Up Popup ถ้าต้องการ
-          print("[DEBUG] Normal Quest result: leveled_up=${result['leveled_up']}, base=${result['base_level']}, new=${result['new_level']}");
-          if (mounted && result['leveled_up'] == true) {
-            final baseLv = result['base_level'] as int? ?? 0;
-            final newLv  = result['new_level']  as int? ?? 0;
             
-            // 🌟 ตรวสอบการเปลี่ยนร่างโดยใช้ Model Group (Kid: 0, Teen: 1, Adult: 2)
-            int getModelGroup(int lv) {
-              if (lv >= 30) return 2;
-              if (lv >= 15) return 1;
-              return 0;
-            }
-            final isEvolution = getModelGroup(newLv) > getModelGroup(baseLv);
-
-            // 🌟 รีเฟรช Profile ก่อนโชว์ Popup เพื่อให้มีข้อมูลล่าสุด
-            final freshUser = await ApiService.getProfile(0);
-
-            if (isEvolution && mounted) {
-              // 1. ถ้าถึงเกณฑ์วิวัฒนาการ โชว์ CharacterUpPopup ทันที (มีข้อมูลเลเวลด้านบนอยู่แล้ว)
-              await CharacterUpPopup.show(
-                context,
-                baseLevel: baseLv,
-                newLevel: newLv,
-                user: freshUser ?? widget.user,
-                onTapContinue: () {},
-              );
-            } else if (mounted) {
-              // 2. ถ้าเลเวลอัปปกติ ค่อยโชว์ LevelUpPopup แบบเดิม
-              await LevelUpPopup.show(
-                context,
-                baseLevel: baseLv,
-                newLevel: newLv,
-                onTapContinue: () {},
+            // 🌟 กรณีไม่มีของรางวัล แต่มีการเลเวลอัพ
+            if (mounted && didLevelUp) {
+              await RewardPopup.show(
+                context, 
+                rewards: [],
+                leveledUp: true,
+                baseLevel: oldLevel,
+                newLevel: actualNewLevel,
+                user: freshProfile ?? widget.user,
               );
             }
-          } else if (mounted) {
-            // กรณีไม่เลเวลอัพ ก็ควรดึง Profile ใหม่ไว้เผื่อ (เช่น ได้ EXP เพิ่มแต่ไม่ข้ามเวล)
-            await ApiService.getProfile(0);
           }
 
           // 🌟 เด้งกลับหน้า All Quest พร้อมส่งค่า true ไปรีเฟรช

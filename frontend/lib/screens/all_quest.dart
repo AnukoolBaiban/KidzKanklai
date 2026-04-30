@@ -30,6 +30,7 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
   int _selectedTabIndex = 0;
   final List<String> _tabs = ["ทั้งหมด", "ระบบ", "ส่วนตัว", "ประวัติ"];
   Key _topBarKey = UniqueKey(); // 🌟 สำหรับรีเฟรชแถบด้านบน
+  Key _bottomBarKey = UniqueKey(); // 🌟 สำหรับรีเฟรชแถบด้านล่าง
 
   // 🌟 ลบ Mock Data ออก และสร้างตัวแปรรับข้อมูลจริงจาก DB
   List<Map<String, dynamic>> _allQuests = [];
@@ -395,8 +396,10 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
       child: SafeArea(
         top: false,
         child: CustomBottomNavigationBar(
+          key: _bottomBarKey,
           selectedIndex: -1,
           avatarUrl: null,
+          user: _user, // 🌟 เพิ่มบรรทัดนี้เพื่อให้ BottomNav อัปเดตตาม State
           onItemTapped: (index) {},
           onAvatarTapped: () =>
               Navigator.pushReplacementNamed(context, '/profile'),
@@ -499,8 +502,15 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
                         Navigator.pop(dialogContext);
                         // เมื่อกลับมาจากการสร้างเควส ให้ Refresh ดึงข้อมูลใหม่ด้วย
                         Navigator.pushNamed(context, '/createnormalquest').then(
-                          (_) {
+                          (_) async {
                             _fetchQuestsFromDB();
+                            final freshProfile = await ApiService.getProfile(0);
+                            if (freshProfile != null && mounted) {
+                              setState(() {
+                                _user = freshProfile;
+                                _bottomBarKey = UniqueKey();
+                              });
+                            }
                           },
                         );
                       }),
@@ -508,8 +518,15 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
                       _buildPopupButton("ภารกิจทันที", () {
                         Navigator.pop(dialogContext);
 
-                        Navigator.pushNamed(context, '/countdown').then((_) {
+                        Navigator.pushNamed(context, '/countdown').then((_) async {
                           _fetchQuestsFromDB();
+                          final freshProfile = await ApiService.getProfile(0);
+                          if (freshProfile != null && mounted) {
+                            setState(() {
+                              _user = freshProfile;
+                              _bottomBarKey = UniqueKey();
+                            });
+                          }
                         });
                       }),
                     ],
@@ -970,6 +987,10 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
         return QuestCard(
           quest: filteredQuests[index],
           onClaim: () async {
+            // 🌟 ดึง Profile ก่อนเรียก API เพื่อบันทึก Level เดิม
+            final profileBefore = await ApiService.getProfile(0);
+            final oldLevel = profileBefore?.level ?? 0;
+
             // โชว์ Loading แบบเดียวกับหน้า Detail
             showDialog(
               context: context,
@@ -987,6 +1008,20 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
             if (mounted) Navigator.pop(context); // ปิด Loading
 
             if (result != null && mounted) {
+              // 🌟 ดึง Profile ใหม่หลัง API เพื่อเปรียบเทียบ Level
+              final freshProfile = await ApiService.getProfile(0);
+              final actualNewLevel = freshProfile?.level ?? oldLevel;
+              final didLevelUp = actualNewLevel > oldLevel;
+
+              // 🌟 อัปเดต State ของ User ทันทีเพื่อให้ BottomNav Bar ขยับในขณะที่โชว์ Popup
+              if (freshProfile != null && mounted) {
+                setState(() {
+                  _user = freshProfile;
+                });
+              }
+
+              debugPrint('📋 [AllQuest] oldLevel=$oldLevel, actualNewLevel=$actualNewLevel, didLevelUp=$didLevelUp');
+
               final rewards = (result['rewards'] as List?) ?? [];
               
               // 🌟 1. แสดงของรางวัล
@@ -1000,54 +1035,28 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
                   );
                 }).toList();
 
-                await RewardPopup.show(context, rewards: popupRewards);
+                await RewardPopup.show(
+                  context, 
+                  rewards: popupRewards,
+                  leveledUp: didLevelUp,
+                  baseLevel: oldLevel,
+                  newLevel: actualNewLevel,
+                  user: freshProfile ?? widget.user,
+                );
+              } else if (mounted && didLevelUp) {
+                // 🌟 กรณีไม่มีของรางวัล แต่มีการเลเวลอัพ
+                await RewardPopup.show(
+                  context, 
+                  rewards: [],
+                  leveledUp: true,
+                  baseLevel: oldLevel,
+                  newLevel: actualNewLevel,
+                  user: freshProfile ?? widget.user,
+                );
               }
 
-              // 🌟 2. แสดง Level Up Popup ถ้าต้องการ
-              if (mounted && result['leveled_up'] == true) {
-                final baseLv = result['base_level'] as int? ?? 0;
-                final newLv  = result['new_level']  as int? ?? 0;
-                
-                // 🌟 ตรวสอบการเปลี่ยนร่างโดยใช้ Model Group (Kid: 0, Teen: 1, Adult: 2)
-                int getModelGroup(int lv) {
-                  if (lv >= 30) return 2;
-                  if (lv >= 15) return 1;
-                  return 0;
-                }
-                final isEvolution = getModelGroup(newLv) > getModelGroup(baseLv);
-
-                // 🌟 รีเฟรช Profile ก่อนโชว์ Popup เพื่อให้มีข้อมูลล่าสุด
-                final freshUser = await ApiService.getProfile(0);
-
-                if (isEvolution && mounted) {
-                  // 1. ถ้าถึงเกณฑ์วิวัฒนาการ โชว์ CharacterUpPopup ทันที (มีข้อมูลเลเวลด้านบนอยู่แล้ว)
-                  await CharacterUpPopup.show(
-                    context,
-                    baseLevel: baseLv,
-                    newLevel: newLv,
-                    user: freshUser ?? widget.user,
-                    onTapContinue: () {},
-                  );
-                } else if (mounted) {
-                  // 2. ถ้าเลเวลอัปปกติ ค่อยโชว์ LevelUpPopup แบบเดิม
-                  await LevelUpPopup.show(
-                    context,
-                    baseLevel: baseLv,
-                    newLevel: newLv,
-                    onTapContinue: () {},
-                  );
-                }
-              }
-
-              // 🌟 3. รีเฟรชข้อมูล User และรายการเควส
+              // 🌟 3. รีเฟรชข้อมูลรายการเควส
               await _fetchQuestsFromDB();
-              // เพิ่มการดึง Profile ใหม่เพื่ออัปเดตเลเวลผู้เล่นในหน้านี้
-              final freshProfile = await ApiService.getProfile(0);
-              if (freshProfile != null && mounted) {
-                setState(() {
-                  _user = freshProfile;
-                });
-              }
             } else {
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -1071,6 +1080,12 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
             // 🌟 ถ้ารับค่าเป็น true ให้รีเฟรชหน้าเพื่ออัปเดตข้อมูล
             if (shouldRefresh == true) {
               _fetchQuestsFromDB();
+              final freshProfile = await ApiService.getProfile(0);
+              if (freshProfile != null && mounted) {
+                setState(() {
+                  _user = freshProfile;
+                });
+              }
             }
           },
         );

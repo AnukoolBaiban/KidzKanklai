@@ -384,13 +384,8 @@ class _FashionPageState extends State<FashionPage> {
                 top: false,
                 child: CustomBottomNavigationBar(
                   selectedIndex: 0,
-                  onItemTapped: (index) {
-                     if (index == 0) Navigator.pushReplacementNamed(context, '/profile');
-                     if (index == 1) {} 
-                     if (index == 2) Navigator.pushReplacementNamed(context, '/lobby');
-                     if (index == 3) Navigator.pushReplacementNamed(context, '/map');
-                     if (index == 4) Navigator.pushReplacementNamed(context, '/club');
-                  },
+                  user: _user,
+                  onItemTapped: (index) {},
                   onAvatarTapped: () => Navigator.pushReplacementNamed(context, '/profile'),
                   onFashionTapped: () {},
                   onRoomTapped: () => Navigator.pushReplacementNamed(context, '/lobby'),
@@ -528,7 +523,7 @@ class _AgeSelector extends StatelessWidget {
     );
 
     return GestureDetector(
-      onTap: isUnlocked ? () => onAgeSelected(ageType) : null,
+      onTap: (isUnlocked && !isSelected) ? () => onAgeSelected(ageType) : null,
       child: circle,
     );
   }
@@ -690,6 +685,9 @@ class _ContentArea extends StatelessWidget {
               selectedTab: selectedSubTab,
               onTabSelected: onSubTabSelected,
             ),
+            
+          if (selectedMainTab == 'หน้าตา' || selectedMainTab == 'ทรงผม')
+            const SizedBox(height: 20),
 
           // Main Content
           Expanded(
@@ -819,7 +817,7 @@ class _FashionGrid extends StatelessWidget {
         return _ItemCard(
           item: item,
           isSelected: isSelected,
-          onTap: () => onItemSelected(item),
+          onTap: isSelected ? null : () => onItemSelected(item),
         );
       },
     );
@@ -829,12 +827,12 @@ class _FashionGrid extends StatelessWidget {
 class _ItemCard extends StatelessWidget {
   final InventoryItem item;
   final bool isSelected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _ItemCard({
     required this.item,
     required this.isSelected,
-    required this.onTap,
+    this.onTap,
   });
 
   String get _itemImagePath {
@@ -875,7 +873,7 @@ class _ItemCard extends StatelessWidget {
         ),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isSelected ? Colors.grey.shade300 : Colors.white,
             borderRadius: BorderRadius.circular(1),
           ),
           child: Stack(
@@ -1037,7 +1035,7 @@ class _SkinColorSelector extends StatelessWidget {
           if (index < colors.length) displayColor = colors[index];
           
           return GestureDetector(
-            onTap: () {
+            onTap: isSelected ? null : () {
                onColorSelected(index);
                onInventoryItemSelected(item);
             },

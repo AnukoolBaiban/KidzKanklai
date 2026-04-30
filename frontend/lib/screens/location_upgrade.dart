@@ -42,6 +42,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
   int _currentExp = 0;
   int _nextLevelExp = 40;
   double _expPercent = 0.0;
+  int _energyBarKey = 0; // 🌟 1. เพิ่มตัวแปร key สำหรับ EnergyBar
 
   String _intStat = "10";
   String _strStat = "10";
@@ -56,6 +57,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
   StateMachineController? _controller;
   api.User? _user;
   bool _isRiveLoaded = false;
+  Map<String, String> _examStatuses = {}; // เก็บสถานะว่าสอบผ่านหรือยัง
 
   // Background paths สำหรับแต่ละสถานที่
   String get _backgroundPath {
@@ -80,6 +82,56 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
     super.initState();
     _fetchUserProfile();
     _fetchFullProfileForRive();
+    if (widget.locationName == 'สนามสอบ') {
+      _fetchExamStatuses();
+    }
+  }
+
+  Future<void> _fetchExamStatuses() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+
+      final conductData = await _supabase
+          .from('conduct')
+          .select('exam_id, status, exams(name)')
+          .eq('user_id', user.id)
+          .order('exam_id', ascending: false)
+          .limit(3);
+
+      debugPrint('📋 conductData: $conductData');
+
+      if (conductData != null && (conductData as List).isNotEmpty) {
+        Map<String, String> fetched = {};
+        for (var conduct in conductData) {
+          final exam = conduct['exams'];
+          if (exam == null) continue;
+          String dbName = exam['name'] ?? '';
+          String status = conduct['status'] ?? 'pending';
+          debugPrint('📋 exam name: "$dbName" | status: "$status"');
+          
+          // แมปชื่อตรงๆ จาก DB (ชื่อในฐานข้อมูลคือ ตึกสอบวิทยาศาสตร์, ตึกสอบคณิตศาสตร์, ตึกสอบอังกฤษ)
+          String key = '';
+          if (dbName.contains('วิทยาศาสตร์')) {
+            key = 'ตึกสอบวิทยาศาสตร์';
+          } else if (dbName.contains('คณิตศาสตร์')) {
+            key = 'ตึกสอบคณิตศาสตร์';
+          } else if (dbName.contains('อังกฤษ')) {
+            key = 'ตึกสอบอังกฤษ';
+          }
+          if (key.isNotEmpty) {
+            // ถ้าเคยมีสถานะเป็น completed แล้ว อย่าให้ pending ทับ
+            if (fetched[key] != 'completed') {
+              fetched[key] = status;
+            }
+          }
+        }
+        debugPrint('📋 fetched exam statuses: $fetched');
+        if (mounted) setState(() => _examStatuses = fetched);
+      }
+    } catch (e) {
+      debugPrint('Error fetching exam statuses: $e');
+    }
   }
 
   void _updateLevelUI(int dbLevel, int totalExp) {
@@ -243,11 +295,24 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
     }
   }
 
+  String _getModelAsset() {
+    if (_user != null) {
+      final bt = _user!.bodyType.toUpperCase();
+      if (bt == 'ADULT') return 'assets/animation/adult.riv';
+      if (bt == 'TEEN') return 'assets/animation/teen.riv';
+      return 'assets/animation/kid.riv';
+    }
+    int lvl = _level;
+    if (lvl >= 30) return 'assets/animation/adult.riv';
+    if (lvl >= 15) return 'assets/animation/teen.riv';
+    return 'assets/animation/kid.riv';
+  }
+
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
 
-    final topBarHeight = 75.0 + topPadding;
+    final topBarHeight = 60.0 + topPadding;
 
     return Scaffold(
       body: Stack(
@@ -277,16 +342,14 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                   /// Status Rewards Box
                   _buildStatusRewardsBox(),
 
-                  if (true) ...[
+                  if (widget.locationName != 'สนามสอบ') ...[
                     SizedBox(height: 20),
-                    EnergyBar(),
+                    EnergyBar(key: ValueKey(_energyBarKey)), // 🌟 2. ใส่ key ให้ EnergyBar
+                    SizedBox(height: 20),
+                    /// Stat Box
+                    _buildStatBox(),
                     SizedBox(height: 20),
                   ],
-
-                  /// Stat Box
-                  _buildStatBox(),
-
-                  SizedBox(height: 20),
                 ],
               ),
             ),
@@ -520,7 +583,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
     final isPark = widget.locationName == 'สวนสาธารณะ';
 
     return Container(
-      padding: EdgeInsets.all(20),
+      padding: EdgeInsets.fromLTRB(20,20,20,20),
       child: Column(
         children: [
           // Cost Display
@@ -529,7 +592,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
             children: [
               Center(
                 child: CostDisplayWidget(
-                  energyCostText: '20', // 🌟 ส่งข้อความไปโชว์แทน
+                  energyCostText: '10-20', // 🌟 ส่งข้อความไปโชว์แทน
                   ticketCost: 1,
                   showTicket: true,
                   showEnergy: !isPark,
@@ -538,7 +601,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
             ],
           ),
 
-          SizedBox(height: 20),
+          SizedBox(height: 8),
 
           // ✅ ปุ่ม Start (แก้ตรงนี้)
           Container(
@@ -610,7 +673,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                         );
                       }
 
-                      _fetchUserProfile(); // รีเฟรชข้อมูลตัวละคร
+                      // _fetchUserProfile(); // รีเฟรชข้อมูลตัวละคร (ย้ายไปทำตอนกลับมาจาก popup)
 
                       if (mounted) {
                         // 🌟 เตรียมของรางวัลที่จะส่งไปโชว์
@@ -623,16 +686,25 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                            correctRewards = {'พลังงาน': result['stamina_change'] ?? 0};
                         }
 
-                        Navigator.push(
+                        await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => ResultStatScreen(
                               isSuccess: true, // บอกว่าสำเร็จ
                               statusRewards: correctRewards,
                               oldStats: oldStatsData,
+                              user: _user, // 🌟 ส่ง user ไปให้โชว์แอนิเมชัน
                             ),
                           ),
                         );
+                        
+                        // 🌟 ดึงข้อมูลใหม่หลังจากปิดหน้า ResultStatScreen (เพื่อให้เรียลไทม์)
+                        if (mounted) {
+                          setState(() {
+                            _energyBarKey++; // บังคับให้ EnergyBar รีโหลดใหม่
+                          });
+                          _fetchUserProfile(); // อัปเดต state ตัวละคร
+                        }
                       }
                     } else {
                       // ❌ กรณีล้มเหลว (เช่น พลังงานไม่พอตอนฝึกฝนจนเหลือ 0)
@@ -642,7 +714,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                         );
                       }
 
-                      _fetchUserProfile(); // รีเฟรชให้เห็นหลอดพลังงานลด
+                      // _fetchUserProfile(); // รีเฟรชให้เห็นหลอดพลังงานลด (ย้ายไปทำด้านล่าง)
 
                       // 🌟 เช็คว่าถ้าไม่ใช่สวนสาธารณะ ให้โชว์หน้าจอฝึกไม่สำเร็จ
                       if (widget.locationName != 'สวนสาธารณะ' && mounted) {
@@ -653,7 +725,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                         if (widget.locationName == 'โรงยิม') failedStat = {'ความแข็งแรง': 0};
                         if (widget.locationName == 'สวนสนุก') failedStat = {'ความคิดสร้างสรรค์': 0};
 
-                        Navigator.push(
+                        await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => ResultStatScreen(
@@ -662,9 +734,18 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                               // 🌟 2. ส่ง stat ที่พยายามฝึก ไปแทนคำว่าพลังงาน!
                               statusRewards: failedStat, 
                               oldStats: oldStatsData,
+                              user: _user, // 🌟 ส่ง user ไปให้โชว์แอนิเมชัน
                             ),
                           ),
                         );
+                      }
+                      
+                      // 🌟 ดึงข้อมูลใหม่หลังจากแสดงผลล้มเหลว หรือกลับมาจากหน้า popup
+                      if (mounted) {
+                        setState(() {
+                          _energyBarKey++;
+                        });
+                        _fetchUserProfile();
                       }
                     }
                   }
@@ -776,43 +857,47 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
 
   Widget _buildExamMap() {
     return SizedBox(
-      height: 380,
+      key: ValueKey('exam-map-${_examStatuses.values.join('-')}'),
+      height: 580,
       width: double.infinity,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           // อาคารบนซ้าย (วิทย์)
           Positioned(
-            top: 40,
+            top: 150,
             left: 0,
             child: _buildExamBuilding(
               label: 'ตึกสอบวิทยาศาสตร์',
               image: 'assets/images/map/sci_building.png',
               stat: {'ความฉลาด': 1, 'ความแข็งแรง': 0, 'ความคิดสร้างสรรค์': 0},
               width: 140,
+              isPassed: _examStatuses['ตึกสอบวิทยาศาสตร์'] == 'completed',
             ),
           ),
           // อาคารบนขวา (คณิต)
           Positioned(
-            top: 0,
+            top: 40,
             right: 0,
             child: _buildExamBuilding(
               label: 'ตึกสอบคณิตศาสตร์',
               image: 'assets/images/map/math_building.png',
               stat: {'ความฉลาด': 2, 'ความแข็งแรง': 0, 'ความคิดสร้างสรรค์': 0},
               width: 130,
+              isPassed: _examStatuses['ตึกสอบคณิตศาสตร์'] == 'completed',
             ),
           ),
 
           // อาคารล่าง (อังกฤษ)
           Positioned(
-            top: 170,
+            top: 360,
             right: 30,
             child: _buildExamBuilding(
               label: 'ตึกสอบอังกฤษ',
               image: 'assets/images/map/eng_building.png',
               stat: {'ความฉลาด': 1, 'ความแข็งแรง': 0, 'ความคิดสร้างสรรค์': 1},
               width: 160,
+              isPassed: _examStatuses['ตึกสอบอังกฤษ'] == 'completed',
             ),
           ),
         ],
@@ -825,52 +910,39 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
     required String image,
     required Map<String, int> stat,
     double width = 120,
+    bool isPassed = false,
   }) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
+    return _ExamBuildingItem(
+      key: ValueKey('$label-$isPassed'), // บังคับ rebuild เมื่อสถานะเปลี่ยน
+      imagePath: image,
+      label: label,
+      width: width,
+      isPassed: isPassed,
+      onTap: () async {
+        final result = await Navigator.push<bool>(
           context,
           MaterialPageRoute(
-            builder: (_) =>
-                ExamScreen(
-                  user: _user,
-                  locationName: label,
-                  locationImage: image,
-                  statusRewards: stat,
-                ),
+            builder: (_) => ExamScreen(
+              user: _user,
+              locationName: label,
+              locationImage: image,
+              statusRewards: stat,
+            ),
           ),
         );
+        debugPrint('📋 [location_upgrade] returned from ExamScreen with result: $result for $label');
+        // ถ้า ExamScreen ส่งค่า true กลับมา แปลว่าสอบผ่านแล้ว → อัปเดตสถานะทันที
+        if (mounted) {
+          if (result == true) {
+            setState(() {
+              _examStatuses[label] = 'completed';
+            });
+            debugPrint('📋 [location_upgrade] forcefully set $label to completed');
+          }
+          // ดึงข้อมูลล่าสุดจาก DB อีกครั้งเพื่อความถูกต้อง
+          await _fetchExamStatuses();
+        }
       },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Image.asset(
-            image,
-            width: width,
-            fit: BoxFit.contain,
-          ),
-        ],
-      ),
     );
   }
 
@@ -897,13 +969,30 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.all(8),
-                child: const CircleAvatar(
-                  radius: 54,
-                  backgroundImage: AssetImage(
-                    'assets/images/profile/profile_img.png',
-                  ),
-                ),
+                width: 114,
+                height: 114,
+                clipBehavior: Clip.antiAlias,
+                decoration: const BoxDecoration(shape: BoxShape.circle),
+                child: _user == null 
+                  ? const Center(child: CircularProgressIndicator()) 
+                  : Transform.scale(
+                      scale: 1.6,
+                      alignment: Alignment.center,
+                      child: Transform.translate(
+                        offset: Offset(1, _user!.bodyType.toUpperCase() == 'KID' ? 15 : 15),
+                        child: (RiveCache().getFile(_getModelAsset()) != null 
+                            ? RiveAnimation.direct(
+                                RiveCache().getFile(_getModelAsset())!,
+                                fit: BoxFit.contain,
+                                onInit: _onRiveInit,
+                              )
+                            : RiveAnimation.asset(
+                                _getModelAsset(), 
+                                fit: BoxFit.contain,
+                                onInit: _onRiveInit,
+                              )),
+                      ),
+                    ),
               ),
             ],
           ),
@@ -986,14 +1075,17 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.black,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.black,
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 8),
@@ -1059,10 +1151,8 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
       left: 0,
       right: 0,
       child: Container(
-        height: height,
         padding: EdgeInsets.only(top: topPadding),
         color: Colors.black.withOpacity(0.4),
-        alignment: Alignment.bottomCenter,
         child: CustomTopBar(
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
@@ -1115,4 +1205,121 @@ class GradientCircularProgressPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(CustomPainter oldDelegate) => true;
+}
+
+class _ExamBuildingItem extends StatefulWidget {
+  final String imagePath;
+  final String label;
+  final double width;
+  final VoidCallback onTap;
+  final bool isPassed;
+
+  const _ExamBuildingItem({
+    super.key,
+    required this.imagePath,
+    required this.label,
+    required this.width,
+    required this.onTap,
+    this.isPassed = false,
+  });
+
+  @override
+  State<_ExamBuildingItem> createState() => _ExamBuildingItemState();
+}
+
+class _ExamBuildingItemState extends State<_ExamBuildingItem> {
+  bool _isHovered = false;
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = _isPressed ? 0.90 : (_isHovered ? 1.05 : 1.0);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapUp: (_) => setState(() => _isPressed = false),
+        onTapCancel: () => setState(() => _isPressed = false),
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: scale,
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeInOut,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Image.asset(
+                    widget.imagePath,
+                    width: widget.width,
+                    fit: BoxFit.contain,
+                  ),
+                  // ✅ ติ๊กถูกบอกว่าสอบผ่านแล้ว
+                  if (widget.isPassed)
+                    Positioned(
+                      top: -5,
+                      right: -5,
+                      child: Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.check,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: widget.isPassed ? Colors.green.shade50 : Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: widget.isPassed ? Border.all(color: Colors.green, width: 1.5) : null,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: _isHovered ? 8 : 4,
+                      offset: Offset(0, _isHovered ? 4 : 2),
+                    )
+                  ],
+                ),
+                child: Text(
+                  widget.label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: widget.isPassed ? Colors.green.shade800 : Colors.black,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
