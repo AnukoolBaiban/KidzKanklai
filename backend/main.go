@@ -51,6 +51,9 @@ func main() {
 	auth.GET("/inventory", handlers.GetInventory)
 	auth.POST("/equip", handlers.EquipItem)
 	auth.GET("/equipped", handlers.GetEquippedItems)
+	
+	// --- Gacha System ---
+	auth.POST("/gacha/pull", handlers.PullGacha)
 
 	// --- Rewards ---
 	auth.POST("/rewards/login-bonus", handlers.ClaimLoginTickets)

@@ -4,6 +4,7 @@ import '../widgets/custom_top_bar.dart';
 import 'gasha_display.dart';
 import '../widgets/bottom_navigation_bar.dart';
 import '../widgets/gasha_rate_popup.dart';
+import '../api_service.dart';
 
 class GashaScreen extends StatefulWidget {
   const GashaScreen({super.key});
@@ -12,7 +13,8 @@ class GashaScreen extends StatefulWidget {
   State<GashaScreen> createState() => _GashaScreenState();
 }
 
-class _GashaScreenState extends State<GashaScreen> {
+class _GashaScreenState extends State<GashaScreen> with TickerProviderStateMixin {
+  AnimationController? _rainbowController;
   int _selectedIndex = 1;
   final int _coins = 2000;
   final int _cost = 2000;
@@ -23,11 +25,38 @@ class _GashaScreenState extends State<GashaScreen> {
     if (index < routes.length) Navigator.pushNamed(context, routes[index]);
   }
 
-  void _handleRandom() {
-    if (_coins < _cost) {
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _rainbowController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _rainbowController?.dispose();
+    super.dispose();
+  }
+
+  void _handleRandom() async {
+    if (_isLoading) return;
+
+    setState(() => _isLoading = true);
+    
+    // เรียก API กาชา
+    final result = await ApiService.pullGacha();
+    
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (result == null || result['error'] != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('เหรียญไม่พอสำหรับการสุ่ม'),
+        SnackBar(
+          content: Text(result?['error'] ?? 'เกิดข้อผิดพลาดในการสุ่ม'),
           backgroundColor: Colors.red,
         ),
       );
@@ -39,12 +68,17 @@ class _GashaScreenState extends State<GashaScreen> {
       context,
       PageRouteBuilder(
         opaque: false,
-        pageBuilder: (context, anim, secAnim) => const GashaDisplayScreen(),
+        pageBuilder: (context, anim, secAnim) => GashaDisplayScreen(
+          gachaResult: result,
+        ),
         transitionsBuilder: (context, anim, secAnim, child) {
           return FadeTransition(opacity: anim, child: child);
         },
       ),
-    );
+    ).then((_) {
+      // Rebuild to refresh the top bar coins
+      setState(() {});
+    });
   }
 
   @override
@@ -167,21 +201,24 @@ class _GashaScreenState extends State<GashaScreen> {
         const SizedBox(height: 12),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            // Rare 1
             _buildRewardItem(
-              imagePath: 'assets/images/item/Gasha.png',
-              color: Colors.purpleAccent,
+              imagePath: 'assets/images/Fashion/FaceStyle/Face_04.PNG',
+              color: Colors.orangeAccent,
               size: size,
             ),
             const SizedBox(width: 12),
-            _buildRewardItem(
-              imagePath: 'assets/images/item/Gasha.png',
-              color: Colors.pinkAccent,
+            // Epic (Middle)
+            _buildEpicRewardItem(
+              imagePath: 'assets/images/Fashion/Outfit/Outfit_03.PNG',
               size: size,
             ),
             const SizedBox(width: 12),
+            // Rare 2
             _buildRewardItem(
-              imagePath: 'assets/images/item/Gasha.png',
+              imagePath: 'assets/images/Fashion/HairStyle/Hair_04.PNG',
               color: Colors.orangeAccent,
               size: size,
             ),
@@ -191,13 +228,13 @@ class _GashaScreenState extends State<GashaScreen> {
     );
   }
 
-  // ── ส่วนประกอบชิ้นย่อย: Reward Item ──
+  // ── ส่วนประกอบชิ้นย่อย: Reward Item (Rare/Common) ──
   Widget _buildRewardItem({
     required String imagePath,
     required Color color,
     required Size size,
   }) {
-    final double itemSize = size.width < 350 ? 55 : 65;
+    final double itemSize = size.width < 350 ? 65 : 75;
     return Container(
       width: itemSize,
       height: itemSize,
@@ -208,6 +245,13 @@ class _GashaScreenState extends State<GashaScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       padding: const EdgeInsets.all(3),
       child: Container(
@@ -216,9 +260,66 @@ class _GashaScreenState extends State<GashaScreen> {
           borderRadius: BorderRadius.circular(17),
         ),
         alignment: Alignment.center,
-        padding: const EdgeInsets.all(8.0),
-        child: Image.asset(imagePath, fit: BoxFit.contain),
+        padding: const EdgeInsets.all(0.0),
+        child: Transform.scale(
+          scale: 2.4,
+          child: Image.asset(imagePath, fit: BoxFit.contain),
+        ),
       ),
+    );
+  }
+
+  // ── ส่วนประกอบชิ้นย่อย: Epic Reward Item (Rainbow) ──
+  Widget _buildEpicRewardItem({
+    required String imagePath,
+    required Size size,
+  }) {
+    final double itemSize = size.width < 350 ? 85 : 100;
+    if (_rainbowController == null) return const SizedBox();
+    
+    return AnimatedBuilder(
+      animation: _rainbowController!,
+      builder: (context, child) {
+        return Container(
+          width: itemSize,
+          height: itemSize,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            gradient: SweepGradient(
+              colors: const [
+                Color(0xFFFFB3BA), // Pastel Red
+                Color(0xFFFFDFBA), // Pastel Orange
+                Color(0xFFFFFFBA), // Pastel Yellow
+                Color(0xFFBAFFC9), // Pastel Green
+                Color(0xFFBAE1FF), // Pastel Blue
+                Color(0xFFD0BAFF), // Pastel Purple
+                Color(0xFFFFB3BA), // Repeat for smooth loop
+              ],
+              transform: GradientRotation(_rainbowController!.value * 2 * pi),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.purple.withValues(alpha: 0.4),
+                blurRadius: 12,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(4),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            alignment: Alignment.center,
+            padding: const EdgeInsets.all(0.0),
+            child: Transform.scale(
+              scale: 1.4,
+              child: Image.asset(imagePath, fit: BoxFit.contain),
+            ),
+          ),
+        );
+      },
     );
   }
 

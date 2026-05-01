@@ -437,7 +437,9 @@ class CountdownCharacterWidgetState extends State<CountdownCharacterWidget> {
 
   // ── Sleepy idle timer ────────────────────────────────────────
   Timer? _sleepyTimer;
-  static const Duration _sleepyInterval = Duration(seconds: 15);
+  static const Duration _sleepyInterval = Duration(seconds: 16);
+  bool _isSleepyPlaying = false;
+  bool _isTapping = false; // สำหรับป้องกันการกดย้ำๆ (Debounce)
 
   @override
   void dispose() {
@@ -575,6 +577,14 @@ class CountdownCharacterWidgetState extends State<CountdownCharacterWidget> {
     _sleepyTimer = Timer(_sleepyInterval, () {
       if (mounted) {
         _autoSleepyInput?.fire();
+        _isSleepyPlaying = true;
+        // ป้องกันการกดตัวละครขณะที่กำลังเล่นท่า Sleepy (7 วินาที)
+        // เพื่อรับประกันว่า State Machine จบการ Blending คืนสู่ Idle สนิท 100%
+        Future.delayed(const Duration(milliseconds: 7000), () {
+          if (mounted) {
+            _isSleepyPlaying = false;
+          }
+        });
         _startSleepyTimer(); // วนซ้ำ
       }
     });
@@ -594,10 +604,61 @@ class CountdownCharacterWidgetState extends State<CountdownCharacterWidget> {
     _sleepyTimer?.cancel();
   }
 
+  // ── Kick Fashion Inputs ───────────────────────────────────────
+  // ฟังก์ชันนี้จะบังคับ "เตะ" ค่าให้ผิดไป 1 จังหวะแล้วคืนค่าเดิม
+  // เพื่อให้ State Machine ของ Rive รู้สึกว่ามี Input เปลี่ยนแปลง และดึงหน้าตากลับมา
+  void _kickFashionInputs() {
+    final u = widget.user;
+    if (u == null) return;
+    
+    final targetFace = _parseId(u.equippedFace);
+    final targetHair = _parseId(u.equippedHair);
+
+    // เซ็ตให้เป็นค่า -1 ก่อน
+    if (_faceInput != null) _faceInput!.value = -1.0;
+    if (_hairInput != null) _hairInput!.value = -1.0;
+
+    // คืนค่าที่ถูกต้องในอีก 50ms ถัดไป
+    Future.delayed(const Duration(milliseconds: 50), () {
+      if (!mounted) return;
+      if (_faceInput != null) _faceInput!.value = targetFace;
+      if (_hairInput != null) _hairInput!.value = targetHair;
+      _updateFashionInputs(); // อัปเดตที่เหลือให้ชัวร์
+    });
+  }
+
   /// เล่นท่า Cheerup เมื่อแตะ (ถูกเรียกจากข้างนอกที่ซ้อน overlay ไว้)
   void triggerCheerup() {
-    _tapcharacterInput?.fire();
-    _startSleepyTimer(); // reset idle timer
+    // ถ้ากำลังเล่น Sleepy อยู่ หรืออยู่ในช่วงคูลดาวน์การกด ให้ละทิ้งการกด
+    if (_isSleepyPlaying || _isTapping) return;
+
+    // ล็อกการกดทันที
+    _isTapping = true;
+
+    // รีเฟรชหน้าตาและเสื้อผ้าก่อนเริ่มท่าใหม่
+    _updateFashionInputs();
+
+    // หน่วงเวลาจังหวะเสี้ยววินาที เพื่อให้ Rive เคลียร์สถานะเดิมก่อนเริ่มท่า Cheerup
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        _tapcharacterInput?.fire();
+        _startSleepyTimer(); // reset idle timer
+        
+        // บังคับเตะ (Kick) ค่าแฟชั่นทันทีหลัง Trigger ทำงาน
+        // เพื่อแก้ปัญหา Rive จำค่าเดิมแล้วไม่ยอมดึงหน้าขึ้นมาแสดง
+        _kickFashionInputs();
+      }
+    });
+
+    // ตั้งคูลดาวน์การกด 3.5 วินาที เพื่อให้เล่นท่า Cheerup ให้จบสนิท
+    // ป้องกันการกดรัวๆ (Cheerup ชน Cheerup) ซึ่งทำให้หน้าหายได้
+    Future.delayed(const Duration(milliseconds: 3500), () {
+      if (mounted) {
+        setState(() {
+          _isTapping = false;
+        });
+      }
+    });
   }
 
   // ── Build ─────────────────────────────────────────────────────
@@ -608,38 +669,31 @@ class CountdownCharacterWidgetState extends State<CountdownCharacterWidget> {
 
     final asset = _getModelAsset();
 
-    return GestureDetector(
-      onTap: () {
-        _tapcharacterInput?.fire();
-        _startSleepyTimer(); // reset idle timer เมื่อแตะ
-      },
-      behavior: HitTestBehavior.translucent,
-      child: SizedBox(
-        width: widget.width,
-        height: widget.height,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            if (!_isRiveLoaded) const CircularProgressIndicator(),
+    return SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          if (!_isRiveLoaded) const CircularProgressIndicator(),
 
-            if (RiveCache().getFile(asset) != null)
-              RiveAnimation.direct(
-                RiveCache().getFile(asset)!,
-                fit: BoxFit.contain,
-                antialiasing: false,
-                onInit: _onRiveInit,
-                stateMachines: const ['State Machine 1'],
-              )
-            else
-              RiveAnimation.asset(
-                asset,
-                fit: BoxFit.contain,
-                antialiasing: false,
-                onInit: _onRiveInit,
-                stateMachines: const ['State Machine 1'],
-              ),
-          ],
-        ),
+          if (RiveCache().getFile(asset) != null)
+            RiveAnimation.direct(
+              RiveCache().getFile(asset)!,
+              fit: BoxFit.contain,
+              antialiasing: false,
+              onInit: _onRiveInit,
+              stateMachines: const ['State Machine 1'],
+            )
+          else
+            RiveAnimation.asset(
+              asset,
+              fit: BoxFit.contain,
+              antialiasing: false,
+              onInit: _onRiveInit,
+              stateMachines: const ['State Machine 1'],
+            ),
+        ],
       ),
     );
   }
