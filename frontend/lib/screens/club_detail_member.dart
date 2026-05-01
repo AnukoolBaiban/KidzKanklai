@@ -6,6 +6,7 @@ import 'package:flutter_application_1/screens/player_profile.dart' hide Gradient
 import 'package:flutter_application_1/widgets/character_widget.dart'; // เพิ่มบรรทัดนี้
 import 'package:flutter_application_1/widgets/bottom_navigation_bar.dart'; // สำหรับ GradientCircularProgressPainter
 import 'package:flutter_application_1/api_service.dart' as api; // เพิ่มบรรทัดนี้
+import 'package:flutter_application_1/widgets/club/confirm_quit_popup.dart';
 
 // 🌟 คลาสจัดการการโหลดข้อมูลล่วงหน้า
 class ClubDetailMemberPreloader {
@@ -310,25 +311,12 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
   }
 
   void _showLeaveClubDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('ลาออกจากชมรม'),
-        content: const Text('คุณต้องการลาออกจากชมรมนี้ใช่ไหม?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('ยกเลิก'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await _leaveClub();
-            },
-            child: const Text('ลาออก', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
+    ConfirmQuitPopup.show(
+      context,
+      onConfirm: () async {
+        Navigator.pop(context); // ปิด Popup ยืนยัน
+        await _leaveClub();
+      },
     );
   }
 
