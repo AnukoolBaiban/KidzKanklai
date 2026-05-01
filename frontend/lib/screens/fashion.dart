@@ -936,7 +936,7 @@ class _ItemCard extends StatelessWidget {
                     ),
                   ),
 
-                  // Text Name
+                  // Text Description (แทน Name)
                   Padding(
                     padding: const EdgeInsets.only(
                       bottom: 8.0,
@@ -945,7 +945,7 @@ class _ItemCard extends StatelessWidget {
                       right: 4,
                     ),
                     child: Text(
-                      item.name,
+                      item.description.isNotEmpty ? item.description : item.name,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
