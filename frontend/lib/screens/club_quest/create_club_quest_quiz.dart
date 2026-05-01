@@ -206,65 +206,92 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
     }
   }
 
+  bool _hasUnsavedChanges() {
+    // ตรวจสอบข้อมูลจากหน้าแรก
+    bool nameChanged = widget.initialData?['name'] != null && widget.initialData!['name'].toString().trim().isNotEmpty;
+    bool detailChanged = widget.initialData?['detail'] != null && widget.initialData!['detail'].toString().trim().isNotEmpty;
+    bool dateChanged = widget.initialData?['date'] != null;
+    bool imageChanged = widget.initialData?['imageFile'] != null;
+
+    // ตรวจสอบข้อมูลแบบทดสอบ (หน้านี้)
+    bool questionsChanged = false;
+    if (_questions.length > 1) {
+      questionsChanged = true;
+    } else if (_questions.isNotEmpty) {
+      if (_questions[0].textController.text.trim().isNotEmpty) {
+        questionsChanged = true;
+      } else {
+        for (var c in _questions[0].optionControllers) {
+          if (c.text.trim().isNotEmpty) {
+            questionsChanged = true;
+            break;
+          }
+        }
+      }
+    }
+
+    return nameChanged || detailChanged || dateChanged || imageChanged || questionsChanged;
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final topPadding = MediaQuery.of(context).padding.top;
-
-    final topBarHeight = 75.0 + topPadding;
-    final headerHeight = 80.0;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     // ignore: deprecated_member_use
     return WillPopScope(
       onWillPop: () async => true,
       child: Scaffold(
+        resizeToAvoidBottomInset: false,
         body: Stack(
           children: [
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: size.height,
-              child: _buildBackground(),
-            ),
+            _buildBackground(),
 
-            Padding(
-              padding: EdgeInsets.only(
-                top: topBarHeight + headerHeight + 10, 
-                left: size.width * 0.05,
-                right: size.width * 0.05,
-              ),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 10),
-
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.8),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      padding: EdgeInsets.all(16),
+            Column(
+              children: [
+                _buildTopBar(topPadding),
+                _buildBlueHeader(),
+                
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      top: 10,
+                      bottom: bottomPadding + 20,
+                      left: size.width * 0.05,
+                      right: size.width * 0.05,
+                    ),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildQuizSection(),
-                          SizedBox(height: 32),
+                          const SizedBox(height: 10),
 
-                          _buildActionButtons(),
-                          SizedBox(height: 20),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.8),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            padding: EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildQuizSection(),
+                                SizedBox(height: 32),
+
+                                _buildActionButtons(),
+                                SizedBox(height: 20),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-
-            _buildTopBar(topPadding, topBarHeight),
-            _buildBlueHeader(topBarHeight),
 
             if (_showQuestInfo)
               Positioned.fill(
@@ -285,22 +312,15 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
     );
   }
 
-  Widget _buildTopBar(double topPadding, double height) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: height,
+  Widget _buildTopBar(double topPadding) {
+    return Container(
         padding: EdgeInsets.only(top: topPadding),
         color: Colors.black.withOpacity(0.4),
-        alignment: Alignment.bottomCenter,
         child: CustomTopBar(
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
           onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
         ),
-      ),
     );
   }
 
@@ -331,26 +351,7 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
 
         setState(() => _isPressed = false);
 
-        // 🌟 แก้ไข: ใช้ Navigator.pop() 2 ครั้งเพื่อถอยกลับไปหน้าแรก แทนการเรียก Push หน้าใหม่
-        if (widget.isEditing) {
-          ExitEditClubQuestPopup.show(
-            context,
-            onConfirm: () {
-              Navigator.pop(context); // ปิด popup
-              Navigator.pop(context); // ย้อนกลับไปหน้า Detail Leader
-              Navigator.pop(context); // ย้อนกลับไปอีกเพื่อปิดหน้าย่อย
-            },
-          );
-        } else {
-          ConfirmExitPopup.show(
-            context,
-            onConfirm: () {
-              Navigator.pop(context); // ปิด popup
-              Navigator.pop(context); // ย้อนกลับไปหน้าก่อนหน้า (CreateQuestScreen)
-              Navigator.pop(context); // ย้อนกลับไปหน้า Room Head
-            },
-          );
-        }
+        Navigator.pop(context); // ย้อนกลับไปหน้าแรก (CreateClubQuestScreen)
       },
       child: Image.asset(
         _isPressed
@@ -362,12 +363,8 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
     );
   }
 
-  Widget _buildBlueHeader(double topOffset) {
-    return Positioned(
-      top: topOffset,
-      left: 0,
-      right: 0,
-      child: Container(
+  Widget _buildBlueHeader() {
+    return Container(
         height: 80,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -399,7 +396,6 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
             ),
           ],
         ),
-      ),
     );
   }
 
@@ -469,50 +465,51 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
           return _buildQuestionCard(index);
         }),
         SizedBox(height: 8),
-        Align(
-          alignment: Alignment.center,
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF556AEB), Color(0xFF59ABEC)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: [
-                BoxShadow(
-                  color: Color(0xFF556AEB).withOpacity(0.4),
-                  blurRadius: 8,
-                  offset: Offset(0, 4),
+        if (_questions.length < 10)
+          Align(
+            alignment: Alignment.center,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF556AEB), Color(0xFF59ABEC)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
                 ),
-              ],
-            ),
-            child: ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _questions.add(QuizQuestion());
-                });
-              },
-              icon: Icon(Icons.add, color: Colors.white, size: 18),
-              label: Text(
-                'เพิ่มคำถาม',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                borderRadius: BorderRadius.circular(25),
+                boxShadow: [
+                  BoxShadow(
+                    color: Color(0xFF556AEB).withOpacity(0.4),
+                    blurRadius: 8,
+                    offset: Offset(0, 4),
+                  ),
+                ],
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                shadowColor: Colors.transparent,
-                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25),
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _questions.add(QuizQuestion());
+                  });
+                },
+                icon: Icon(Icons.add, color: Colors.white, size: 18),
+                label: Text(
+                  'เพิ่มคำถาม',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
         SizedBox(height: 15),
         Container(
           width: double.infinity,
@@ -762,9 +759,22 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
       decoration: BoxDecoration(
         color: Color(0xFFE94444),
         borderRadius: BorderRadius.circular(25),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0xFFE94444).withOpacity(0.4),
+            blurRadius: 8,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: ElevatedButton(
         onPressed: () {
+          if (!_hasUnsavedChanges()) {
+            Navigator.pop(context); // ย้อนกลับ 1
+            Navigator.pop(context); // ย้อนกลับ 2
+            return;
+          }
+
           // 🌟 แก้ไข: ใช้ Navigator.pop() แทนการ Push หน้าใหม่
           if (widget.isEditing) {
             ExitEditClubQuestPopup.show(

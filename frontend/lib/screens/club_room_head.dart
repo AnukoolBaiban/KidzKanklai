@@ -217,7 +217,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
         padding: const EdgeInsets.all(2),
         decoration: const BoxDecoration(
           shape: BoxShape.circle,
-          color: Color(0xFF002A50),
+          color: Color(0xFF015496),
         ),
         child: Container(
           foregroundDecoration: _isDetailPressed

@@ -224,7 +224,7 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
         ), // ความหนาของเส้นขอบปกติต้องน้อยกว่านี้หน่อย ลอง 2px
         decoration: const BoxDecoration(
           shape: BoxShape.circle,
-          color: Color(0xFF002A50),
+          color: Color(0xFF015496),
         ),
         child: Container(
           foregroundDecoration: _isDetailPressed
