@@ -245,21 +245,28 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
       final questIds = (questsResponse as List<dynamic>).map((q) => q['id']).toList();
       final Map<String, Set<int>> completedQuestsMap = {};
       
+      debugPrint('🔍 [HEAD] questIds this week: $questIds');
+      
       if (questIds.isNotEmpty) {
         final doQuestsResponse = await supabase
             .from('do_quests')
             .select('user_id, quest_id, status')
-            .inFilter('quest_id', questIds)
-            .eq('status', 'completed');
+            .inFilter('quest_id', questIds);
+
+        debugPrint('🔍 [HEAD] all do_quests rows: $doQuestsResponse');
 
         for (final dq in doQuestsResponse as List<dynamic>) {
           final uid = dq['user_id'].toString();
           final qid = dq['quest_id'] as int;
-          if (!completedQuestsMap.containsKey(uid)) {
-            completedQuestsMap[uid] = {};
+          final status = dq['status'].toString();
+          if (status != 'not_started' && status != 'in_progress' && status != 'assigned') {
+            if (!completedQuestsMap.containsKey(uid)) {
+              completedQuestsMap[uid] = {};
+            }
+            completedQuestsMap[uid]!.add(qid);
           }
-          completedQuestsMap[uid]!.add(qid);
         }
+        debugPrint('🔍 [HEAD] completedQuestsMap: $completedQuestsMap');
       }
 
       final membersWithStats = membersWithLevel.map((m) {
@@ -1020,7 +1027,14 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => PlayerProfileScreen(playerId: memberId)),
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                PlayerProfileScreen(playerId: memberId),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+            transitionDuration: const Duration(milliseconds: 500),
+          ),
         );
       },
       child: Container(
@@ -1119,6 +1133,28 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
                               ),
                             ],
                           ),
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.symmetric(horizontal: 10),
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isLeader
+                                  ? const Color(0xFFFFB775)
+                                  : const Color(0xFFCBE7F5),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.black, width: 1.5),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              isLeader ? "หัวหน้า" : "สมาชิก",
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -1155,16 +1191,6 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 2),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: isLeader ? const Color(0xFFFFB775) : const Color(0xFFCBE7F5),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.black, width: 1.5),
-                            ),
-                            child: Text(isLeader ? "หัวหน้า" : "สมาชิก", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black)),
-                          ),
                           const SizedBox(height: 6),
                           Text(detail.isEmpty ? 'ไม่มีคำแนะนำตัว' : detail, style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.3), maxLines: 2, overflow: TextOverflow.ellipsis),
                         ],
@@ -1174,42 +1200,43 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
                 ],
               ),
             ),
-            Container(height: 2, color: const Color(0xFF9DD0E7)),
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Container(
-                    width: 105,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isLeader ? const Color(0xFFFFE0B2) : const Color(0xFFCBE7F5),
-                      borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(8)),
+            if (!isLeader) ...[          
+              Container(height: 2, color: const Color(0xFF9DD0E7)),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      width: 105,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFCBE7F5),
+                        borderRadius: BorderRadius.only(bottomLeft: Radius.circular(8)),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Text("ภารกิจที่เสร็จแล้ว", style: TextStyle(fontSize: 12, color: Colors.black87, fontWeight: FontWeight.bold)),
                     ),
-                    alignment: Alignment.center,
-                    child: const Text("ภารกิจที่เสร็จแล้ว", style: TextStyle(fontSize: 12, color: Colors.black87, fontWeight: FontWeight.bold)),
-                  ),
-                  Container(width: 2, color: const Color(0xFF9DD0E7)),
-                  Expanded(
-                    child: totalQuests == 0
-                        ? const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('ไม่มีภารกิจสัปดาห์นี้', style: TextStyle(fontSize: 12, color: Colors.grey))))
-                        : Row(
-                            children: List.generate(totalQuests, (qi) {
-                              final int currentQuestId = _weeklyQuests[qi]['id'];
-                              final bool done = completedQuests.contains(currentQuestId);
-                              final bool isLastCell = qi == totalQuests - 1;
-                              
-                              return Expanded(
-                                child: isLastCell
-                                    ? _buildQuestCircle(qi + 1, done)
-                                    : Row(children: [Expanded(child: _buildQuestCircle(qi + 1, done)), Container(width: 2, color: const Color(0xFF9DD0E7))]),
-                              );
-                            }),
-                          ),
-                  ),
-                ],
+                    Container(width: 2, color: const Color(0xFF9DD0E7)),
+                    Expanded(
+                      child: totalQuests == 0
+                          ? const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('ไม่มีภารกิจสัปดาห์นี้', style: TextStyle(fontSize: 12, color: Colors.grey))))
+                          : Row(
+                              children: List.generate(totalQuests, (qi) {
+                                final int currentQuestId = _weeklyQuests[qi]['id'];
+                                final bool done = completedQuests.contains(currentQuestId);
+                                final bool isLastCell = qi == totalQuests - 1;
+                                return Expanded(
+                                  child: isLastCell
+                                      ? _buildQuestCircle(qi + 1, done)
+                                      : Row(children: [Expanded(child: _buildQuestCircle(qi + 1, done)), Container(width: 2, color: const Color(0xFF9DD0E7))]),
+                                );
+                              }),
+                            ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),

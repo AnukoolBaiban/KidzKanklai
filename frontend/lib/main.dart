@@ -81,6 +81,12 @@ class KidzKanklaiApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         textTheme: GoogleFonts.kanitTextTheme(),
         useMaterial3: true,
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: FadePageTransitionsBuilder(),
+            TargetPlatform.iOS: FadePageTransitionsBuilder(),
+          },
+        ),
       ),
 
       // ลงทะเบียน Observer ของเรา
@@ -164,12 +170,30 @@ class AuthGate extends StatelessWidget {
         if (session != null) {
           // ✅ login แล้ว
           AudioManager().playBGM('lobby.mp3');
-          return const LobbyScreen();
+          return const LobbyScreen(showLoading: true);
         } else {
           // ❌ ยังไม่ login
           return const LoginScreen();
         }
       },
+    );
+  }
+}
+
+class FadePageTransitionsBuilder extends PageTransitionsBuilder {
+  const FadePageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return FadeTransition(
+      opacity: animation,
+      child: child,
     );
   }
 }

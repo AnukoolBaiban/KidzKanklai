@@ -245,7 +245,7 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
             .from('do_quests')
             .select('user_id, quest_id, status')
             .inFilter('quest_id', questIds)
-            .eq('status', 'completed');
+            .inFilter('status', ['completed', 'claimed']);
 
         for (final dq in doQuestsResponse as List<dynamic>) {
           final uid = dq['user_id'].toString();
@@ -894,8 +894,13 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
           // 🌟 2. สั่งเปลี่ยนหน้า พร้อมส่ง playerId ไปให้
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => PlayerProfileScreen(playerId: targetId.toString()),
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  PlayerProfileScreen(playerId: targetId.toString()),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                return FadeTransition(opacity: animation, child: child);
+              },
+              transitionDuration: const Duration(milliseconds: 500),
             ),
           );
         }
@@ -1082,77 +1087,75 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
               ],
             ),
           ),
-          // Lower Row: แสดงวงกลมภารกิจ (ทุกคน)
-          Container(height: 2, color: const Color(0xFF9DD0E7)),
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  width: 105,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isLeader
-                        ? const Color(0xFFFFE0B2)
-                        : const Color(0xFFCBE7F5),
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(8),
+          if (!isLeader) ...[
+            Container(height: 2, color: const Color(0xFF9DD0E7)),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    width: 105,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFCBE7F5),
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(8),
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Text(
+                      "ภารกิจที่เสร็จแล้ว",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.black87,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                  alignment: Alignment.center,
-                  child: const Text(
-                    "ภารกิจที่เสร็จแล้ว",
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.black87,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                Container(width: 2, color: const Color(0xFF9DD0E7)),
-                Expanded(
-                  child: totalQuests == 0
-                      ? const Center(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8),
-                            child: Text(
-                              'ไม่มีภารกิจสัปดาห์นี้',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
+                  Container(width: 2, color: const Color(0xFF9DD0E7)),
+                  Expanded(
+                    child: totalQuests == 0
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                'ไม่มีภารกิจสัปดาห์นี้',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
                               ),
                             ),
+                          )
+                        : Row(
+                            children: List.generate(totalQuests, (qi) {
+                              final int currentQuestId = _weeklyQuests[qi]['id'];
+                              final bool done = completedQuests.contains(currentQuestId);
+                              final bool isLastCell = qi == totalQuests - 1;
+                              
+                              return Expanded(
+                                child: isLastCell
+                                    ? _buildQuestCircle(qi + 1, done)
+                                    : Row(
+                                        children: [
+                                          Expanded(
+                                            child: _buildQuestCircle(
+                                                qi + 1, done),
+                                          ),
+                                          Container(
+                                            width: 2,
+                                            color: const Color(0xFF9DD0E7),
+                                          ),
+                                        ],
+                                      ),
+                              );
+                            }),
                           ),
-                        )
-                      : Row(
-                          children: List.generate(totalQuests, (qi) {
-                            // 🌟 แก้ไข: เทียบ ID ของเควสในตำแหน่งนั้น ว่าอยู่ใน Set ที่ทำเสร็จหรือไม่
-                            final int currentQuestId = _weeklyQuests[qi]['id'];
-                            final bool done = completedQuests.contains(currentQuestId);
-                            final bool isLastCell = qi == totalQuests - 1;
-                            
-                            return Expanded(
-                              child: isLastCell
-                                  ? _buildQuestCircle(qi + 1, done)
-                                  : Row(
-                                      children: [
-                                        Expanded(
-                                          child: _buildQuestCircle(
-                                              qi + 1, done),
-                                        ),
-                                        Container(
-                                          width: 2,
-                                          color: const Color(0xFF9DD0E7),
-                                        ),
-                                      ],
-                                    ),
-                            );
-                          }),
-                        ),
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
       ),
