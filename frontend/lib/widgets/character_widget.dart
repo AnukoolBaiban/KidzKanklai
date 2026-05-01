@@ -191,7 +191,15 @@ class _CharacterWidgetState extends State<CharacterWidget>
       }
     }
 
-    double hairVal = widget.user != null ? parseId(widget.user!.equippedHair) : 0.0;
+    // 🌟 ฟังก์ชันช่วยแก้ปัญหาการเรียงลำดับ HairID ใน Rive Model ที่สลับกัน
+    double getCorrectHairId(double originalId) {
+      if (originalId == 2.0) return 3.0; // Hair_02 ในรูป คือ Rive ID 3
+      if (originalId == 3.0) return 4.0; // Hair_03 ในรูป คือ Rive ID 4
+      if (originalId == 4.0) return 2.0; // Hair_04 ในรูป คือ Rive ID 2
+      return originalId;
+    }
+
+    double hairVal = widget.user != null ? getCorrectHairId(parseId(widget.user!.equippedHair)) : 0.0;
     double faceVal = widget.user != null ? parseId(widget.user!.equippedFace) : 0.0;
     double skinVal = widget.user != null ? parseId(widget.user!.equippedSkin) : 0.0;
     double clothVal = widget.user != null ? parseId(widget.user!.equippedOutfit) : 0.0;
@@ -471,7 +479,15 @@ class CountdownCharacterWidgetState extends State<CountdownCharacterWidget> {
   void _updateFashionInputs() {
     final u = widget.user;
     if (u == null) return;
-    if (_hairInput  != null) _hairInput!.value  = _parseId(u.equippedHair);
+
+    double getCorrectHairId(double originalId) {
+      if (originalId == 2.0) return 3.0;
+      if (originalId == 3.0) return 4.0;
+      if (originalId == 4.0) return 2.0;
+      return originalId;
+    }
+
+    if (_hairInput  != null) _hairInput!.value  = getCorrectHairId(_parseId(u.equippedHair));
     if (_faceInput  != null) _faceInput!.value  = _parseId(u.equippedFace);
     if (_skinInput  != null) _skinInput!.value  = _parseId(u.equippedSkin);
     if (_clothInput != null) _clothInput!.value = _parseId(u.equippedOutfit);
