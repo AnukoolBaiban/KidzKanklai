@@ -4,7 +4,10 @@ import 'package:flutter_application_1/widgets/club/club_delete_popup.dart';
 import 'package:flutter_application_1/widgets/club/club_room_components.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_application_1/api_service.dart';
-import 'package:flutter_application_1/screens/player_profile.dart'; // 🌟 ดูโปรไฟล์เพื่อน
+import 'package:flutter_application_1/screens/player_profile.dart' hide GradientCircularProgressPainter; // 🌟 ดูโปรไฟล์เพื่อน
+import 'package:flutter_application_1/widgets/character_widget.dart'; // เพิ่มบรรทัดนี้
+import 'package:flutter_application_1/widgets/bottom_navigation_bar.dart'; // สำหรับ GradientCircularProgressPainter
+import 'package:flutter_application_1/api_service.dart' as api; // เพิ่มบรรทัดนี้
 
 class ClubDetailHeadScreen extends StatefulWidget {
   const ClubDetailHeadScreen({super.key});
@@ -34,6 +37,7 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
   String _myName = '';
   String _myDetail = '';
   int _myLevel = 1;
+  api.User? _myUser; // เก็บข้อมูลผู้ใช้ปัจจุบันสำหรับแสดงตัวละคร
 
   // ข้อมูลชมรม
   int _clubId = 0;
@@ -81,13 +85,105 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
     };
   }
 
+  // 🌟 ฟังก์ชันคำนวณ EXP เปอร์เซ็นต์
+  double _getExpPercent(int dbLevel, int totalExp) {
+    int remainingExp = totalExp;
+    int requiredExpForNextLevel = 0;
+
+    for (int i = 1; i < dbLevel; i++) {
+      int expUsed = 0;
+      if (i < 6) {
+        expUsed = 40 * i;
+      } else {
+        expUsed = 200 + (i * i);
+      }
+      remainingExp -= expUsed;
+    }
+
+    if (dbLevel < 6) {
+      requiredExpForNextLevel = 40 * dbLevel;
+    } else {
+      requiredExpForNextLevel = 200 + (dbLevel * dbLevel);
+    }
+
+    return (requiredExpForNextLevel > 0)
+        ? (remainingExp / requiredExpForNextLevel).clamp(0.0, 1.0)
+        : 0.0;
+  }
+
+  // 🌟 ฟังก์ชันช่วยดึงข้อมูลตัวละครและของที่สวมใส่
+  Future<api.User> _fetchUserCharacter(String uId) async {
+    final supabase = Supabase.instance.client;
+    final charData = await supabase
+        .from('characters')
+        .select('id, level, experience, body_type, skin_color, emotion')
+        .eq('user_id', uId)
+        .maybeSingle();
+
+    String eqSkin = '';
+    String eqFace = '';
+    String eqHair = '';
+    String eqOutfit = '';
+    int level = 1;
+    int exp = 0;
+    String bodyType = 'KID';
+
+    if (charData != null) {
+      eqSkin = charData['skin_color']?.toString() ?? '';
+      eqFace = charData['emotion']?.toString() ?? '';
+      level = charData['level'] ?? 1;
+      exp = charData['experience'] ?? 0;
+      bodyType = charData['body_type']?.toString() ?? 'KID';
+
+      final charId = charData['id'];
+      if (charId != null) {
+        try {
+          final wearResponse = await supabase
+              .from('wear')
+              .select('type, items(name, image)')
+              .eq('character_id', charId);
+
+          for (var w in wearResponse as List<dynamic>) {
+            final type = w['type']?.toString().toLowerCase() ?? '';
+            final itemData = w['items'];
+            if (itemData != null) {
+              final itemVal = itemData['name']?.toString() ?? itemData['image']?.toString() ?? '';
+              if (type == 'hair') eqHair = itemVal;
+              if (type == 'face' || type == 'emotion') eqFace = itemVal;
+              if (type == 'skin') eqSkin = itemVal;
+              if (type == 'cloth' || type == 'outfit' || type == 'clothes') eqOutfit = itemVal;
+            }
+          }
+        } catch (e) {
+          debugPrint('Error fetching wear for $charId: $e');
+        }
+      }
+    }
+
+    return api.User(
+      id: 0, username: '', email: '', exp: exp, coins: 0, tickets: 0, vouchers: 0, bio: '', soundBGM: 0, soundSFX: 0, statIntellect: 0, statStrength: 0, statCreativity: 0,
+      level: level,
+      equippedSkin: eqSkin,
+      equippedHair: eqHair,
+      equippedFace: eqFace,
+      equippedOutfit: eqOutfit,
+      bodyType: bodyType,
+    );
+  }
+
   // ── ดึงข้อมูลทั้งหมด ─────────────────────────────────────────────────────
   Future<void> _fetchAllData() async {
+    setState(() => _isLoading = true);
+
     try {
       final supabase = Supabase.instance.client;
-      final userId = supabase.auth.currentUser!.id;
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
 
-      // 1. ข้อมูลตัวเอง
+      // 1. ตรวจสอบว่าตัวเองอยู่ชมรมไหนและได้ข้อมูลโปรไฟล์ตัวเองด้วย
       final myProfile = await supabase
           .from('user_profiles')
           .select('name, detail, club_id')
@@ -100,12 +196,8 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
         return;
       }
 
-      // 2. Level ตัวเอง
-      final myCharacter = await supabase
-          .from('characters')
-          .select('level')
-          .eq('user_id', userId)
-          .maybeSingle();
+      // 2. ข้อมูลตัวละครตัวเอง
+      api.User myUserObj = await _fetchUserCharacter(userId);
 
       // 3. ข้อมูลชมรม
       final club = await supabase
@@ -122,14 +214,12 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
 
       final List<Map<String, dynamic>> membersWithLevel = [];
       for (final member in membersResponse as List<dynamic>) {
-        final charData = await supabase
-            .from('characters')
-            .select('level')
-            .eq('user_id', member['id'])
-            .maybeSingle();
+        final userObj = await _fetchUserCharacter(member['id']);
+
         membersWithLevel.add({
           ...Map<String, dynamic>.from(member),
-          'level': charData?['level'] ?? 1,
+          'level': userObj.level,
+          'user_obj': userObj,
         });
       }
 
@@ -185,7 +275,8 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
           _clubId = clubId;
           _myName = myProfile['name'] ?? '';
           _myDetail = myProfile['detail'] ?? '';
-          _myLevel = myCharacter?['level'] ?? 1;
+          _myLevel = myUserObj.level;
+          _myUser = myUserObj;
           
           _clubName = club['name'] ?? '';
           _inviteCode = club['invite_code'] ?? '------';
@@ -556,29 +647,42 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
           Stack(
             alignment: Alignment.center,
             children: [
-              Container(
-                width: 110,
-                height: 110,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: SweepGradient(
+              CustomPaint(
+                size: const Size(110, 110),
+                painter: GradientCircularProgressPainter(
+                  progress: _myUser != null ? _getExpPercent(_myUser!.level, _myUser!.exp) : 0.0,
+                  gradient: const LinearGradient(
                     colors: [Color(0xFF88FF40), Color(0xFF66E0FF)],
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
                   ),
-                ),
-                child: Container(
-                  margin: const EdgeInsets.all(5),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
+                  strokeWidth: 6,
                 ),
               ),
               Container(
                 padding: const EdgeInsets.all(6),
-                child: const CircleAvatar(
-                  radius: 50,
-                  backgroundImage: AssetImage('assets/images/profile/profile_img.png'),
-                  backgroundColor: Colors.transparent,
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                  ),
+                  clipBehavior: Clip.hardEdge,
+                  child: IgnorePointer(
+                    child: Transform.translate(
+                      offset: const Offset(2, 20),
+                      child: Transform.scale(
+                        scale: 1.6,
+                        child: RepaintBoundary(
+                          child: CharacterWidget(
+                            user: _myUser,
+                            isInteractive: false,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -939,16 +1043,81 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: const Color(0xFF9DD0E7), width: 2),
-                            ),
-                            child: const CircleAvatar(
-                              radius: 36,
-                              backgroundImage: AssetImage('assets/images/profile/profile_img.png'),
-                              backgroundColor: Colors.transparent,
-                            ),
+                          Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  CustomPaint(
+                                    size: const Size(80, 80),
+                                    painter: GradientCircularProgressPainter(
+                                      progress: member['user_obj'] != null ? _getExpPercent(member['user_obj'].level, member['user_obj'].exp) : 0.0,
+                                      gradient: const LinearGradient(
+                                        colors: [Color(0xFF88FF40), Color(0xFF66E0FF)],
+                                        begin: Alignment.bottomCenter,
+                                        end: Alignment.topCenter,
+                                      ),
+                                      strokeWidth: 4,
+                                    ),
+                                  ),
+                                  Container(
+                                    width: 72,
+                                    height: 72,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.white,
+                                      border: Border.all(color: Colors.transparent, width: 2),
+                                    ),
+                                    clipBehavior: Clip.hardEdge,
+                                    child: IgnorePointer(
+                                      child: Transform.translate(
+                                        offset: const Offset(2, 15),
+                                        child: Transform.scale(
+                                          scale: 1.6,
+                                          child: RepaintBoundary(
+                                            child: CharacterWidget(
+                                              user: member['user_obj'],
+                                              isInteractive: false,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Positioned(
+                                bottom: -4,
+                                right: -4,
+                                child: Container(
+                                  width: 30,
+                                  height: 30,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.white,
+                                    border: Border.all(
+                                      color: const Color(0xFF9DD0E7),
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '$level',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                          color: Colors.black,
+                                          height: 1.1,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

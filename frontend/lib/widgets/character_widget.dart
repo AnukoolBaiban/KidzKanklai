@@ -168,9 +168,15 @@ class _CharacterWidgetState extends State<CharacterWidget>
   void _updateRiveInputs() {
     double parseId(String s) {
       if (s.isEmpty) return 0;
+      s = s.replaceAll('.png', '').replaceAll('.jpg', '');
       if (s.contains('_')) {
         try {
           return double.parse(s.split('_').last);
+        } catch (_) {}
+      }
+      if (s.contains(' ')) {
+        try {
+          return double.parse(s.split(' ').last);
         } catch (_) {}
       }
       if (s.startsWith("Hair Style ")) {
@@ -449,8 +455,12 @@ class CountdownCharacterWidgetState extends State<CountdownCharacterWidget> {
   // ── Fashion value parser (เหมือน CharacterWidget) ────────────
   double _parseId(String s) {
     if (s.isEmpty) return 0;
+    s = s.replaceAll('.png', '').replaceAll('.jpg', '');
     if (s.contains('_')) {
       try { return double.parse(s.split('_').last); } catch (_) {}
+    }
+    if (s.contains(' ')) {
+      try { return double.parse(s.split(' ').last); } catch (_) {}
     }
     if (s.startsWith('Hair Style ')) {
       try { return double.parse(s.replaceAll('Hair Style ', '')); } catch (_) {}
