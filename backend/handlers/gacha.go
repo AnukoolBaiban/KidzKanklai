@@ -219,3 +219,88 @@ func PullGacha(c *gin.Context) {
 
 	c.JSON(http.StatusOK, res)
 }
+
+// GetGachaRates returns all gacha pool items with their computed drop rates
+func GetGachaRates(c *gin.Context) {
+	ctx := context.Background()
+
+	rows, err := configs.DB.Query(ctx, `
+		SELECT id, name, description, image, rarity, category_id 
+		FROM public.items 
+		WHERE id = ANY($1)
+		ORDER BY rarity DESC, id ASC
+	`, GachaPool)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch gacha rates"})
+		return
+	}
+	defer rows.Close()
+
+	type RateItem struct {
+		ID          int64   `json:"id"`
+		Name        string  `json:"name"`
+		Description string  `json:"description"`
+		Image       string  `json:"image"`
+		Rarity      string  `json:"rarity"`
+		CategoryID  int64   `json:"category_id"`
+		Rate        float64 `json:"rate"`
+	}
+
+	var commonItems, rareItems, epicItems []RateItem
+
+	for rows.Next() {
+		var (
+			id         int64
+			name       string
+			desc       *string
+			image      *string
+			rarity     *string
+			categoryID *int64
+		)
+		if err := rows.Scan(&id, &name, &desc, &image, &rarity, &categoryID); err != nil {
+			continue
+		}
+		item := RateItem{
+			ID:          id,
+			Name:        name,
+			Description: func() string { if desc != nil { return *desc }; return name }(),
+			Image:       func() string { if image != nil { return *image }; return "" }(),
+			Rarity:      func() string { if rarity != nil { return *rarity }; return "COMMON" }(),
+			CategoryID:  func() int64 { if categoryID != nil { return *categoryID }; return 0 }(),
+		}
+		switch item.Rarity {
+		case "EPIC":
+			epicItems = append(epicItems, item)
+		case "RARE":
+			rareItems = append(rareItems, item)
+		default:
+			commonItems = append(commonItems, item)
+		}
+	}
+
+	// Compute per-item rates based on rarity weights
+	var result []RateItem
+	if len(epicItems) > 0 {
+		rateEach := float64(WeightEpic) / float64(len(epicItems))
+		for _, it := range epicItems {
+			it.Rate = rateEach
+			result = append(result, it)
+		}
+	}
+	if len(rareItems) > 0 {
+		rateEach := float64(WeightRare) / float64(len(rareItems))
+		for _, it := range rareItems {
+			it.Rate = rateEach
+			result = append(result, it)
+		}
+	}
+	if len(commonItems) > 0 {
+		rateEach := float64(WeightCommon) / float64(len(commonItems))
+		for _, it := range commonItems {
+			it.Rate = rateEach
+			result = append(result, it)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"items": result})
+}

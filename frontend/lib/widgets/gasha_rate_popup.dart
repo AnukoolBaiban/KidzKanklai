@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/api_service.dart';
 
-class GashaRatePopup extends StatelessWidget {
+class GashaRatePopup extends StatefulWidget {
   const GashaRatePopup({super.key});
 
   static Future<void> show(BuildContext context) {
@@ -12,26 +13,50 @@ class GashaRatePopup extends StatelessWidget {
   }
 
   @override
+  State<GashaRatePopup> createState() => _GashaRatePopupState();
+}
+
+class _GashaRatePopupState extends State<GashaRatePopup> {
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _epicItems = [];
+  List<Map<String, dynamic>> _rareItems = [];
+  List<Map<String, dynamic>> _commonItems = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRates();
+  }
+
+  Future<void> _loadRates() async {
+    final rates = await ApiService.getGachaRates();
+    if (mounted) {
+      setState(() {
+        _epicItems = rates.where((it) => it['rarity'] == 'EPIC').toList();
+        _rareItems = rates.where((it) => it['rarity'] == 'RARE').toList();
+        _commonItems = rates.where((it) => it['rarity'] != 'EPIC' && it['rarity'] != 'RARE').toList();
+        _isLoading = false;
+      });
+    }
+  }
+
+  String _getImagePath(Map<String, dynamic> item) {
+    final String itemName = item['name'] ?? '';
+    final int categoryId = item['category_id'] ?? 0;
+    
+    if (categoryId == 10) {
+      return 'assets/images/Fashion/Outfit/$itemName.PNG';
+    } else if (categoryId == 12) {
+      return 'assets/images/Fashion/HairStyle/$itemName.PNG';
+    } else if (categoryId == 13) {
+      return 'assets/images/Fashion/FaceStyle/$itemName.PNG';
+    }
+    return 'assets/images/item/EXP.png';
+  }
+
+  @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-
-    // ข้อมูลเรทกาชาของจริง
-    final epicItems = [
-      {'name': 'Outfit_03', 'rate': '1.0%', 'image': 'assets/images/Fashion/Outfit/Outfit_03.PNG'},
-    ];
-
-    final rareItems = [
-      {'name': 'Face_04', 'rate': '4.5%', 'image': 'assets/images/Fashion/FaceStyle/Face_04.PNG'},
-      {'name': 'Hair_04', 'rate': '4.5%', 'image': 'assets/images/Fashion/HairStyle/Hair_04.PNG'},
-    ];
-
-    final commonItems = [
-      {'name': 'Outfit_01', 'rate': '18.0%', 'image': 'assets/images/Fashion/Outfit/Outfit_01.PNG'},
-      {'name': 'Face_02', 'rate': '18.0%', 'image': 'assets/images/Fashion/FaceStyle/Face_02.PNG'},
-      {'name': 'Face_03', 'rate': '18.0%', 'image': 'assets/images/Fashion/FaceStyle/Face_03.PNG'},
-      {'name': 'Hair_01', 'rate': '18.0%', 'image': 'assets/images/Fashion/HairStyle/Hair_01.PNG'},
-      {'name': 'Hair_03', 'rate': '18.0%', 'image': 'assets/images/Fashion/HairStyle/Hair_03.PNG'},
-    ];
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -155,50 +180,63 @@ class GashaRatePopup extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: ScrollConfiguration(
-                        behavior: ScrollConfiguration.of(
-                          context,
-                        ).copyWith(scrollbars: false),
-                        child: ListView(
-                          padding: const EdgeInsets.all(16),
-                          shrinkWrap: true,
-                          physics: const BouncingScrollPhysics(),
-                          children: [
-                            // หมวดอีปิค (Epic)
-                            _buildCategory(
-                              title: 'อีปิค (Epic) - รวม 1%',
-                              titleColor: Colors.black87,
-                              underlineColor: const Color(0xFFFF4081), // เส้นขีดชมพู
-                              iconPath: 'assets/images/icon/Epic-icon.png',
-                              fallbackIcon: Icons.stars,
-                              iconColor: Colors.pinkAccent,
-                              items: epicItems,
+                      child: _isLoading
+                          ? const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(32.0),
+                                child: CircularProgressIndicator(),
+                              ),
+                            )
+                          : ScrollConfiguration(
+                              behavior: ScrollConfiguration.of(
+                                context,
+                              ).copyWith(scrollbars: false),
+                              child: ListView(
+                                padding: const EdgeInsets.all(16),
+                                shrinkWrap: true,
+                                physics: const BouncingScrollPhysics(),
+                                children: [
+                                  // หมวดอีปิค (Epic)
+                                  if (_epicItems.isNotEmpty) ...[
+                                    _buildCategory(
+                                      title: 'อีปิค (Epic) - รวม 1%',
+                                      titleColor: Colors.black87,
+                                      underlineColor: const Color(0xFFFF4081),
+                                      iconPath: 'assets/images/icon/Epic-icon.png',
+                                      fallbackIcon: Icons.stars,
+                                      iconColor: Colors.pinkAccent,
+                                      items: _epicItems,
+                                    ),
+                                    const SizedBox(height: 30),
+                                  ],
+                                  // หมวดแรร์ (Rare)
+                                  if (_rareItems.isNotEmpty) ...[
+                                    _buildCategory(
+                                      title: 'แรร์ (Rare) - รวม 9%',
+                                      titleColor: Colors.black87,
+                                      underlineColor: const Color(0xFFFF9800),
+                                      iconPath: 'assets/images/design/design4.png',
+                                      fallbackIcon: Icons.star,
+                                      iconColor: Colors.orange,
+                                      items: _rareItems,
+                                    ),
+                                    const SizedBox(height: 30),
+                                  ],
+                                  // หมวดธรรมดา (Common)
+                                  if (_commonItems.isNotEmpty) ...[
+                                    _buildCategory(
+                                      title: 'ธรรมดา (Common) - รวม 90%',
+                                      titleColor: Colors.black87,
+                                      underlineColor: const Color(0xFF93C8D0),
+                                      iconPath: 'assets/images/design/design1.png',
+                                      fallbackIcon: Icons.star_border,
+                                      iconColor: Colors.blueAccent,
+                                      items: _commonItems,
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 30),
-                            // หมวดแรร์ (Rare)
-                            _buildCategory(
-                              title: 'แรร์ (Rare) - รวม 9%',
-                              titleColor: Colors.black87,
-                              underlineColor: const Color(0xFFFF9800), // เส้นขีดส้ม
-                              iconPath: 'assets/images/design/design4.png',
-                              fallbackIcon: Icons.star,
-                              iconColor: Colors.orange,
-                              items: rareItems,
-                            ),
-                            const SizedBox(height: 30),
-                            // หมวดธรรมดา (Common)
-                            _buildCategory(
-                              title: 'ธรรมดา (Common) - รวม 90%',
-                              titleColor: Colors.black87,
-                              underlineColor: const Color(0xFF93C8D0), // เส้นขีดฟ้า
-                              iconPath: 'assets/images/design/design1.png',
-                              fallbackIcon: Icons.star_border,
-                              iconColor: Colors.blueAccent,
-                              items: commonItems,
-                            ),
-                          ],
-                        ),
-                      ),
                     ),
                   ),
                 ],
@@ -217,7 +255,7 @@ class GashaRatePopup extends StatelessWidget {
     required String iconPath,
     required IconData fallbackIcon,
     required Color iconColor,
-    required List<Map<String, String>> items,
+    required List<Map<String, dynamic>> items,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -253,13 +291,20 @@ class GashaRatePopup extends StatelessWidget {
         ),
         // Items
         ...items.map((item) {
+          final itemNameStr = item['name']?.toString() ?? '';
+          final itemDescStr = item['description']?.toString() ?? itemNameStr;
+          final itemRate = item['rate'] != null
+              ? '${(item['rate'] as num).toStringAsFixed(1)}%'
+              : '0%';
+          final itemImagePath = _getImagePath(item);
+
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
               children: [
                 // Item Image
                 Image.asset(
-                  item['image']!,
+                  itemImagePath,
                   width: 56,
                   height: 56,
                   fit: BoxFit.contain,
@@ -273,7 +318,7 @@ class GashaRatePopup extends StatelessWidget {
                 // Item Name
                 Expanded(
                   child: Text(
-                    item['name']!,
+                    itemDescStr,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -283,7 +328,7 @@ class GashaRatePopup extends StatelessWidget {
                 ),
                 // Item Rate
                 Text(
-                  item['rate']!,
+                  itemRate,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -293,8 +338,8 @@ class GashaRatePopup extends StatelessWidget {
               ],
             ),
           );
-        }).toList(),
+        }),
       ],
     );
   }
-}
+}

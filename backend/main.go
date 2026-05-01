@@ -54,6 +54,7 @@ func main() {
 	
 	// --- Gacha System ---
 	auth.POST("/gacha/pull", handlers.PullGacha)
+	auth.GET("/gacha/rates", handlers.GetGachaRates)
 
 	// --- Rewards ---
 	auth.POST("/rewards/login-bonus", handlers.ClaimLoginTickets)

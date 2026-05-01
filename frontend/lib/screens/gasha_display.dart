@@ -637,6 +637,7 @@ class _GashaDisplayScreenState extends State<GashaDisplayScreen>
     final coinReward = widget.gachaResult?['coin_reward'] ?? 0;
     
     final itemName = itemData['name'] ?? 'EXP';
+    final itemDescription = itemData['description'] ?? itemName;
     final int categoryId = itemData['category_id'] ?? 0;
     
     String itemImage = 'assets/images/item/EXP.png';
@@ -797,7 +798,7 @@ class _GashaDisplayScreenState extends State<GashaDisplayScreen>
 
               // ── ชื่อไอเทม ──
               Text(
-                itemName,
+                itemDescription,
                 style: TextStyle(
                   color: const Color(0xFF313131),
                   fontSize: titleSize,

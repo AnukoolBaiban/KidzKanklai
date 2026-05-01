@@ -117,9 +117,8 @@ class _GashaScreenState extends State<GashaScreen> with TickerProviderStateMixin
     final size = MediaQuery.sizeOf(context);
     final topPadding = MediaQuery.paddingOf(context).top;
     final topBarHeight = 75.0 + topPadding;
-
     // คำนวณขอบบน-ล่างให้รองรับจอเล็ก/จอใหญ่ได้ดียิ่งขึ้น
-    final topOffset = size.height < 700 ? topBarHeight + 20 : topBarHeight + 40;
+    final topOffset = size.height < 700 ? 80.0 + topPadding : 100.0 + topPadding;
     final bottomOffset = size.height < 700 ? 70.0 : 90.0;
     final hPadding = size.width < 380 ? 16.0 : 24.0;
 
@@ -417,17 +416,14 @@ class _GashaScreenState extends State<GashaScreen> with TickerProviderStateMixin
   // ── Top Bar ──
   Widget _buildTopBar(BuildContext context) {
     final topPadding = MediaQuery.paddingOf(context).top;
-    final topBarHeight = 75.0 + topPadding;
 
     return Positioned(
       top: 0,
       left: 0,
       right: 0,
       child: Container(
-        height: topBarHeight,
         padding: EdgeInsets.only(top: topPadding),
         color: Colors.black.withValues(alpha: 0.4),
-        alignment: Alignment.bottomCenter,
         child: CustomTopBar(
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
@@ -441,7 +437,7 @@ class _GashaScreenState extends State<GashaScreen> with TickerProviderStateMixin
   Widget _buildBackButton(BuildContext context) {
     final topPadding = MediaQuery.paddingOf(context).top;
     return Positioned(
-      top: topPadding + 85.0,
+      top: topPadding + 65.0,
       left: 16,
       child: const _BackButton(),
     );

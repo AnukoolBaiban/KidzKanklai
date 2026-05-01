@@ -274,6 +274,24 @@ class ApiService {
     }
   }
 
+  // Gacha Rates — ดึงข้อมูล pool items พร้อมโอกาสได้รับจาก DB
+  static Future<List<Map<String, dynamic>>> getGachaRates() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/gacha/rates'),
+        headers: _headers,
+      );
+      ApiService._checkUnauthorized(response.statusCode);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(data['items'] ?? []);
+      }
+    } catch (e) {
+      print("Get Gacha Rates Error: $e");
+    }
+    return [];
+  }
+
   // ฟังก์ชันเคลมโบนัสล็อกอินรายวัน/รายสัปดาห์
   static Future<List<dynamic>> claimLoginBonus() async {
     try {
