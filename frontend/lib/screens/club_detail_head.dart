@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_application_1/widgets/club/club_delete_popup.dart';
 import 'package:flutter_application_1/widgets/club/club_room_components.dart';
+import 'package:flutter_application_1/widgets/club/confirm_delete_member_popup.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_application_1/api_service.dart';
 import 'package:flutter_application_1/screens/player_profile.dart' hide GradientCircularProgressPainter; // 🌟 ดูโปรไฟล์เพื่อน
@@ -473,34 +474,29 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
 
   // 🌟 ฟังก์ชันเตะสมาชิก
   Future<void> _kickMember(String targetId, String name) async {
-    // 1. Popup ยืนยัน
-    final bool? confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('ไล่สมาชิกออก'),
-        content: Text('คุณต้องการไล่ "$name" ออกจากชมรมใช่หรือไม่?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('ยกเลิก'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('ไล่ออก', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
+    // 1. Popup ยืนยันด้วย ConfirmDeletePopup
+    bool confirmed = false;
+    await ConfirmDeleteMemberPopup.show(
+      context,
+      title: 'ไล่ "$name" ออกจากชมรม?',
+      subtitle: 'สมาชิกจะถูกนำออกจากชมรมอย่างถาวร',
+      onConfirm: () {
+        confirmed = true;
+        Navigator.pop(context);
+      },
     );
 
-    if (confirm != true) return;
+    if (!confirmed) return;
 
+    // 2. Loading
+    if (!mounted) return;
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => const Center(child: CircularProgressIndicator()),
     );
 
-    // 2. เรียก API
+    // 3. เรียก API
     final result = await ApiService.kickClubMember(targetId);
 
     if (mounted) Navigator.pop(context); // ปิด Loading
