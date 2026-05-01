@@ -5,6 +5,7 @@ import 'package:rive/rive.dart' hide LinearGradient, Image;
 import 'package:flutter_application_1/config/rive_cache.dart'; 
 import '../widgets/character_widget.dart';
 import 'package:flutter_application_1/api_service.dart' as api;
+import 'loading.dart';
 
 class PlayerProfileScreen extends StatefulWidget {
   final String playerId; // 🌟 รับ UUID ของคนที่เราจะดูโปรไฟล์
@@ -18,6 +19,7 @@ class PlayerProfileScreen extends StatefulWidget {
 class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
   final _supabase = Supabase.instance.client;
   bool _isBackPressed = false;
+  bool _isLoading = true;
 
   // --- Profile Data ---
   String _displayName = "Loading...";
@@ -207,13 +209,32 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
           _displayBio = "โปรดเช็ค Debug Console เพื่อดูสาเหตุที่แท้จริง";
         });
       }
+    } finally {
+      if (mounted) {
+        // ให้หน่วงเวลาโหลดนิดนึงเพื่อให้แอนิเมชัน Loading โชว์และโมเดลพร้อม
+        await Future.delayed(const Duration(milliseconds: 500));
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 600),
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: child,
+        );
+      },
+      child: _isLoading
+          ? const LoadingScreen(key: ValueKey('loading'), isStandalone: false)
+          : Scaffold(
+              key: const ValueKey('profile'),
+              backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: false,
       extendBody: true,
       body: Stack(
@@ -257,6 +278,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
           ),
         ],
       ),
+            ),
     );
   }
 

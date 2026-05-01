@@ -555,7 +555,7 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
 
   Widget _buildLeaderInfoSection() {
     final bool isLeader = _myRole == 'owner';
-    final String roleLabel = isLeader ? 'เจ้าของชมรม' : 'สมาชิก';
+    final String roleLabel = isLeader ? 'หัวหน้า' : 'สมาชิก';
     final Color roleBgColor =
         isLeader ? const Color(0xFFFFE0B2) : const Color(0xFFCBE7F5);
 
@@ -1032,7 +1032,7 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
                           ),
                           alignment: Alignment.center,
                           child: Text(
-                            isLeader ? "เจ้าของชมรม" : "สมาชิก",
+                            isLeader ? "หัวหน้า" : "สมาชิก",
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,

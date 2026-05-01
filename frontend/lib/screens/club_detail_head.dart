@@ -1163,7 +1163,7 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: Colors.black, width: 1.5),
                             ),
-                            child: Text(isLeader ? "เจ้าของชมรม" : "สมาชิก", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black)),
+                            child: Text(isLeader ? "หัวหน้า" : "สมาชิก", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black)),
                           ),
                           const SizedBox(height: 6),
                           Text(detail.isEmpty ? 'ไม่มีคำแนะนำตัว' : detail, style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.3), maxLines: 2, overflow: TextOverflow.ellipsis),
