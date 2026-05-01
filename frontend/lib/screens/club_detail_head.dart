@@ -10,6 +10,208 @@ import 'package:flutter_application_1/widgets/character_widget.dart'; // เพ�
 import 'package:flutter_application_1/widgets/bottom_navigation_bar.dart'; // สำหรับ GradientCircularProgressPainter
 import 'package:flutter_application_1/api_service.dart' as api; // เพิ่มบรรทัดนี้
 
+// 🌟 คลาสจัดการการโหลดข้อมูลล่วงหน้า
+class ClubDetailHeadPreloader {
+  static Map<String, dynamic>? cachedData;
+  static bool isPreloading = false;
+
+  static void clearCache() {
+    cachedData = null;
+    isPreloading = false;
+  }
+
+  static Map<String, String> getThisWeekTimeRangeUTC() {
+    DateTime now = DateTime.now().toUtc();
+    DateTime nowUtc7 = now.add(const Duration(hours: 7));
+    int daysSinceMonday = nowUtc7.weekday - DateTime.monday;
+    DateTime startOfWeekUtc7 = DateTime(nowUtc7.year, nowUtc7.month, nowUtc7.day)
+        .subtract(Duration(days: daysSinceMonday));
+    DateTime endOfWeekUtc7 = startOfWeekUtc7.add(const Duration(days: 7));
+
+    String formatNaiveLocal(DateTime dt) {
+      String y = dt.year.toString().padLeft(4, '0');
+      String m = dt.month.toString().padLeft(2, '0');
+      String d = dt.day.toString().padLeft(2, '0');
+      return '$y-$m-${d}T00:00:00'; 
+    }
+
+    return {
+      'start': formatNaiveLocal(startOfWeekUtc7),
+      'end': formatNaiveLocal(endOfWeekUtc7),
+    };
+  }
+
+  static Future<api.User> fetchUserCharacter(String uId) async {
+    final supabase = Supabase.instance.client;
+    final charData = await supabase
+        .from('characters')
+        .select('id, level, experience, body_type, skin_color, emotion')
+        .eq('user_id', uId)
+        .maybeSingle();
+
+    String eqSkin = '';
+    String eqFace = '';
+    String eqHair = '';
+    String eqOutfit = '';
+    int level = 1;
+    int exp = 0;
+    String bodyType = 'KID';
+
+    if (charData != null) {
+      eqSkin = charData['skin_color']?.toString() ?? '';
+      eqFace = charData['emotion']?.toString() ?? '';
+      level = charData['level'] ?? 1;
+      exp = charData['experience'] ?? 0;
+      bodyType = charData['body_type']?.toString() ?? 'KID';
+
+      final charId = charData['id'];
+      if (charId != null) {
+        try {
+          final wearResponse = await supabase
+              .from('wear')
+              .select('type, items(name, image)')
+              .eq('character_id', charId);
+
+          for (var w in wearResponse as List<dynamic>) {
+            final type = w['type']?.toString().toLowerCase() ?? '';
+            final itemData = w['items'];
+            if (itemData != null) {
+              final itemVal = itemData['name']?.toString() ?? itemData['image']?.toString() ?? '';
+              if (type == 'hair') eqHair = itemVal;
+              if (type == 'face' || type == 'emotion') eqFace = itemVal;
+              if (type == 'skin') eqSkin = itemVal;
+              if (type == 'cloth' || type == 'outfit' || type == 'clothes') eqOutfit = itemVal;
+            }
+          }
+        } catch (e) {
+          debugPrint('Error fetching wear for $charId: $e');
+        }
+      }
+    }
+
+    return api.User(
+      id: 0, username: '', email: '', exp: exp, coins: 0, tickets: 0, vouchers: 0, bio: '', soundBGM: 0, soundSFX: 0, statIntellect: 0, statStrength: 0, statCreativity: 0,
+      level: level,
+      equippedSkin: eqSkin,
+      equippedHair: eqHair,
+      equippedFace: eqFace,
+      equippedOutfit: eqOutfit,
+      bodyType: bodyType,
+    );
+  }
+
+  static Future<void> preload() async {
+    if (isPreloading || cachedData != null) return;
+    isPreloading = true;
+
+    try {
+      final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) {
+        isPreloading = false;
+        return;
+      }
+
+      final myProfile = await supabase
+          .from('user_profiles')
+          .select('name, detail, club_id')
+          .eq('id', userId)
+          .single();
+
+      final clubId = myProfile['club_id'];
+      if (clubId == null) {
+        isPreloading = false;
+        return;
+      }
+
+      api.User myUserObj = await fetchUserCharacter(userId);
+
+      final club = await supabase
+          .from('clubs')
+          .select('name, description, invite_code')
+          .eq('id', clubId)
+          .single();
+
+      final membersResponse = await supabase
+          .from('user_profiles')
+          .select('id, name, detail, club_role')
+          .eq('club_id', clubId);
+
+      final List<Map<String, dynamic>> membersWithLevel = [];
+      for (final member in membersResponse as List<dynamic>) {
+        final userObj = await fetchUserCharacter(member['id']);
+
+        membersWithLevel.add({
+          ...Map<String, dynamic>.from(member),
+          'level': userObj.level,
+          'user_obj': userObj,
+        });
+      }
+
+      membersWithLevel.sort((a, b) {
+        final aRole = a['club_role'] ?? '';
+        final bRole = b['club_role'] ?? '';
+        if (aRole == 'owner' && bRole != 'owner') return -1;
+        if (aRole != 'owner' && bRole == 'owner') return 1;
+        return 0;
+      });
+
+      final timeRange = getThisWeekTimeRangeUTC();
+      final questsResponse = await supabase
+          .from('quests')
+          .select('id, name')
+          .eq('club_id', clubId)
+          .gte('start_date', timeRange['start']!)
+          .lt('start_date', timeRange['end']!)
+          .order('start_date', ascending: true);
+
+      final questIds = (questsResponse as List<dynamic>).map((q) => q['id']).toList();
+      final Map<String, Set<int>> completedQuestsMap = {};
+      
+      if (questIds.isNotEmpty) {
+        final doQuestsResponse = await supabase
+            .from('do_quests')
+            .select('user_id, quest_id, status')
+            .inFilter('quest_id', questIds);
+
+        for (final dq in doQuestsResponse as List<dynamic>) {
+          final uid = dq['user_id'].toString();
+          final qid = dq['quest_id'] as int;
+          final status = dq['status'].toString();
+          if (status != 'not_started' && status != 'in_progress' && status != 'assigned') {
+            if (!completedQuestsMap.containsKey(uid)) {
+              completedQuestsMap[uid] = {};
+            }
+            completedQuestsMap[uid]!.add(qid);
+          }
+        }
+      }
+
+      final membersWithStats = membersWithLevel.map((m) {
+        final uid = m['id'].toString();
+        return {
+          ...m,
+          'completed_quests': completedQuestsMap[uid] ?? <int>{},
+        };
+      }).toList();
+
+      cachedData = {
+        'clubId': clubId,
+        'myProfile': myProfile,
+        'myUserObj': myUserObj,
+        'club': club,
+        'membersWithStats': membersWithStats,
+        'questsResponse': questsResponse,
+      };
+
+    } catch (e) {
+      debugPrint("Preload Head Data Error: $e");
+    } finally {
+      isPreloading = false;
+    }
+  }
+}
+
 class ClubDetailHeadScreen extends StatefulWidget {
   const ClubDetailHeadScreen({super.key});
 
@@ -176,128 +378,36 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
   Future<void> _fetchAllData() async {
     setState(() => _isLoading = true);
 
-    try {
-      final supabase = Supabase.instance.client;
-      final userId = supabase.auth.currentUser?.id;
-      if (userId == null) {
-        if (mounted) setState(() => _isLoading = false);
-        return;
-      }
+    // รอให้ Preload เสร็จ (ถ้ากำลังโหลดอยู่)
+    while (ClubDetailHeadPreloader.isPreloading) {
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
 
-      // 1. ตรวจสอบว่าตัวเองอยู่ชมรมไหนและได้ข้อมูลโปรไฟล์ตัวเองด้วย
-      final myProfile = await supabase
-          .from('user_profiles')
-          .select('name, detail, club_id')
-          .eq('id', userId)
-          .single();
+    // ถ้าไม่มีข้อมูล Cache ค่อยโหลดใหม่
+    if (ClubDetailHeadPreloader.cachedData == null) {
+      await ClubDetailHeadPreloader.preload();
+    }
 
-      final clubId = myProfile['club_id'];
-      if (clubId == null) {
-        if (mounted) setState(() => _isLoading = false);
-        return;
-      }
+    final data = ClubDetailHeadPreloader.cachedData;
 
-      // 2. ข้อมูลตัวละครตัวเอง
-      api.User myUserObj = await _fetchUserCharacter(userId);
+    if (data != null && mounted) {
+      setState(() {
+        _clubId = data['clubId'];
+        _myName = data['myProfile']['name'] ?? '';
+        _myDetail = data['myProfile']['detail'] ?? '';
+        _myUser = data['myUserObj'];
+        _myLevel = _myUser!.level;
+        
+        _clubName = data['club']['name'] ?? '';
+        _inviteCode = data['club']['invite_code'] ?? '------';
+        _clubNameController.text = _clubName;
+        _clubDetailController.text = data['club']['description'] ?? '';
 
-      // 3. ข้อมูลชมรม
-      final club = await supabase
-          .from('clubs')
-          .select('name, description, invite_code')
-          .eq('id', clubId)
-          .single();
-
-      // 4. สมาชิกทั้งหมด
-      final membersResponse = await supabase
-          .from('user_profiles')
-          .select('id, name, detail, club_role')
-          .eq('club_id', clubId);
-
-      final List<Map<String, dynamic>> membersWithLevel = [];
-      for (final member in membersResponse as List<dynamic>) {
-        final userObj = await _fetchUserCharacter(member['id']);
-
-        membersWithLevel.add({
-          ...Map<String, dynamic>.from(member),
-          'level': userObj.level,
-          'user_obj': userObj,
-        });
-      }
-
-      // เรียงหัวหน้าขึ้นก่อน
-      membersWithLevel.sort((a, b) {
-        final aRole = a['club_role'] ?? '';
-        final bRole = b['club_role'] ?? '';
-        if (aRole == 'owner' && bRole != 'owner') return -1;
-        if (aRole != 'owner' && bRole == 'owner') return 1;
-        return 0;
+        _members = data['membersWithStats'];
+        _weeklyQuests = data['questsResponse'];
+        _isLoading = false;
       });
-
-      // 5. ภารกิจและประวัติ
-      final timeRange = _getThisWeekTimeRangeUTC();
-      final questsResponse = await supabase
-          .from('quests')
-          .select('id, name')
-          .eq('club_id', clubId)
-          .gte('start_date', timeRange['start']!)
-          .lt('start_date', timeRange['end']!)
-          .order('start_date', ascending: true);
-
-      final questIds = (questsResponse as List<dynamic>).map((q) => q['id']).toList();
-      final Map<String, Set<int>> completedQuestsMap = {};
-      
-      debugPrint('🔍 [HEAD] questIds this week: $questIds');
-      
-      if (questIds.isNotEmpty) {
-        final doQuestsResponse = await supabase
-            .from('do_quests')
-            .select('user_id, quest_id, status')
-            .inFilter('quest_id', questIds);
-
-        debugPrint('🔍 [HEAD] all do_quests rows: $doQuestsResponse');
-
-        for (final dq in doQuestsResponse as List<dynamic>) {
-          final uid = dq['user_id'].toString();
-          final qid = dq['quest_id'] as int;
-          final status = dq['status'].toString();
-          if (status != 'not_started' && status != 'in_progress' && status != 'assigned') {
-            if (!completedQuestsMap.containsKey(uid)) {
-              completedQuestsMap[uid] = {};
-            }
-            completedQuestsMap[uid]!.add(qid);
-          }
-        }
-        debugPrint('🔍 [HEAD] completedQuestsMap: $completedQuestsMap');
-      }
-
-      final membersWithStats = membersWithLevel.map((m) {
-        final uid = m['id'].toString();
-        return {
-          ...m,
-          'completed_quests': completedQuestsMap[uid] ?? <int>{},
-        };
-      }).toList();
-
-      if (mounted) {
-        setState(() {
-          _clubId = clubId;
-          _myName = myProfile['name'] ?? '';
-          _myDetail = myProfile['detail'] ?? '';
-          _myLevel = myUserObj.level;
-          _myUser = myUserObj;
-          
-          _clubName = club['name'] ?? '';
-          _inviteCode = club['invite_code'] ?? '------';
-          _clubNameController.text = _clubName;
-          _clubDetailController.text = club['description'] ?? '';
-
-          _members = membersWithStats;
-          _weeklyQuests = questsResponse;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint("Error fetching head data: $e");
+    } else {
       if (mounted) setState(() => _isLoading = false);
     }
   }

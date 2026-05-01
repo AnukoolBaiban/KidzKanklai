@@ -7,61 +7,24 @@ import 'package:flutter_application_1/widgets/character_widget.dart'; // เพ�
 import 'package:flutter_application_1/widgets/bottom_navigation_bar.dart'; // สำหรับ GradientCircularProgressPainter
 import 'package:flutter_application_1/api_service.dart' as api; // เพิ่มบรรทัดนี้
 
-class ClubDetailMemberScreen extends StatefulWidget {
-  const ClubDetailMemberScreen({super.key});
+// 🌟 คลาสจัดการการโหลดข้อมูลล่วงหน้า
+class ClubDetailMemberPreloader {
+  static Map<String, dynamic>? cachedData;
+  static bool isPreloading = false;
 
-  @override
-  State<ClubDetailMemberScreen> createState() => _ClubDetailMemberScreenState();
-}
-
-class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
-  bool _isLeavePressed = false;
-  int _selectedIndex = 3;
-  bool _isShowingMembers = false;
-
-  // ── State Variables ──────────────────────────────────────────────────────
-  bool _isLoading = true;
-
-  // ข้อมูลตัวเอง
-  String _myName = '';
-  String _myDetail = '';
-  String _myRole = '';
-  int _myLevel = 1;
-  api.User? _myUser; // เก็บข้อมูลผู้ใช้ปัจจุบันสำหรับแสดงตัวละคร
-
-  // ข้อมูลชมรม
-  String _clubName = '';
-  String _clubDescription = '';
-  String _inviteCode = '';
-
-  // ข้อมูลสมาชิก
-  List<Map<String, dynamic>> _members = [];
-
-  // ภารกิจสัปดาห์นี้ (เพื่อนับ total_quests)
-  List<dynamic> _weeklyQuests = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchAllData();
+  static void clearCache() {
+    cachedData = null;
+    isPreloading = false;
   }
 
-  // 🌟 ฟังก์ชันคำนวณเวลาสัปดาห์นี้ (จันทร์ 00:00 - จันทร์หน้า 00:00 UTC+7)
-  Map<String, String> _getThisWeekTimeRangeUTC() {
+  static Map<String, String> getThisWeekTimeRangeUTC() {
     DateTime now = DateTime.now().toUtc();
     DateTime nowUtc7 = now.add(const Duration(hours: 7));
-    
     int daysSinceMonday = nowUtc7.weekday - DateTime.monday;
-    
-    // จันทร์นี้ 00:00:00 (อิงตามเวลาไทย)
     DateTime startOfWeekUtc7 = DateTime(nowUtc7.year, nowUtc7.month, nowUtc7.day)
         .subtract(Duration(days: daysSinceMonday));
-        
-    // จันทร์หน้า 00:00:00 (อิงตามเวลาไทย)
     DateTime endOfWeekUtc7 = startOfWeekUtc7.add(const Duration(days: 7));
 
-    // 🌟 แก้ไข: แปลงเป็น String รูปแบบเวลาท้องถิ่นเป๊ะๆ (ไม่มีอักษร Z และไม่หักลบ 7 ชม.)
-    // เพื่อให้ Database เปรียบเทียบตัวเลข วัน-เวลา ตรงๆ ป้องกันบั๊ก Timezone
     String formatNaiveLocal(DateTime dt) {
       String y = dt.year.toString().padLeft(4, '0');
       String m = dt.month.toString().padLeft(2, '0');
@@ -70,39 +33,12 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
     }
 
     return {
-      'start': formatNaiveLocal(startOfWeekUtc7), // ผลลัพธ์: '2024-05-27T00:00:00'
-      'end': formatNaiveLocal(endOfWeekUtc7),     // ผลลัพธ์: '2024-06-03T00:00:00'
+      'start': formatNaiveLocal(startOfWeekUtc7),
+      'end': formatNaiveLocal(endOfWeekUtc7),
     };
   }
 
-  // 🌟 ฟังก์ชันคำนวณ EXP เปอร์เซ็นต์
-  double _getExpPercent(int dbLevel, int totalExp) {
-    int remainingExp = totalExp;
-    int requiredExpForNextLevel = 0;
-
-    for (int i = 1; i < dbLevel; i++) {
-      int expUsed = 0;
-      if (i < 6) {
-        expUsed = 40 * i;
-      } else {
-        expUsed = 200 + (i * i);
-      }
-      remainingExp -= expUsed;
-    }
-
-    if (dbLevel < 6) {
-      requiredExpForNextLevel = 40 * dbLevel;
-    } else {
-      requiredExpForNextLevel = 200 + (dbLevel * dbLevel);
-    }
-
-    return (requiredExpForNextLevel > 0)
-        ? (remainingExp / requiredExpForNextLevel).clamp(0.0, 1.0)
-        : 0.0;
-  }
-
-  // 🌟 ฟังก์ชันช่วยดึงข้อมูลตัวละครและของที่สวมใส่
-  Future<api.User> _fetchUserCharacter(String uId) async {
+  static Future<api.User> fetchUserCharacter(String uId) async {
     final supabase = Supabase.instance.client;
     final charData = await supabase
         .from('characters')
@@ -161,19 +97,18 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
     );
   }
 
-  // ── ดึงข้อมูลทั้งหมด ─────────────────────────────────────────────────────
-  Future<void> _fetchAllData() async {
-    setState(() => _isLoading = true);
+  static Future<void> preload() async {
+    if (isPreloading || cachedData != null) return;
+    isPreloading = true;
 
     try {
       final supabase = Supabase.instance.client;
       final userId = supabase.auth.currentUser?.id;
       if (userId == null) {
-        if (mounted) setState(() => _isLoading = false);
+        isPreloading = false;
         return;
       }
 
-      // 1. ดึงข้อมูลโปรไฟล์ตัวเอง
       final myProfile = await supabase
           .from('user_profiles')
           .select('name, detail, club_id, club_role')
@@ -182,30 +117,26 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
 
       final clubId = myProfile['club_id'];
       if (clubId == null) {
-        if (mounted) setState(() => _isLoading = false);
+        isPreloading = false;
         return;
       }
 
-      // 2. ข้อมูลตัวละครตัวเอง
-      api.User myUserObj = await _fetchUserCharacter(userId);
+      api.User myUserObj = await fetchUserCharacter(userId);
 
-      // 3. ดึงข้อมูลชมรม
       final club = await supabase
           .from('clubs')
           .select('name, description, invite_code')
           .eq('id', clubId)
           .single();
 
-      // 4. ดึงสมาชิกทั้งหมดในชมรม
       final membersResponse = await supabase
           .from('user_profiles')
           .select('id, name, detail, club_role')
           .eq('club_id', clubId);
 
-      // 5. ดึง level ของแต่ละสมาชิก
       final List<Map<String, dynamic>> membersWithLevel = [];
       for (final member in membersResponse as List<dynamic>) {
-        final userObj = await _fetchUserCharacter(member['id']);
+        final userObj = await fetchUserCharacter(member['id']);
 
         membersWithLevel.add({
           ...Map<String, dynamic>.from(member),
@@ -214,7 +145,6 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
         });
       }
 
-      // เรียงหัวหน้าขึ้นก่อน
       membersWithLevel.sort((a, b) {
         final aRole = a['club_role'] ?? '';
         final bRole = b['club_role'] ?? '';
@@ -223,8 +153,7 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
         return 0;
       });
 
-      // 6. ดึงภารกิจสัปดาห์นี้ (🌟 สั่ง order by start_date เพื่อให้เรียงลำดับ 1, 2, 3 เป๊ะๆ)
-      final timeRange = _getThisWeekTimeRangeUTC();
+      final timeRange = getThisWeekTimeRangeUTC();
       final questsResponse = await supabase
           .from('quests')
           .select('id, name')
@@ -233,13 +162,9 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
           .lt('start_date', timeRange['end']!)
           .order('start_date', ascending: true);
 
-      // 7. ดึง do_quests สถานะ 'completed'
-      final questIds = (questsResponse as List<dynamic>)
-          .map((q) => q['id'])
-          .toList();
-
-      // 🌟 เปลี่ยนมาเก็บเป็น Set (กลุ่มของ ID) แทนการนับจำนวน
+      final questIds = (questsResponse as List<dynamic>).map((q) => q['id']).toList();
       final Map<String, Set<int>> completedQuestsMap = {};
+      
       if (questIds.isNotEmpty) {
         final doQuestsResponse = await supabase
             .from('do_quests')
@@ -253,36 +178,133 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
           if (!completedQuestsMap.containsKey(uid)) {
             completedQuestsMap[uid] = {};
           }
-          completedQuestsMap[uid]!.add(qid); // เก็บ ID ของเควสที่ทำเสร็จ
+          completedQuestsMap[uid]!.add(qid);
         }
       }
 
-      // ใส่ข้อมูลการทำเควสเข้าไปในสมาชิก
       final membersWithStats = membersWithLevel.map((m) {
         final uid = m['id'].toString();
         return {
           ...m,
-          'completed_quests': completedQuestsMap[uid] ?? <int>{}, // แนบ Set ลงไป
+          'completed_quests': completedQuestsMap[uid] ?? <int>{},
         };
       }).toList();
 
-      if (mounted) {
-        setState(() {
-          _myName = myProfile['name'] ?? '';
-          _myDetail = myProfile['detail'] ?? '';
-          _myRole = myProfile['club_role'] ?? 'member';
-          _myLevel = myUserObj.level;
-          _myUser = myUserObj;
-          _clubName = club['name'] ?? '';
-          _clubDescription = club['description'] ?? '';
-          _inviteCode = club['invite_code'] ?? '------';
-          _members = membersWithStats;
-          _weeklyQuests = questsResponse;
-          _isLoading = false;
-        });
-      }
+      cachedData = {
+        'clubId': clubId,
+        'myProfile': myProfile,
+        'myUserObj': myUserObj,
+        'club': club,
+        'membersWithStats': membersWithStats,
+        'questsResponse': questsResponse,
+      };
+
     } catch (e) {
-      debugPrint("Error fetching club detail data: $e");
+      debugPrint("Preload Member Data Error: $e");
+    } finally {
+      isPreloading = false;
+    }
+  }
+}
+
+class ClubDetailMemberScreen extends StatefulWidget {
+  const ClubDetailMemberScreen({super.key});
+
+  @override
+  State<ClubDetailMemberScreen> createState() => _ClubDetailMemberScreenState();
+}
+
+class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
+  bool _isLeavePressed = false;
+  int _selectedIndex = 3;
+  bool _isShowingMembers = false;
+
+  // ── State Variables ──────────────────────────────────────────────────────
+  bool _isLoading = true;
+
+  // ข้อมูลตัวเอง
+  String _myName = '';
+  String _myDetail = '';
+  String _myRole = '';
+  int _myLevel = 1;
+  api.User? _myUser; // เก็บข้อมูลผู้ใช้ปัจจุบันสำหรับแสดงตัวละคร
+
+  // ข้อมูลชมรม
+  String _clubName = '';
+  String _clubDescription = '';
+  String _inviteCode = '';
+
+  // ข้อมูลสมาชิก
+  List<Map<String, dynamic>> _members = [];
+
+  // ภารกิจสัปดาห์นี้ (เพื่อนับ total_quests)
+  List<dynamic> _weeklyQuests = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAllData();
+  }
+
+  // 🌟 ฟังก์ชันคำนวณ EXP เปอร์เซ็นต์
+  double _getExpPercent(int dbLevel, int totalExp) {
+    int remainingExp = totalExp;
+    int requiredExpForNextLevel = 0;
+
+    for (int i = 1; i < dbLevel; i++) {
+      int expUsed = 0;
+      if (i < 6) {
+        expUsed = 40 * i;
+      } else {
+        expUsed = 200 + (i * i);
+      }
+      remainingExp -= expUsed;
+    }
+
+    if (dbLevel < 6) {
+      requiredExpForNextLevel = 40 * dbLevel;
+    } else {
+      requiredExpForNextLevel = 200 + (dbLevel * dbLevel);
+    }
+
+    return (requiredExpForNextLevel > 0)
+        ? (remainingExp / requiredExpForNextLevel).clamp(0.0, 1.0)
+        : 0.0;
+  }
+
+  // ── ดึงข้อมูลทั้งหมด ─────────────────────────────────────────────────────
+  Future<void> _fetchAllData() async {
+    setState(() => _isLoading = true);
+
+    // รอให้ Preload เสร็จ (ถ้ากำลังโหลดอยู่)
+    while (ClubDetailMemberPreloader.isPreloading) {
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+
+    // ถ้าไม่มีข้อมูล Cache ค่อยโหลดใหม่
+    if (ClubDetailMemberPreloader.cachedData == null) {
+      await ClubDetailMemberPreloader.preload();
+    }
+
+    final data = ClubDetailMemberPreloader.cachedData;
+
+    if (data != null && mounted) {
+      setState(() {
+        _myName = data['myProfile']['name'] ?? '';
+        _myDetail = data['myProfile']['detail'] ?? '';
+        _myRole = data['myProfile']['club_role'] ?? 'member';
+        _myUser = data['myUserObj'];
+        _myLevel = _myUser!.level;
+        
+        _clubName = data['club']['name'] ?? '';
+        _clubDescription = data['club']['description'] ?? '';
+        _inviteCode = data['club']['invite_code'] ?? '------';
+
+        _members = data['membersWithStats'];
+        _weeklyQuests = data['questsResponse'];
+        _isLoading = false;
+      });
+    } else {
       if (mounted) setState(() => _isLoading = false);
     }
   }

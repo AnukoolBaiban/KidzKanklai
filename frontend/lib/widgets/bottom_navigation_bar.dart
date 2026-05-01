@@ -342,18 +342,29 @@ class _CustomBottomNavigationBarState extends State<CustomBottomNavigationBar> {
                       ),
                       clipBehavior: Clip.hardEdge,
                       child: IgnorePointer(
-                        child: Transform.translate(
-                          offset: const Offset(2, 15), 
-                          child: Transform.scale(
-                            scale: 1.8,
-                            child: RepaintBoundary(
-                              child: CharacterWidget(
-                                user: _user,
-                                isInteractive: false,
+                        child: _user == null
+                            ? const Center(
+                                child: SizedBox(
+                                  width: 25,
+                                  height: 25,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2374B5)),
+                                  ),
+                                ),
+                              )
+                            : Transform.translate(
+                                offset: const Offset(2, 15),
+                                child: Transform.scale(
+                                  scale: 1.8,
+                                  child: RepaintBoundary(
+                                    child: CharacterWidget(
+                                      user: _user,
+                                      isInteractive: false,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                        ),
                       ),
                     ),
                   ),

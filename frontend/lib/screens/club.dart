@@ -3,9 +3,10 @@ import 'package:flutter_application_1/widgets/custom_top_bar.dart';
 import 'package:flutter_application_1/widgets/bottom_navigation_bar.dart';
 import '../widgets/club/club_button.dart';
 import '../widgets/club/join_box.dart';
-import 'package:flutter_application_1/screens/club_room_head.dart'; // เปลี่ยนให้ตรงกับชื่อไฟล์จริง
-import 'package:flutter_application_1/screens/club_room_member.dart'; // เปลี่ยนให้ตรงกับชื่อไฟล์จริง
+import 'package:flutter_application_1/screens/club_room_head.dart';
+import 'package:flutter_application_1/screens/club_room_member.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_application_1/screens/loading.dart';
 
 // ============================================================
 // Club - หน้าหลักชมรม (สถานะ: ยังไม่มีชมรม)
@@ -61,6 +62,9 @@ class _ClubState extends State<Club> with TickerProviderStateMixin {
           .eq('id', user.id)
           .maybeSingle();
 
+      // หน่วงเวลาเล็กน้อยเพื่อให้หน้า Loading มีโอกาสได้แสดงผล (ให้ user รับรู้ว่ากำลังเช็ค)
+      await Future.delayed(const Duration(milliseconds: 500));
+
       if (response != null && response['club_id'] != null) {
         // ถ้ามีชมรมแล้ว ให้ไปหน้าชมรมของตัวเองทันที
         final role = response['club_role'];
@@ -100,6 +104,7 @@ class _ClubState extends State<Club> with TickerProviderStateMixin {
 
   // ── Navigation Helper ───────────────────────────────────────
   void _onNavTapped(int index) {
+    if (index == _selectedIndex) return; // ไม่กดซ้ำหน้าเดิม
     setState(() => _selectedIndex = index);
     const routes = ['/fashion', '/lobby', '/map', '/club'];
     if (index < routes.length) Navigator.pushNamed(context, routes[index]);
@@ -117,12 +122,20 @@ class _ClubState extends State<Club> with TickerProviderStateMixin {
     final hPad = size.width * 0.05; // ~5% padding แนวนอน
     final btnHPad = size.width * 0.12; // ~12% padding ปุ่ม
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false,
-      extendBody: true,
-      body: Stack(
-        children: [
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 600),
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        return FadeTransition(opacity: animation, child: child);
+      },
+      child: _isLoading
+          ? const LoadingScreen(key: ValueKey('loading'), isStandalone: false)
+          : Scaffold(
+              key: const ValueKey('club_main'),
+              backgroundColor: Colors.transparent,
+              resizeToAvoidBottomInset: false,
+              extendBody: true,
+              body: Stack(
+                children: [
           // ── Background (Pan Animation) ──────────────────────
           _buildBackground(),
 
@@ -234,6 +247,7 @@ class _ClubState extends State<Club> with TickerProviderStateMixin {
           _buildBottomNav(),
         ],
       ),
+    ),
     );
   }
 

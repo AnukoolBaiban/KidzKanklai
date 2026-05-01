@@ -28,6 +28,8 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
   void initState() {
     super.initState();
     _fetchClubData(); // 🌟 2. สั่งโหลดข้อมูลตอนเปิดหน้า
+    // โหลดข้อมูลของหน้ารายละเอียดล่วงหน้าแบบ Background
+    Future.microtask(() => ClubDetailHeadPreloader.preload());
   }
 
   // 🌟 ฟังก์ชันคำนวณเวลาสัปดาห์นี้ (จันทร์ 00:00 - จันทร์หน้า 00:00)

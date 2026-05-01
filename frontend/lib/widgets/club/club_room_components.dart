@@ -56,6 +56,7 @@ class ClubBottomNavBar extends StatelessWidget {
         child: CustomBottomNavigationBar(
           selectedIndex: selectedIndex,
           onItemTapped: (index) {
+            if (index == 3) return; // ไม่กดซ้ำปุ่มชมรมเมื่ออยู่หน้าชมรมอยู่แล้ว
             onItemTapped(index);
             const routes = ['/fashion', '/lobby', '/map', '/club'];
             if (index < routes.length) {
