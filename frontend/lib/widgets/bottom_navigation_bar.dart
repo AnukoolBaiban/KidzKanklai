@@ -89,12 +89,19 @@ class _CustomBottomNavigationBarState extends State<CustomBottomNavigationBar> {
   int _level = 1;
   double _expPercent = 0.0;
   User? _user;
+  
+  // 🌟 ใช้ Static Cache เพื่อให้ตอนเปลี่ยนหน้าไม่ต้องโชว์โหลดดิ้งหมุนๆ ให้รำคาญ
+  static User? _cachedUser;
 
   @override
   void initState() {
     super.initState();
     if (widget.user != null) {
       _user = widget.user;
+      _cachedUser = widget.user;
+      _updateLevelUI(_user!.level, _user!.exp);
+    } else if (_cachedUser != null) {
+      _user = _cachedUser;
       _updateLevelUI(_user!.level, _user!.exp);
     }
     _setupRealtimeCharacter(); // 🌟 3. สั่งรันตัวดักฟังตอนเปิด UI
@@ -109,6 +116,7 @@ class _CustomBottomNavigationBarState extends State<CustomBottomNavigationBar> {
     if (widget.user != oldWidget.user && widget.user != null) {
       setState(() {
         _user = widget.user;
+        _cachedUser = widget.user;
         _updateLevelUI(_user!.level, _user!.exp);
       });
     }
@@ -119,6 +127,7 @@ class _CustomBottomNavigationBarState extends State<CustomBottomNavigationBar> {
     if (mounted && user != null) {
       setState(() {
         _user = user;
+        _cachedUser = user;
         _updateLevelUI(_user!.level, _user!.exp);
       });
     }

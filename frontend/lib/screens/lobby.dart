@@ -185,7 +185,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   children: [
                     // Character Widget - อยู่ชั้นล่างสุด
                     Positioned(
-                      bottom: _user?.bodyType.toUpperCase() == 'ADULT' ? 25 :
+                      bottom: _user?.bodyType.toUpperCase() == 'ADULT' ? -5 :
                               _user?.bodyType.toUpperCase() == 'TEEN' ? -40 : -150, // ร่างเด็กตัวเล็กเลยต้องกดลงมา ส่วนวัยรุ่น/ผู้ใหญ่ขยับขึ้นมาหน่อยไม่ให้ขาหลุดขอบ
                       child: _isLoading || _user == null
                           ? const SizedBox() // Or CircularProgressIndicator() if you want to see it loading
