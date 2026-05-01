@@ -719,9 +719,9 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               alignment: Alignment.center,
-              child: const Text(
-                "สมาชิก",
-                style: TextStyle(
+              child: Text(
+                "สมาชิก (${_members.length}/50)",
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
