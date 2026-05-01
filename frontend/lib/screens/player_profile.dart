@@ -509,6 +509,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
           // 🌟 ใช้ _buildInfoField ที่ไม่มีปุ่มแก้ไข
           _buildInfoField(
             content: _displayName,
+            columnName: 'user_name',
             textStyle: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 18,
@@ -521,6 +522,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
           const SizedBox(height: 6),
           _buildInfoField(
             content: _displayBio,
+            columnName: 'user_detail',
             textStyle: const TextStyle(
               fontSize: 14,
               color: Colors.grey,
@@ -536,9 +538,78 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
     );
   }
 
-  // 🌟 ฟังก์ชัน _buildInfoField แบบ Read-only (ลบปุ่มแก้ไขออก)
+  // 🌟 ฟังก์ชันแสดงรายละเอียดแบบ Read-only
+  void _showViewDialog(String title, String content) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.95),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFFAAD7EA),
+                width: 3,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "รายละเอียด$title",
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF00385D),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFAAD7EA), width: 2),
+                  ),
+                  child: Text(
+                    content.isEmpty ? "ไม่มีข้อมูล" : content,
+                    style: const TextStyle(fontSize: 16, color: Colors.black87),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2374B5),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("ปิด", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // 🌟 ฟังก์ชัน _buildInfoField ที่มีปุ่มลูกตาดูรายละเอียด
   Widget _buildInfoField({
     required String content,
+    required String columnName,
     required TextStyle textStyle,
     required Color borderColor,
     double height = 35,
@@ -553,9 +624,22 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
         border: Border.all(color: borderColor, width: 1.5),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(child: Text(content, style: textStyle)),
+          GestureDetector(
+            onTap: () {
+              _showViewDialog(
+                columnName == 'user_name' ? 'ชื่อ' : 'แนะนำตัว',
+                content,
+              );
+            },
+            child: const Icon(
+              Icons.visibility,
+              color: Color(0xFF1E5173),
+              size: 18,
+            ),
+          ),
         ],
       ),
     );
@@ -687,7 +771,11 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
             height: 45,
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: const Color(0xFF2E4C6D),
+              gradient: const LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [Color(0xFF1A3D62), Color(0xFF195290)],
+              ),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Image.asset(iconPath, fit: BoxFit.contain),
