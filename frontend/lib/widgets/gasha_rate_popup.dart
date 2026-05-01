@@ -15,21 +15,22 @@ class GashaRatePopup extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
 
-    // Mock data for groups
-    final rareItems = [
-      {'name': 'ชุดเดรส', 'rate': '0.0002%'},
-      {'name': 'ผมสตรอเบอร์รี่', 'rate': '0.0005%'},
+    // ข้อมูลเรทกาชาของจริง
+    final epicItems = [
+      {'name': 'Outfit_03', 'rate': '1.0%', 'image': 'assets/images/Fashion/Outfit/Outfit_03.PNG'},
     ];
 
-    final normalItems = [
-      {'name': 'หน้าแบ๊ว', 'rate': '0.02%'},
-      {'name': 'หน้าแบ๊ว', 'rate': '0.02%'},
-      {'name': 'หน้าแบ๊ว', 'rate': '0.02%'},
-      {'name': 'หน้าแบ๊ว', 'rate': '0.02%'},
-      {'name': 'หน้าแบ๊ว', 'rate': '0.02%'},
-      {'name': 'หน้าแบ๊ว', 'rate': '0.02%'},
-      {'name': 'หน้าแบ๊ว', 'rate': '0.02%'},
-      {'name': 'หน้าแบ๊ว', 'rate': '0.02%'},
+    final rareItems = [
+      {'name': 'Face_04', 'rate': '4.5%', 'image': 'assets/images/Fashion/FaceStyle/Face_04.PNG'},
+      {'name': 'Hair_04', 'rate': '4.5%', 'image': 'assets/images/Fashion/HairStyle/Hair_04.PNG'},
+    ];
+
+    final commonItems = [
+      {'name': 'Outfit_01', 'rate': '18.0%', 'image': 'assets/images/Fashion/Outfit/Outfit_01.PNG'},
+      {'name': 'Face_02', 'rate': '18.0%', 'image': 'assets/images/Fashion/FaceStyle/Face_02.PNG'},
+      {'name': 'Face_03', 'rate': '18.0%', 'image': 'assets/images/Fashion/FaceStyle/Face_03.PNG'},
+      {'name': 'Hair_01', 'rate': '18.0%', 'image': 'assets/images/Fashion/HairStyle/Hair_01.PNG'},
+      {'name': 'Hair_03', 'rate': '18.0%', 'image': 'assets/images/Fashion/HairStyle/Hair_03.PNG'},
     ];
 
     return Dialog(
@@ -39,7 +40,7 @@ class GashaRatePopup extends StatelessWidget {
       child: Center(
         child: Container(
           width: size.width * 0.9,
-          constraints: const BoxConstraints(maxWidth: 350, maxHeight: 450),
+          constraints: const BoxConstraints(maxWidth: 350, maxHeight: 550),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             boxShadow: const [
@@ -83,32 +84,32 @@ class GashaRatePopup extends StatelessWidget {
                     height: 65,
                     child: Stack(
                       children: [
-                        Center(
+                        const Center(
                           child: Text(
                             'โอกาสได้รับ',
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
-                              color: const Color(0xFF002A50),
+                              color: Color(0xFF002A50),
                               shadows: [
                                 Shadow(
                                   color: Colors.white,
-                                  offset: const Offset(1.5, 1.5),
+                                  offset: Offset(1.5, 1.5),
                                   blurRadius: 1,
                                 ),
                                 Shadow(
                                   color: Colors.white,
-                                  offset: const Offset(-1.5, -1.5),
+                                  offset: Offset(-1.5, -1.5),
                                   blurRadius: 1,
                                 ),
                                 Shadow(
                                   color: Colors.white,
-                                  offset: const Offset(1.5, -1.5),
+                                  offset: Offset(1.5, -1.5),
                                   blurRadius: 1,
                                 ),
                                 Shadow(
                                   color: Colors.white,
-                                  offset: const Offset(-1.5, 1.5),
+                                  offset: Offset(-1.5, 1.5),
                                   blurRadius: 1,
                                 ),
                               ],
@@ -163,26 +164,37 @@ class GashaRatePopup extends StatelessWidget {
                           shrinkWrap: true,
                           physics: const BouncingScrollPhysics(),
                           children: [
-                            // หมวดแรร์
+                            // หมวดอีปิค (Epic)
                             _buildCategory(
-                              title: 'แรร์',
+                              title: 'อีปิค (Epic) - รวม 1%',
                               titleColor: Colors.black87,
-                              underlineColor: const Color(
-                                0xFFFF9800,
-                              ), // เส้นขีดส้ม
+                              underlineColor: const Color(0xFFFF4081), // เส้นขีดชมพู
+                              iconPath: 'assets/images/icon/Epic-icon.png',
+                              fallbackIcon: Icons.stars,
+                              iconColor: Colors.pinkAccent,
+                              items: epicItems,
+                            ),
+                            const SizedBox(height: 30),
+                            // หมวดแรร์ (Rare)
+                            _buildCategory(
+                              title: 'แรร์ (Rare) - รวม 9%',
+                              titleColor: Colors.black87,
+                              underlineColor: const Color(0xFFFF9800), // เส้นขีดส้ม
                               iconPath: 'assets/images/design/design4.png',
+                              fallbackIcon: Icons.star,
+                              iconColor: Colors.orange,
                               items: rareItems,
                             ),
                             const SizedBox(height: 30),
-                            // หมวดธรรมดา
+                            // หมวดธรรมดา (Common)
                             _buildCategory(
-                              title: 'ธรรมดา',
+                              title: 'ธรรมดา (Common) - รวม 90%',
                               titleColor: Colors.black87,
-                              underlineColor: const Color(
-                                0xFF93C8D0,
-                              ), // เส้นขีดฟ้า
+                              underlineColor: const Color(0xFF93C8D0), // เส้นขีดฟ้า
                               iconPath: 'assets/images/design/design1.png',
-                              items: normalItems,
+                              fallbackIcon: Icons.star_border,
+                              iconColor: Colors.blueAccent,
+                              items: commonItems,
                             ),
                           ],
                         ),
@@ -203,6 +215,8 @@ class GashaRatePopup extends StatelessWidget {
     required Color titleColor,
     required Color underlineColor,
     required String iconPath,
+    required IconData fallbackIcon,
+    required Color iconColor,
     required List<Map<String, String>> items,
   }) {
     return Column(
@@ -213,17 +227,17 @@ class GashaRatePopup extends StatelessWidget {
           children: [
             Image.asset(
               iconPath,
-              width: 48,
-              height: 48,
+              width: 32,
+              height: 32,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) =>
-                  const Icon(Icons.star, color: Colors.orange, size: 44),
+                  Icon(fallbackIcon, color: iconColor, size: 32),
             ),
             const SizedBox(width: 12),
             Text(
               title,
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: titleColor,
               ),
@@ -232,7 +246,7 @@ class GashaRatePopup extends StatelessWidget {
         ),
         // Underline
         Container(
-          margin: const EdgeInsets.only(top: 0.5, bottom: 6),
+          margin: const EdgeInsets.only(top: 4, bottom: 8),
           height: 1,
           width: double.infinity,
           color: underlineColor,
@@ -240,19 +254,19 @@ class GashaRatePopup extends StatelessWidget {
         // Items
         ...items.map((item) {
           return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
               children: [
                 // Item Image
                 Image.asset(
-                  'assets/images/item/Ticket_energy_img.png',
-                  width: 36,
-                  height: 36,
+                  item['image']!,
+                  width: 56,
+                  height: 56,
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) => const Icon(
-                    Icons.confirmation_num,
+                    Icons.inventory_2,
                     color: Colors.grey,
-                    size: 36,
+                    size: 56,
                   ),
                 ),
                 const SizedBox(width: 16),

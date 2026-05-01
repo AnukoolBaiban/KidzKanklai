@@ -252,6 +252,27 @@ class ApiService {
     }
   }
 
+  // Gacha Pull
+  static Future<Map<String, dynamic>?> pullGacha() async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/gacha/pull'),
+        headers: _headers,
+      );
+      ApiService._checkUnauthorized(response.statusCode);
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final errorData = jsonDecode(response.body);
+        print("Pull Gacha Failed: ${response.statusCode} - ${errorData['error']}");
+        return {"error": errorData['error']};
+      }
+    } catch (e) {
+      print("Pull Gacha Error: $e");
+      return {"error": "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"};
+    }
+  }
+
   // ฟังก์ชันเคลมโบนัสล็อกอินรายวัน/รายสัปดาห์
   static Future<List<dynamic>> claimLoginBonus() async {
     try {
