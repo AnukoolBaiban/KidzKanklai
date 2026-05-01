@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_application_1/widgets/club/club_delete_popup.dart';
 import 'package:flutter_application_1/widgets/club/club_room_components.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -203,19 +204,173 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
   }
 
   // 🌟 บันทึกการแก้ไขชื่อ/รายละเอียด ลง Supabase ตรงๆ (ง่ายกว่ารอ API)
-  Future<void> _updateClubInfo(String column, String value) async {
+  Future<bool> _updateClubInfo(String column, String value) async {
     try {
       await Supabase.instance.client
           .from('clubs')
           .update({column: value})
           .eq('id', _clubId);
       
-      if (column == 'name') {
-        setState(() => _clubName = value); // อัปเดต Topbar
-      }
+      return true;
     } catch (e) {
       debugPrint("Update Club error: $e");
+      return false;
     }
+  }
+
+  void _showEditDialog(String title, String currentValue, String columnToUpdate) {
+    final TextEditingController controller = TextEditingController(text: currentValue);
+    final int maxLength = columnToUpdate == 'name' ? 20 : 300;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFFAAD7EA),
+                width: 3,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "แก้ไข$title",
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF00385D),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: controller,
+                  maxLength: maxLength,
+                  inputFormatters: [LengthLimitingTextInputFormatter(maxLength)],
+                  maxLines: columnToUpdate == 'description' ? 3 : 1,
+                  style: const TextStyle(fontSize: 16),
+                  buildCounter: (context, {required currentLength, required isFocused, maxLength}) {
+                    final bool isMax = currentLength == maxLength;
+                    return Text(
+                      '$currentLength/$maxLength',
+                      style: TextStyle(
+                        color: isMax ? Colors.red : Colors.black54,
+                        fontSize: 12,
+                      ),
+                    );
+                  },
+                  decoration: InputDecoration(
+                    hintText: "กรอก$titleใหม่",
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFAAD7EA), width: 2),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF2374B5), width: 2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // ยกเลิก
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey.shade400,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("ยกเลิก", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // บันทึก
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF85D755), Color(0xFF34C759)],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () async {
+                            final newValue = controller.text.trim();
+                            // ชื่อห้ามว่าง
+                            if (columnToUpdate == 'name' && newValue.isEmpty) return;
+
+                            // Show Loading Dialog
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (ctx) => const Center(child: CircularProgressIndicator()),
+                            );
+
+                            final success = await _updateClubInfo(columnToUpdate, newValue);
+
+                            if (mounted) {
+                              Navigator.pop(context); // Close loading dialog
+                              if (success) {
+                                setState(() {
+                                  if (columnToUpdate == 'name') {
+                                    _clubName = newValue;
+                                    _clubNameController.text = newValue;
+                                  } else if (columnToUpdate == 'description') {
+                                    _clubDetailController.text = newValue;
+                                  }
+                                });
+                                Navigator.pop(context); // Close edit dialog
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('บันทึกข้อมูลเรียบร้อย')),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('เกิดข้อผิดพลาดในการบันทึก')),
+                                );
+                              }
+                            }
+                          },
+                          child: const Text("บันทึก", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   // 🌟 ฟังก์ชันเตะสมาชิก
@@ -291,6 +446,7 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           const ClubBackground(),
@@ -577,46 +733,45 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-            child: Container(
-              height: 42,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: _clubNameController,
-                      focusNode: _nameFocusNode,
-                      readOnly: !_isEditingName,
-                      onTapOutside: (event) {
-                        setState(() {
-                          _isEditingName = false;
-                        });
-                        _nameFocusNode.unfocus();
-                        _updateClubInfo('name', _clubNameController.text); // 🌟 บันทึก
-                      },
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
-                      decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero),
+            padding: const EdgeInsets.fromLTRB(12, 12, 8, 8),
+            child: Row(
+              children: [
+                const Expanded(flex: 2, child: Text("ชื่อชมรม", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF00385D)))),
+                Expanded(
+                  flex: 3,
+                  child: Container(
+                    height: 35,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 2, offset: const Offset(0, 1))],
+                    ),
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 40),
+                        Expanded(
+                          child: Center(
+                            child: Text(
+                              _clubName,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => _showEditDialog("ชื่อชมรม", _clubName, "name"),
+                          child: Container(
+                            width: 40,
+                            alignment: Alignment.centerLeft,
+                            padding: const EdgeInsets.only(left: 6),
+                            child: Image.asset('assets/images/icon/iconEdit.png', width: 18, height: 18),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _isEditingName = true;
-                      });
-                      _nameFocusNode.requestFocus();
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 6, right: 6, top: 4, bottom: 4),
-                      child: Image.asset('assets/images/icon/iconEdit.png', width: 22, height: 22),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           Padding(
@@ -663,49 +818,67 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
 
   Widget _buildDetailsBox() {
     return Container(
-      width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(15),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF9DD0E7), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-      child: Stack(
-        fit: StackFit.expand,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ScrollConfiguration(
-            behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.only(right: 30),
-                child: TextField(
-                  controller: _clubDetailController,
-                  focusNode: _detailFocusNode,
-                  readOnly: !_isEditingDetail,
-                  maxLines: null,
-                  onTapOutside: (event) {
-                    setState(() {
-                      _isEditingDetail = false;
-                    });
-                    _detailFocusNode.unfocus();
-                    _updateClubInfo('description', _clubDetailController.text); // 🌟 บันทึก
-                  },
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
-                  decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero, hintText: 'เพิ่มรายละเอียดชมรมที่นี่...'),
-                ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(10),
+                topRight: Radius.circular(10),
               ),
             ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'รายละเอียด',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF002A50),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => _showEditDialog("รายละเอียดชมรม", _clubDetailController.text, "description"),
+                  child: Image.asset('assets/images/icon/iconEdit.png', width: 20, height: 20),
+                ),
+              ],
+            ),
           ),
-          Positioned(
-            top: 0,
-            right: 0,
-            child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _isEditingDetail = true;
-                });
-                _detailFocusNode.requestFocus();
-              },
-              child: Image.asset('assets/images/icon/iconEdit.png', width: 22, height: 22),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Text(
+                      _clubDetailController.text.isEmpty ? 'เพิ่มรายละเอียดชมรมที่นี่...' : _clubDetailController.text,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: _clubDetailController.text.isEmpty ? Colors.black54 : Colors.black87,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ],

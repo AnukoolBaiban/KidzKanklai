@@ -28,6 +28,7 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
   // ข้อมูลชมรม
   String _clubName = '';
   String _clubDescription = '';
+  String _inviteCode = '';
 
   // ข้อมูลสมาชิก
   List<Map<String, dynamic>> _members = [];
@@ -99,7 +100,7 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
       // 3. ดึงข้อมูลชมรม
       final club = await supabase
           .from('clubs')
-          .select('name, description')
+          .select('name, description, invite_code')
           .eq('id', clubId)
           .single();
 
@@ -183,6 +184,7 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
           _myLevel = myCharacter?['level'] ?? 1;
           _clubName = club['name'] ?? '';
           _clubDescription = club['description'] ?? '';
+          _inviteCode = club['invite_code'] ?? '------';
           _members = membersWithStats;
           _weeklyQuests = questsResponse;
           _isLoading = false;
@@ -293,10 +295,13 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
                       const SizedBox(height: 16),
                       _buildTabs(),
                       const SizedBox(height: 12),
-                      if (!_isShowingMembers)
-                        Expanded(child: _buildDetailsBox())
-                      else
+                      if (!_isShowingMembers) ...[
+                        _buildInviteCodeSection(),
+                        const SizedBox(height: 12),
+                        Expanded(child: _buildDetailsBox()),
+                      ] else ...[
                         Expanded(child: _buildMembersList()),
+                      ],
                     ],
                   ),
           ),
@@ -605,28 +610,145 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
     );
   }
 
-  Widget _buildDetailsBox() {
+  Widget _buildInviteCodeSection() {
     return Container(
-      width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(15),
+        color: const Color(0xFF9DD0E7),
+        borderRadius: BorderRadius.circular(10),
       ),
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-      child: ScrollConfiguration(
-        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-        child: SingleChildScrollView(
-          child: Text(
-            _clubDescription.isEmpty
-                ? 'ไม่มีรายละเอียดชมรม'
-                : _clubDescription,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 8, 8),
+            child: Row(
+              children: [
+                const Expanded(flex: 2, child: Text("ชื่อชมรม", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF00385D)))),
+                Expanded(
+                  flex: 3,
+                  child: Container(
+                    height: 35,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 2, offset: const Offset(0, 1))],
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      _clubName,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 8, 8),
+            child: Row(
+              children: [
+                const Expanded(flex: 2, child: Text("รหัสเชิญเข้าชมรม", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF00385D)))),
+                Expanded(
+                  flex: 3,
+                  child: Container(
+                    height: 35,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 2, offset: const Offset(0, 1))],
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(_inviteCode, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87))),
+                        GestureDetector(
+                          onTap: () {
+                            debugPrint("Copy code tapped");
+                          },
+                          child: Container(
+                            width: 40,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF4A7699),
+                              borderRadius: BorderRadius.only(topRight: Radius.circular(18), bottomRight: Radius.circular(18)),
+                            ),
+                            child: Center(child: Image.asset('assets/images/icon/iconCopy.png', width: 20, height: 20)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailsBox() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF9DD0E7), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(10),
+                topRight: Radius.circular(10),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: const [
+                Text(
+                  'รายละเอียด',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF002A50),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Text(
+                      _clubDescription.isEmpty
+                          ? 'ไม่มีรายละเอียดชมรม'
+                          : _clubDescription,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

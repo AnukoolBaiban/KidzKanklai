@@ -118,62 +118,44 @@ class _ClubCreateScreenState extends State<ClubCreateScreen> {
               right: size.width < 380 ? 24 : 40,
               bottom: bottomPadding + 20,
             ),
-            child: Center(
+            child: Align(
+              alignment: Alignment.topCenter,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(
                   maxWidth: 500,
                 ), // จำกัดความกว้างสูงสุดเวลาใช้จอใหญ่
-                child: SingleChildScrollView(
+                child: CustomScrollView(
                   physics: const BouncingScrollPhysics(),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 1. กล่องตั้งชื่อชมรม
-                      ClubNameField(controller: _nameController),
-                      SizedBox(
-                        height: size.height * 0.035 > 24
-                            ? 24
-                            : size.height * 0.035,
-                      ),
+                  slivers: [
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 1. กล่องตั้งชื่อชมรม
+                          ClubNameField(controller: _nameController),
+                          SizedBox(
+                            height: size.height * 0.035 > 24
+                                ? 24
+                                : size.height * 0.035,
+                          ),
 
-                      // 2. รายละเอียดของชมรม
-                      const SectionLabel('รายละเอียดของชมรม'),
-                      SizedBox(
-                        height: size.height * 0.012 > 8
-                            ? 8
-                            : size.height * 0.012,
-                      ),
-                      ClubDescField(controller: _descController),
-                      SizedBox(
-                        height: size.height * 0.035 > 24
-                            ? 24
-                            : size.height * 0.035,
-                      ),
+                          // 2. รายละเอียดของชมรม
+                          Expanded(
+                            child: ClubDescField(controller: _descController),
+                          ),
+                          SizedBox(
+                            height: size.height * 0.05 > 40
+                                ? 40
+                                : size.height * 0.05,
+                          ),
 
-                      // 3. สร้างรหัสชมรม
-                      const SectionLabel('สร้างรหัสชมรม'),
-                      SizedBox(
-                        height: size.height * 0.012 > 8
-                            ? 8
-                            : size.height * 0.012,
+                          _buildBottomButton(size),
+                        ],
                       ),
-                      ClubCodeSection(
-                        generatedCode: _generatedCode,
-                        isCodePressed: _isCodePressed,
-                        onTapDown: () => setState(() => _isCodePressed = true),
-                        onTapUp: () => setState(() => _isCodePressed = false),
-                        onTapCancel: () =>
-                            setState(() => _isCodePressed = false),
-                        onTap: () {
-                          setState(() => _isCodePressed = false);
-                          _generateCode();
-                        },
-                      ),
-                      SizedBox(height: size.height * 0.03),
-                      _buildBottomButton(size),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),

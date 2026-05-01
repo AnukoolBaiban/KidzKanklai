@@ -1,57 +1,113 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 // ── 1. กล่องตั้งชื่อชมรม ─────────────────────────────────────
-class ClubNameField extends StatelessWidget {
+class ClubNameField extends StatefulWidget {
   final TextEditingController controller;
 
   const ClubNameField({super.key, required this.controller});
 
   @override
+  State<ClubNameField> createState() => _ClubNameFieldState();
+}
+
+class _ClubNameFieldState extends State<ClubNameField> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_updateState);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_updateState);
+    super.dispose();
+  }
+
+  void _updateState() {
+    setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFAAD7EA), width: 2),
+        border: Border.all(color: const Color(0xFF9DD0E7), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'ตั้งชื่อชมรมของคุณ',
-            style: TextStyle(
-              fontSize: size.width * 0.06 > 24 ? 24 : size.width * 0.06,
-              fontWeight: FontWeight.bold,
-              color: const Color(0xFF333333),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(10),
+                topRight: Radius.circular(10),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: const [
+                Text(
+                  'ชื่อชมรม',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF002A50),
+                  ),
+                ),
+              ],
             ),
           ),
           TextField(
-            controller: controller,
-            style: TextStyle(
-              fontSize: size.width * 0.038 > 16 ? 16 : size.width * 0.038,
-              color: const Color(0xFF444444),
-            ),
-            decoration: const InputDecoration(
-              hintText: 'ชื่อชมรม',
-              hintStyle: TextStyle(color: Color(0xFFBBBBBB)),
-              enabledBorder: UnderlineInputBorder(
-                borderSide: BorderSide(
-                  color: Color.fromRGBO(68, 113, 153, 1),
-                  width: 1.5,
+            controller: widget.controller,
+            maxLength: 20,
+            inputFormatters: [LengthLimitingTextInputFormatter(20)],
+            decoration: InputDecoration(
+              counterText: '',
+              hintText: 'ตั้งชื่อชมรมของคุณ',
+              hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              suffixIcon: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 15),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${widget.controller.text.length}/20',
+                      style: TextStyle(
+                        color: widget.controller.text.length >= 20
+                            ? Colors.red
+                            : Colors.grey.shade400,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Image.asset(
+                      'assets/images/icon/iconEdit.png',
+                      width: 18,
+                      height: 18,
+                      fit: BoxFit.contain,
+                    ),
+                  ],
                 ),
               ),
-              focusedBorder: UnderlineInputBorder(
-                borderSide: BorderSide(
-                  color: Color.fromRGBO(68, 113, 153, 1),
-                  width: 2,
-                ),
-              ),
-              contentPadding: EdgeInsets.only(top: 8, bottom: 4),
-              isDense: true,
             ),
+            style: const TextStyle(fontSize: 16, color: Color(0xFF002A50)),
           ),
         ],
       ),
@@ -60,148 +116,113 @@ class ClubNameField extends StatelessWidget {
 }
 
 // ── 2. กล่องรายละเอียดของชมรม ────────────────────────────────
-class ClubDescField extends StatelessWidget {
+class ClubDescField extends StatefulWidget {
   final TextEditingController controller;
 
   const ClubDescField({super.key, required this.controller});
 
   @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    return Container(
-      width: double.infinity,
-      height: 120, // ใช้ Fixed height เป็น Responsive base ที่ดีกว่า
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFAAD7EA), width: 2),
-      ),
-      child: TextField(
-        controller: controller,
-        maxLines: null,
-        expands: true,
-        textAlignVertical: TextAlignVertical.top,
-        style: TextStyle(
-          fontSize: size.width * 0.038 > 16 ? 16 : size.width * 0.038,
-          color: const Color(0xFF444444),
-          height: 1.5,
-        ),
-        decoration: const InputDecoration(
-          hintText: 'รายละเอียด',
-          hintStyle: TextStyle(color: Color(0xFFBBBBBB)),
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.zero,
-          isDense: true,
-        ),
-      ),
-    );
-  }
+  State<ClubDescField> createState() => _ClubDescFieldState();
 }
 
-// ── 3. กล่องสร้างรหัสชมรม ────────────────────────────────────
-class ClubCodeSection extends StatelessWidget {
-  final String? generatedCode;
-  final bool isCodePressed;
-  final VoidCallback onTapDown;
-  final VoidCallback onTapUp;
-  final VoidCallback onTapCancel;
-  final VoidCallback onTap;
+class _ClubDescFieldState extends State<ClubDescField> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_updateState);
+  }
 
-  const ClubCodeSection({
-    super.key,
-    required this.generatedCode,
-    required this.isCodePressed,
-    required this.onTapDown,
-    required this.onTapUp,
-    required this.onTapCancel,
-    required this.onTap,
-  });
+  @override
+  void dispose() {
+    widget.controller.removeListener(_updateState);
+    super.dispose();
+  }
+
+  void _updateState() {
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFAAD7EA), width: 2),
+        border: Border.all(color: const Color(0xFF9DD0E7), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // แสดงรหัสที่สร้างแล้ว (ถ้ามี)
-          if (generatedCode != null) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0F8FF),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFAAD7EA), width: 1.5),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    generatedCode!,
-                    style: TextStyle(
-                      fontSize: size.width * 0.055 > 24 ? 24 : size.width * 0.055,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF2374B5),
-                      letterSpacing: 4,
-                    ),
-                  ),
-                ],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(10),
+                topRight: Radius.circular(10),
               ),
             ),
-            const SizedBox(height: 14),
-          ],
-          // ปุ่มสร้างรหัส
-          GestureDetector(
-            onTapDown: (_) => onTapDown(),
-            onTapUp: (_) => onTapUp(),
-            onTapCancel: onTapCancel,
-            onTap: onTap,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 12),
-              decoration: BoxDecoration(
-                color: isCodePressed ? Colors.black : const Color(0xFF313131),
-                borderRadius: BorderRadius.circular(50),
-              ),
-              child: Text(
-                generatedCode == null ? 'สร้างรหัส' : 'สร้างรหัสใหม่',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: size.width * 0.042 > 16 ? 16 : size.width * 0.042,
-                  fontWeight: FontWeight.bold,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'รายละเอียด',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF002A50),
+                  ),
                 ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${widget.controller.text.length}/300',
+                      style: TextStyle(
+                        color: widget.controller.text.length >= 300
+                            ? Colors.red
+                            : Colors.grey.shade500,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Image(
+                      image: AssetImage('assets/images/icon/iconEdit.png'),
+                      width: 18,
+                      height: 18,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TextField(
+              controller: widget.controller,
+              maxLength: 300,
+              inputFormatters: [LengthLimitingTextInputFormatter(300)],
+              maxLines: null,
+              expands: true,
+              textAlignVertical: TextAlignVertical.top,
+              decoration: InputDecoration(
+                counterText: '',
+                hintText: 'รายละเอียดของชมรม',
+                hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.all(16),
               ),
+              style: const TextStyle(fontSize: 14, color: Colors.black87),
             ),
           ),
         ],
       ),
     );
   }
-}
-
-// ── Section Label เล็กๆ ─────────────────────────────────────────
-class SectionLabel extends StatelessWidget {
-  final String text;
-
-  const SectionLabel(this.text, {super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    return Text(
-      text,
-      style: TextStyle(
-        fontSize: size.width * 0.042 > 18 ? 18 : size.width * 0.042,
-        fontWeight: FontWeight.bold,
-        color: const Color(0xFF333333),
-      ),
-    );
-  }
-}
+}
