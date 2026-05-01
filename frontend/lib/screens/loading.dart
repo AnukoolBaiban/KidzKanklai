@@ -4,7 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../config/rive_cache.dart';
 
 class LoadingScreen extends StatefulWidget {
-  const LoadingScreen({super.key});
+  final bool isStandalone;
+  
+  const LoadingScreen({super.key, this.isStandalone = true});
 
   @override
   State<LoadingScreen> createState() => _LoadingScreenState();
@@ -19,7 +21,9 @@ class _LoadingScreenState extends State<LoadingScreen> {
   void initState() {
     super.initState();
     _startAnimation();
-    _loadResources();
+    if (widget.isStandalone) {
+      _loadResources();
+    }
   }
 
   Future<void> _loadResources() async {

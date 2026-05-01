@@ -104,13 +104,21 @@ class _FashionPageState extends State<FashionPage> {
     try { return double.parse(s); } catch(_) { return 0; }
   }
 
+  // 🌟 ฟังก์ชันช่วยแก้ปัญหาการเรียงลำดับ HairID ใน Rive Model ที่สลับกัน
+  double _getCorrectHairId(double originalId) {
+    if (originalId == 2.0) return 3.0; // Hair_02 ในรูป คือ Rive ID 3
+    if (originalId == 3.0) return 4.0; // Hair_03 ในรูป คือ Rive ID 4
+    if (originalId == 4.0) return 2.0; // Hair_04 ในรูป คือ Rive ID 2
+    return originalId;
+  }
+
   void _syncRiveToEquipped() {
     if (_controller == null) return;
 
     try {
       // 1. Try using User Profile Data
       if (_user != null) {
-        if (_hairInput != null) _hairInput!.value = parseId(_user!.equippedHair);
+        if (_hairInput != null) _hairInput!.value = _getCorrectHairId(parseId(_user!.equippedHair));
         if (_faceInput != null) _faceInput!.value = parseId(_user!.equippedFace);
         if (_skinInput != null) _skinInput!.value = parseId(_user!.equippedSkin);
         if (_clothInput != null) _clothInput!.value = parseId(_user!.equippedOutfit);
@@ -129,7 +137,7 @@ class _FashionPageState extends State<FashionPage> {
         return item.riveId.toDouble();
       }
 
-      if (_hairInput != null) _hairInput!.value = getRiveId('Hair');
+      if (_hairInput != null) _hairInput!.value = _getCorrectHairId(getRiveId('Hair'));
       if (_faceInput != null) _faceInput!.value = getRiveId('Face');
       if (_skinInput != null) _skinInput!.value = getRiveId('Skin');
       if (_clothInput != null) _clothInput!.value = getRiveId('Outfit');
@@ -251,7 +259,7 @@ class _FashionPageState extends State<FashionPage> {
     });
     
     // Rive Preview
-    if (item.category == 'Hair' && _hairInput != null) _hairInput!.value = item.riveId.toDouble();
+    if (item.category == 'Hair' && _hairInput != null) _hairInput!.value = _getCorrectHairId(item.riveId.toDouble());
     if (item.category == 'Face' && _faceInput != null) _faceInput!.value = item.riveId.toDouble();
     if (item.category == 'Skin' && _skinInput != null) _skinInput!.value = item.riveId.toDouble();
     if (item.category == 'Outfit' && _clothInput != null) _clothInput!.value = item.riveId.toDouble();
@@ -928,7 +936,7 @@ class _ItemCard extends StatelessWidget {
                     ),
                   ),
 
-                  // Text Name
+                  // Text Description (แทน Name)
                   Padding(
                     padding: const EdgeInsets.only(
                       bottom: 8.0,
@@ -937,7 +945,7 @@ class _ItemCard extends StatelessWidget {
                       right: 4,
                     ),
                     child: Text(
-                      item.name,
+                      item.description.isNotEmpty ? item.description : item.name,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,

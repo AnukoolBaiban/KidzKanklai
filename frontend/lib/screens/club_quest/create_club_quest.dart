@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_application_1/api_service.dart';
 import 'package:flutter_application_1/screens/club_room_head.dart';
 import 'package:flutter_application_1/widgets/custom_top_bar.dart';
@@ -191,6 +192,24 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
     widget.onSubmit(data);
   }
 
+  bool _hasUnsavedChanges() {
+    bool nameChanged = _nameController.text.trim().isNotEmpty;
+    bool detailChanged = _detailController.text.trim().isNotEmpty;
+    bool dateChanged = _selectedDate != null;
+    bool imageChanged = _hasImage || _selectedImage != null;
+    bool questionsChanged = _questions.length > 1 || 
+        _questions[0].textController.text.trim().isNotEmpty || 
+        _questions[0].optionControllers.any((c) => c.text.trim().isNotEmpty);
+
+    if (widget.initialData != null) {
+      nameChanged = _nameController.text != (widget.initialData!['name'] ?? '');
+      detailChanged = _detailController.text != (widget.initialData!['detail'] ?? '');
+      dateChanged = _selectedDate != widget.initialData!['date'];
+    }
+
+    return nameChanged || detailChanged || dateChanged || imageChanged || questionsChanged;
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -203,6 +222,10 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
     // ignore: deprecated_member_use
     return WillPopScope(
       onWillPop: () async {
+        if (!_hasUnsavedChanges()) {
+          return true;
+        }
+
         if (widget.isEditing) {
           ExitEditClubQuestPopup.show(
             context,
@@ -223,77 +246,71 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
         return false; // ไม่ให้กลับทันที
       },
       child: Scaffold(
+        resizeToAvoidBottomInset: false,
         body: Stack(
           children: [
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: size.height,
-              child: _buildBackground(),
-            ),
+            _buildBackground(),
 
-            // Main Content with boundary
-            Padding(
-              padding: EdgeInsets.only(
-                top:
-                    topBarHeight +
-                    headerHeight +
-                    10, // เว้นที่ให้ Header ด้านบน
-                // bottom: 110 + bottomPadding, // เว้นที่ให้ Bottom Bar ด้านล่าง
-                left: size.width * 0.05,
-                right: size.width * 0.05,
-              ),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 10),
-
-                    _buildTextField(
-                      controller: _nameController,
-                      hintText: 'ชื่อภารกิจ',
+            Column(
+              children: [
+                _buildTopBar(topPadding),
+                _buildBlueHeader(),
+                
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      top: 10,
+                      bottom: bottomPadding + 20,
+                      left: size.width * 0.05,
+                      right: size.width * 0.05,
                     ),
-
-                    SizedBox(height: 24),
-
-                    // เนื้อหา (อยู่นอกกล่อง)
-                    _buildSectionTitle('เนื้อหา'),
-                    SizedBox(height: 8),
-
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.8),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      padding: EdgeInsets.all(16),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildDatePicker(),
+                          const SizedBox(height: 10),
 
-                          _buildDetailTextField(),
-                          SizedBox(height: 16),
+                          _buildTextField(
+                            controller: _nameController,
+                            hintText: 'ชื่อภารกิจ',
+                          ),
 
-                          _buildCameraButton(),
                           SizedBox(height: 24),
 
-                          _buildActionButtons(),
-                          SizedBox(height: 20),
+                          // เนื้อหา (อยู่นอกกล่อง)
+                          _buildSectionTitle('เนื้อหา'),
+                          SizedBox(height: 8),
+
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.8),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            padding: EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildDatePicker(),
+
+                                _buildDetailTextField(),
+                                SizedBox(height: 16),
+
+                                _buildCameraButton(),
+                                SizedBox(height: 24),
+
+                                _buildActionButtons(),
+                                SizedBox(height: 20),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-
-            // Top Bar (อยู่บนสุด)
-            _buildTopBar(topPadding, topBarHeight),
-
-            // Header Title
-            _buildBlueHeader(topBarHeight),
 
             if (_showQuestInfo)
               Positioned.fill(
@@ -315,23 +332,16 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
   }
 
   // --- Widget: แถบข้อมูลผู้ใช้ (Top Bar Overlay) ---
-  Widget _buildTopBar(double topPadding, double height) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: height,
+  Widget _buildTopBar(double topPadding) {
+    return Container(
         padding: EdgeInsets.only(top: topPadding),
         color: Colors.black.withOpacity(0.4),
-        alignment: Alignment.bottomCenter,
         child: CustomTopBar(
           // user: widget.user,
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
           onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
         ),
-      ),
     );
   }
 
@@ -363,6 +373,11 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
 
         setState(() => _isPressed = false);
 
+        if (!_hasUnsavedChanges()) {
+          Navigator.pop(context);
+          return;
+        }
+
         if (widget.isEditing) {
           ExitEditClubQuestPopup.show(
             context,
@@ -392,12 +407,8 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
   }
 
   // Header with Back Button & Title
-  Widget _buildBlueHeader(double topOffset) {
-    return Positioned(
-      top: topOffset,
-      left: 0,
-      right: 0,
-      child: Container(
+  Widget _buildBlueHeader() {
+    return Container(
         height: 80,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -432,7 +443,6 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
             ),
           ],
         ),
-      ),
     );
   }
 
@@ -492,7 +502,11 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
           ),
           TextField(
             controller: controller,
+            onChanged: (val) => setState(() {}),
+            maxLength: 15,
+            inputFormatters: [LengthLimitingTextInputFormatter(15)],
             decoration: InputDecoration(
+              counterText: '',
               hintText: hintText,
               hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
               border: InputBorder.none,
@@ -501,12 +515,27 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
                 vertical: 12,
               ),
               suffixIcon: Padding(
-                padding: EdgeInsets.all(15),
-                child: Image.asset(
-                  'assets/images/icon/iconEdit.png',
-                  width: 15,
-                  height: 15,
-                  fit: BoxFit.contain,
+                padding: const EdgeInsets.symmetric(horizontal: 15),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${controller.text.length}/15',
+                      style: TextStyle(
+                        color: controller.text.length >= 15
+                            ? Colors.red
+                            : Colors.grey.shade400,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Image.asset(
+                      'assets/images/icon/iconEdit.png',
+                      width: 15,
+                      height: 15,
+                      fit: BoxFit.contain,
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -612,10 +641,25 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
                     color: Color(0xFF002A50),
                   ),
                 ),
-                Image(
-                  image: AssetImage('assets/images/icon/iconEdit.png'),
-                  width: 20,
-                  height: 20,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${_detailController.text.length}/300',
+                      style: TextStyle(
+                        color: _detailController.text.length >= 300
+                            ? Colors.red
+                            : Colors.grey.shade500,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Image(
+                      image: AssetImage('assets/images/icon/iconEdit.png'),
+                      width: 20,
+                      height: 20,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -623,8 +667,12 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
 
           TextField(
             controller: _detailController,
+            onChanged: (val) => setState(() {}),
+            maxLength: 300,
+            inputFormatters: [LengthLimitingTextInputFormatter(300)],
             maxLines: 6,
             decoration: InputDecoration(
+              counterText: '',
               hintText: 'รายละเอียด',
               hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
               border: InputBorder.none,

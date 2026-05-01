@@ -277,11 +277,19 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
     }
   }
 
+  // 🌟 ฟังก์ชันช่วยแก้ปัญหาการเรียงลำดับ HairID ใน Rive Model ที่สลับกัน
+  double _getCorrectHairId(double originalId) {
+    if (originalId == 2.0) return 3.0; // Hair_02 ในรูป คือ Rive ID 3
+    if (originalId == 3.0) return 4.0; // Hair_03 ในรูป คือ Rive ID 4
+    if (originalId == 4.0) return 2.0; // Hair_04 ในรูป คือ Rive ID 2
+    return originalId;
+  }
+
   void _syncRiveToEquipped() {
     if (_controller == null || _user == null) return;
 
     try {
-      if (_hairInput != null) _hairInput!.value = _parseId(_user!.equippedHair);
+      if (_hairInput != null) _hairInput!.value = _getCorrectHairId(_parseId(_user!.equippedHair));
       if (_faceInput != null) _faceInput!.value = _parseId(_user!.equippedFace);
       if (_skinInput != null) _skinInput!.value = _parseId(_user!.equippedSkin);
 
@@ -1068,7 +1076,11 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
             height: 45,
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: const Color(0xFF2E4C6D),
+              gradient: const LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [Color(0xFF1A3D62), Color(0xFF195290)],
+              ),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Image.asset(iconPath, fit: BoxFit.contain),

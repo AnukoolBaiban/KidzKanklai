@@ -85,11 +85,19 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
     }
   }
 
+  // 🌟 ฟังก์ชันช่วยแก้ปัญหาการเรียงลำดับ HairID ใน Rive Model ที่สลับกัน
+  double _getCorrectHairId(double originalId) {
+    if (originalId == 2.0) return 3.0; // Hair_02 ในรูป คือ Rive ID 3
+    if (originalId == 3.0) return 4.0; // Hair_03 ในรูป คือ Rive ID 4
+    if (originalId == 4.0) return 2.0; // Hair_04 ในรูป คือ Rive ID 2
+    return originalId;
+  }
+
   void _syncRiveToEquipped() {
     if (_controller == null || widget.user == null) return;
 
     try {
-      if (_hairInput != null) _hairInput!.value = _parseId(widget.user!.equippedHair);
+      if (_hairInput != null) _hairInput!.value = _getCorrectHairId(_parseId(widget.user!.equippedHair));
       if (_faceInput != null) _faceInput!.value = _parseId(widget.user!.equippedFace);
       if (_skinInput != null) _skinInput!.value = _parseId(widget.user!.equippedSkin);
       if (_clothInput != null) {
@@ -148,7 +156,9 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
           // Background
           Positioned.fill(
             child: Image.asset(
-              'assets/images/background/bg11.png',
+              widget.isSuccess
+                  ? 'assets/images/background/bg11.png'
+                  : 'assets/images/background/bg13.png',
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
                 return Container(color: Color(0xFFE8F5E9));
@@ -206,7 +216,7 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
                                 style: TextStyle(
                                   fontSize: 32,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black,
+                                  color: widget.isSuccess ? const Color(0xFF4CAF50) : Colors.red,
                                 ),
                               ),
                             ],
@@ -612,7 +622,7 @@ class _AnimatedUpwardArrowState extends State<AnimatedUpwardArrow>
           children: [
             const Icon(
               Icons.arrow_upward_rounded,
-              color: Color(0xFFFFB300), // สีเหลือง
+              color: Color(0xFF4CAF50), // สีเขียว
               size: 50,
             ),
             Text(
@@ -620,7 +630,7 @@ class _AnimatedUpwardArrowState extends State<AnimatedUpwardArrow>
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFFFFB300), // สีเหลือง
+                color: Color(0xFF4CAF50), // สีเขียว
               ),
             ),
           ],

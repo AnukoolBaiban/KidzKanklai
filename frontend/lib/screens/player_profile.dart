@@ -4,6 +4,8 @@ import 'package:flutter_application_1/widgets/custom_top_bar.dart';
 import 'package:rive/rive.dart' hide LinearGradient, Image; 
 import 'package:flutter_application_1/config/rive_cache.dart'; 
 import '../widgets/character_widget.dart';
+import 'package:flutter_application_1/api_service.dart' as api;
+import 'loading.dart';
 
 class PlayerProfileScreen extends StatefulWidget {
   final String playerId; // 🌟 รับ UUID ของคนที่เราจะดูโปรไฟล์
@@ -17,6 +19,7 @@ class PlayerProfileScreen extends StatefulWidget {
 class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
   final _supabase = Supabase.instance.client;
   bool _isBackPressed = false;
+  bool _isLoading = true;
 
   // --- Profile Data ---
   String _displayName = "Loading...";
@@ -33,20 +36,8 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
   String _strStat = "10";
   String _creStat = "10";
 
-  // --- Rive State (ดึงจาก DB แทน API) ---
-  SMINumber? _poseInput;
-  SMINumber? _hairInput;
-  SMINumber? _faceInput;
-  SMINumber? _skinInput;
-  SMINumber? _clothInput;
-  SMINumber? _armInput; 
-  StateMachineController? _controller;
-  
-  String _bodyType = 'KID';
-  String _equippedHair = '';
-  String _equippedFace = '';
-  String _equippedSkin = '';
-  String _equippedOutfit = '';
+  // --- Character State ---
+  api.User? _targetUser;
 
   // --- Achievement Data ---
   int _totalAchievements = 18; 
@@ -142,22 +133,25 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
         if (charId != null) {
           final wearResponse = await _supabase
               .from('wear')
-              .select('type, items(image)')
+              .select('type, items(name, image)')
               .eq('character_id', charId);
 
           for (var w in wearResponse as List<dynamic>) {
             final type = w['type']?.toString().toLowerCase() ?? '';
             final itemData = w['items'];
             if (itemData != null) {
-              final image = itemData['image']?.toString() ?? '';
+              final itemVal = itemData['name']?.toString() ?? itemData['image']?.toString() ?? '';
               
-              if (type == 'hair') eqHair = image;
-              if (type == 'face' || type == 'emotion') eqFace = image;
-              if (type == 'skin') eqSkin = image;
-              if (type == 'cloth' || type == 'outfit' || type == 'clothes') eqOutfit = image;
+              if (type == 'hair') eqHair = itemVal;
+              if (type == 'face' || type == 'emotion') eqFace = itemVal;
+              if (type == 'skin') eqSkin = itemVal;
+              if (type == 'cloth' || type == 'outfit' || type == 'clothes') eqOutfit = itemVal;
             }
           }
         }
+
+        final dbLevel = charData['level'] as int? ?? 1;
+        final totalExp = charData['experience'] as int? ?? 0;
 
         // อัปเดตข้อมูลเข้า State
         if (mounted) {
@@ -166,20 +160,19 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
             _strStat = charData['strength'].toString();
             _creStat = charData['creative'].toString();
             
-            _bodyType = charData['body_type']?.toString() ?? 'KID';
-            _equippedSkin = eqSkin;
-            _equippedFace = eqFace;
-            _equippedHair = eqHair;
-            _equippedOutfit = eqOutfit;
+            _targetUser = api.User(
+               id: 0, username: '', email: '', exp: totalExp, coins: 0, tickets: 0, vouchers: 0, bio: '', soundBGM: 0, soundSFX: 0, statIntellect: 0, statStrength: 0, statCreativity: 0,
+               level: dbLevel,
+               equippedSkin: eqSkin,
+               equippedHair: eqHair,
+               equippedFace: eqFace,
+               equippedOutfit: eqOutfit,
+               bodyType: charData['body_type']?.toString() ?? 'KID',
+            );
           });
         }
 
-        final dbLevel = charData['level'] as int? ?? 1;
-        final totalExp = charData['experience'] as int? ?? 0;
         _updateLevelUI(dbLevel, totalExp); 
-        
-        // 🌟 สั่งให้ Rive รีเฟรชชิ้นส่วนสวมใส่
-        _syncRiveToEquipped();
       }
 
       // 3. ดึงข้อมูล Achievement
@@ -216,84 +209,32 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
           _displayBio = "โปรดเช็ค Debug Console เพื่อดูสาเหตุที่แท้จริง";
         });
       }
-    }
-  }
-
-  // 🌟 2. อัปเดตฟังก์ชันแปลงชื่อไฟล์ภาพเป็นตัวเลข (ดักนามสกุลไฟล์)
-  double _parseId(String s) {
-    if (s.isEmpty) return 0;
-    
-    // ลบนามสกุลไฟล์ทิ้งก่อนแยกคำ เพื่อป้องกันบั๊กแปลง '1.png' เป็นตัวเลขไม่ได้
-    s = s.replaceAll('.png', '').replaceAll('.jpg', '');
-    
-    if (s.contains('_')) {
-      try { return double.parse(s.split('_').last); } catch (_) {}
-    }
-    if (s.contains(' ')) {
-      try { return double.parse(s.split(' ').last); } catch (_) {}
-    }
-    try { return double.parse(s); } catch(_) { return 0; }
-  }
-  
-  // --- Rive Logic ---
-  void _onRiveInit(Artboard artboard) {
-    var controller = StateMachineController.fromArtboard(artboard, 'State Machine 1');
-    if (controller == null && artboard.stateMachines.isNotEmpty) {
-       controller = StateMachineController.fromArtboard(artboard, artboard.stateMachines.first.name);
-    }
-
-    if (controller != null) {
-      artboard.addController(controller);
-      _controller = controller;
-
-      for (var input in controller.inputs) {
-        if (input.name == 'Pose') _poseInput = input as SMINumber;
-        if (input.name == 'HairID') _hairInput = input as SMINumber;
-        if (input.name == 'FaceID') _faceInput = input as SMINumber;
-        if (input.name == 'SkinID') _skinInput = input as SMINumber;
-        if (input.name == 'OutfitID') _clothInput = input as SMINumber;
-      }
-      
-      _syncRiveToEquipped();
-
-      if (_poseInput != null) {
-         _poseInput!.value = 2.0; 
+    } finally {
+      if (mounted) {
+        // ให้หน่วงเวลาโหลดนิดนึงเพื่อให้แอนิเมชัน Loading โชว์และโมเดลพร้อม
+        await Future.delayed(const Duration(milliseconds: 500));
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
-  }
-
-  String _getModelAsset() {
-    final bt = _bodyType.toUpperCase();
-    if (bt == 'ADULT') return 'assets/animation/adult.riv';
-    if (bt == 'TEEN') return 'assets/animation/teen.riv';
-    return 'assets/animation/kid.riv';
-  }
-
-  void _syncRiveToEquipped() {
-     if (_controller == null) return;
-     
-     try {
-        if (_hairInput != null) _hairInput!.value = _parseId(_equippedHair);
-        if (_faceInput != null) _faceInput!.value = _parseId(_equippedFace);
-        if (_skinInput != null) _skinInput!.value = _parseId(_equippedSkin);
-        
-        if (_clothInput != null) {
-            _clothInput!.value = _parseId(_equippedOutfit);
-        }
-        if (_armInput != null) {
-            _armInput!.value = _parseId(_equippedOutfit);
-        }
-        
-        if (_poseInput != null) _poseInput!.value = 2.0;
-     } catch (e) {
-       print("Error syncing Rive Profile: $e");
-     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 600),
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: child,
+        );
+      },
+      child: _isLoading
+          ? const LoadingScreen(key: ValueKey('loading'), isStandalone: false)
+          : Scaffold(
+              key: const ValueKey('profile'),
+              backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: false,
       extendBody: true,
       body: Stack(
@@ -337,6 +278,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
           ),
         ],
       ),
+            ),
     );
   }
 
@@ -476,17 +418,10 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
                       child: Transform.scale(
                         scale: 1.6, 
                         child: RepaintBoundary( 
-                          child: (RiveCache().getFile(_getModelAsset()) != null 
-                              ? RiveAnimation.direct(
-                                  RiveCache().getFile(_getModelAsset())!,
-                                  fit: BoxFit.contain,
-                                  onInit: _onRiveInit,
-                                )
-                              : RiveAnimation.asset(
-                                  _getModelAsset(), 
-                                  fit: BoxFit.contain,
-                                  onInit: _onRiveInit,
-                                )),
+                          child: CharacterWidget(
+                            user: _targetUser,
+                            isInteractive: false,
+                          ),
                         ),
                       ),
                     ),
@@ -574,6 +509,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
           // 🌟 ใช้ _buildInfoField ที่ไม่มีปุ่มแก้ไข
           _buildInfoField(
             content: _displayName,
+            columnName: 'user_name',
             textStyle: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 18,
@@ -586,6 +522,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
           const SizedBox(height: 6),
           _buildInfoField(
             content: _displayBio,
+            columnName: 'user_detail',
             textStyle: const TextStyle(
               fontSize: 14,
               color: Colors.grey,
@@ -601,9 +538,78 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
     );
   }
 
-  // 🌟 ฟังก์ชัน _buildInfoField แบบ Read-only (ลบปุ่มแก้ไขออก)
+  // 🌟 ฟังก์ชันแสดงรายละเอียดแบบ Read-only
+  void _showViewDialog(String title, String content) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.95),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFFAAD7EA),
+                width: 3,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "รายละเอียด$title",
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF00385D),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFAAD7EA), width: 2),
+                  ),
+                  child: Text(
+                    content.isEmpty ? "ไม่มีข้อมูล" : content,
+                    style: const TextStyle(fontSize: 16, color: Colors.black87),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2374B5),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("ปิด", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // 🌟 ฟังก์ชัน _buildInfoField ที่มีปุ่มลูกตาดูรายละเอียด
   Widget _buildInfoField({
     required String content,
+    required String columnName,
     required TextStyle textStyle,
     required Color borderColor,
     double height = 35,
@@ -618,9 +624,22 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
         border: Border.all(color: borderColor, width: 1.5),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(child: Text(content, style: textStyle)),
+          GestureDetector(
+            onTap: () {
+              _showViewDialog(
+                columnName == 'user_name' ? 'ชื่อ' : 'แนะนำตัว',
+                content,
+              );
+            },
+            child: const Icon(
+              Icons.visibility,
+              color: Color(0xFF1E5173),
+              size: 18,
+            ),
+          ),
         ],
       ),
     );
@@ -705,18 +724,11 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
                 height: 160,
                 width: 160,
                 child: Transform.translate(
-                  offset: Offset(0, _bodyType.toUpperCase() == 'KID' ? 20 : 0),
-                  child: (RiveCache().getFile(_getModelAsset()) != null 
-                      ? RiveAnimation.direct(
-                          RiveCache().getFile(_getModelAsset())!,
-                          fit: BoxFit.contain,
-                          onInit: _onRiveInit,
-                        )
-                      : RiveAnimation.asset(
-                          _getModelAsset(), 
-                          fit: BoxFit.contain,
-                          onInit: _onRiveInit,
-                        )),
+                  offset: Offset(0, _targetUser?.bodyType.toUpperCase() == 'KID' ? 20 : 0),
+                  child: CharacterWidget(
+                    user: _targetUser,
+                    isInteractive: false,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -759,7 +771,11 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
             height: 45,
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: const Color(0xFF2E4C6D),
+              gradient: const LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [Color(0xFF1A3D62), Color(0xFF195290)],
+              ),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Image.asset(iconPath, fit: BoxFit.contain),

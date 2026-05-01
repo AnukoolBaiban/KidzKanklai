@@ -2,7 +2,211 @@ import 'package:flutter/material.dart';
 import 'package:flutter_application_1/widgets/club/club_room_components.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_application_1/api_service.dart';
-import 'package:flutter_application_1/screens/player_profile.dart'; // 🌟 เพิ่มบรรทัดนี้ (ปรับ path ให้ตรงถ้าจำเป็น)
+import 'package:flutter_application_1/screens/player_profile.dart' hide GradientCircularProgressPainter; // 🌟 เพิ่มบรรทัดนี้ (ปรับ path ให้ตรงถ้าจำเป็น)
+import 'package:flutter_application_1/widgets/character_widget.dart'; // เพิ่มบรรทัดนี้
+import 'package:flutter_application_1/widgets/bottom_navigation_bar.dart'; // สำหรับ GradientCircularProgressPainter
+import 'package:flutter_application_1/api_service.dart' as api; // เพิ่มบรรทัดนี้
+import 'package:flutter_application_1/widgets/club/confirm_quit_popup.dart';
+
+// 🌟 คลาสจัดการการโหลดข้อมูลล่วงหน้า
+class ClubDetailMemberPreloader {
+  static Map<String, dynamic>? cachedData;
+  static bool isPreloading = false;
+
+  static void clearCache() {
+    cachedData = null;
+    isPreloading = false;
+  }
+
+  static Map<String, String> getThisWeekTimeRangeUTC() {
+    DateTime now = DateTime.now().toUtc();
+    DateTime nowUtc7 = now.add(const Duration(hours: 7));
+    int daysSinceMonday = nowUtc7.weekday - DateTime.monday;
+    DateTime startOfWeekUtc7 = DateTime(nowUtc7.year, nowUtc7.month, nowUtc7.day)
+        .subtract(Duration(days: daysSinceMonday));
+    DateTime endOfWeekUtc7 = startOfWeekUtc7.add(const Duration(days: 7));
+
+    String formatNaiveLocal(DateTime dt) {
+      String y = dt.year.toString().padLeft(4, '0');
+      String m = dt.month.toString().padLeft(2, '0');
+      String d = dt.day.toString().padLeft(2, '0');
+      return '$y-$m-${d}T00:00:00'; 
+    }
+
+    return {
+      'start': formatNaiveLocal(startOfWeekUtc7),
+      'end': formatNaiveLocal(endOfWeekUtc7),
+    };
+  }
+
+  static Future<api.User> fetchUserCharacter(String uId) async {
+    final supabase = Supabase.instance.client;
+    final charData = await supabase
+        .from('characters')
+        .select('id, level, experience, body_type, skin_color, emotion')
+        .eq('user_id', uId)
+        .maybeSingle();
+
+    String eqSkin = '';
+    String eqFace = '';
+    String eqHair = '';
+    String eqOutfit = '';
+    int level = 1;
+    int exp = 0;
+    String bodyType = 'KID';
+
+    if (charData != null) {
+      eqSkin = charData['skin_color']?.toString() ?? '';
+      eqFace = charData['emotion']?.toString() ?? '';
+      level = charData['level'] ?? 1;
+      exp = charData['experience'] ?? 0;
+      bodyType = charData['body_type']?.toString() ?? 'KID';
+
+      final charId = charData['id'];
+      if (charId != null) {
+        try {
+          final wearResponse = await supabase
+              .from('wear')
+              .select('type, items(name, image)')
+              .eq('character_id', charId);
+
+          for (var w in wearResponse as List<dynamic>) {
+            final type = w['type']?.toString().toLowerCase() ?? '';
+            final itemData = w['items'];
+            if (itemData != null) {
+              final itemVal = itemData['name']?.toString() ?? itemData['image']?.toString() ?? '';
+              if (type == 'hair') eqHair = itemVal;
+              if (type == 'face' || type == 'emotion') eqFace = itemVal;
+              if (type == 'skin') eqSkin = itemVal;
+              if (type == 'cloth' || type == 'outfit' || type == 'clothes') eqOutfit = itemVal;
+            }
+          }
+        } catch (e) {
+          debugPrint('Error fetching wear for $charId: $e');
+        }
+      }
+    }
+
+    return api.User(
+      id: 0, username: '', email: '', exp: exp, coins: 0, tickets: 0, vouchers: 0, bio: '', soundBGM: 0, soundSFX: 0, statIntellect: 0, statStrength: 0, statCreativity: 0,
+      level: level,
+      equippedSkin: eqSkin,
+      equippedHair: eqHair,
+      equippedFace: eqFace,
+      equippedOutfit: eqOutfit,
+      bodyType: bodyType,
+    );
+  }
+
+  static Future<void> preload({bool forceRefresh = false}) async {
+    if (!forceRefresh && (isPreloading || cachedData != null)) return;
+    isPreloading = true;
+
+    try {
+      final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) {
+        isPreloading = false;
+        return;
+      }
+
+      final myProfile = await supabase
+          .from('user_profiles')
+          .select('name, detail, club_id, club_role')
+          .eq('id', userId)
+          .single();
+
+      final clubId = myProfile['club_id'];
+      if (clubId == null) {
+        isPreloading = false;
+        return;
+      }
+
+      api.User myUserObj = await fetchUserCharacter(userId);
+
+      final club = await supabase
+          .from('clubs')
+          .select('name, description, invite_code')
+          .eq('id', clubId)
+          .single();
+
+      final membersResponse = await supabase
+          .from('user_profiles')
+          .select('id, name, detail, club_role')
+          .eq('club_id', clubId);
+
+      final List<Map<String, dynamic>> membersWithLevel = [];
+      for (final member in membersResponse as List<dynamic>) {
+        final userObj = await fetchUserCharacter(member['id']);
+
+        membersWithLevel.add({
+          ...Map<String, dynamic>.from(member),
+          'level': userObj.level,
+          'user_obj': userObj,
+        });
+      }
+
+      membersWithLevel.sort((a, b) {
+        final aRole = a['club_role'] ?? '';
+        final bRole = b['club_role'] ?? '';
+        if (aRole == 'owner' && bRole != 'owner') return -1;
+        if (aRole != 'owner' && bRole == 'owner') return 1;
+        return 0;
+      });
+
+      final timeRange = getThisWeekTimeRangeUTC();
+      final questsResponse = await supabase
+          .from('quests')
+          .select('id, name')
+          .eq('club_id', clubId)
+          .gte('start_date', timeRange['start']!)
+          .lt('start_date', timeRange['end']!)
+          .order('start_date', ascending: true);
+
+      final questIds = (questsResponse as List<dynamic>).map((q) => q['id']).toList();
+      final Map<String, Set<int>> completedQuestsMap = {};
+      
+      if (questIds.isNotEmpty) {
+        final doQuestsResponse = await supabase
+            .from('do_quests')
+            .select('user_id, quest_id, status')
+            .inFilter('quest_id', questIds)
+            .inFilter('status', ['completed', 'claimed']);
+
+        for (final dq in doQuestsResponse as List<dynamic>) {
+          final uid = dq['user_id'].toString();
+          final qid = dq['quest_id'] as int;
+          if (!completedQuestsMap.containsKey(uid)) {
+            completedQuestsMap[uid] = {};
+          }
+          completedQuestsMap[uid]!.add(qid);
+        }
+      }
+
+      final membersWithStats = membersWithLevel.map((m) {
+        final uid = m['id'].toString();
+        return {
+          ...m,
+          'completed_quests': completedQuestsMap[uid] ?? <int>{},
+        };
+      }).toList();
+
+      cachedData = {
+        'clubId': clubId,
+        'myProfile': myProfile,
+        'myUserObj': myUserObj,
+        'club': club,
+        'membersWithStats': membersWithStats,
+        'questsResponse': questsResponse,
+      };
+
+    } catch (e) {
+      debugPrint("Preload Member Data Error: $e");
+    } finally {
+      isPreloading = false;
+    }
+  }
+}
 
 class ClubDetailMemberScreen extends StatefulWidget {
   const ClubDetailMemberScreen({super.key});
@@ -24,10 +228,12 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
   String _myDetail = '';
   String _myRole = '';
   int _myLevel = 1;
+  api.User? _myUser; // เก็บข้อมูลผู้ใช้ปัจจุบันสำหรับแสดงตัวละคร
 
   // ข้อมูลชมรม
   String _clubName = '';
   String _clubDescription = '';
+  String _inviteCode = '';
 
   // ข้อมูลสมาชิก
   List<Map<String, dynamic>> _members = [];
@@ -41,179 +247,88 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
     _fetchAllData();
   }
 
-  // 🌟 ฟังก์ชันคำนวณเวลาสัปดาห์นี้ (จันทร์ 00:00 - จันทร์หน้า 00:00 UTC+7)
-  Map<String, String> _getThisWeekTimeRangeUTC() {
-    DateTime now = DateTime.now().toUtc();
-    DateTime nowUtc7 = now.add(const Duration(hours: 7));
-    
-    int daysSinceMonday = nowUtc7.weekday - DateTime.monday;
-    
-    // จันทร์นี้ 00:00:00 (อิงตามเวลาไทย)
-    DateTime startOfWeekUtc7 = DateTime(nowUtc7.year, nowUtc7.month, nowUtc7.day)
-        .subtract(Duration(days: daysSinceMonday));
-        
-    // จันทร์หน้า 00:00:00 (อิงตามเวลาไทย)
-    DateTime endOfWeekUtc7 = startOfWeekUtc7.add(const Duration(days: 7));
+  // 🌟 ฟังก์ชันคำนวณ EXP เปอร์เซ็นต์
+  double _getExpPercent(int dbLevel, int totalExp) {
+    int remainingExp = totalExp;
+    int requiredExpForNextLevel = 0;
 
-    // 🌟 แก้ไข: แปลงเป็น String รูปแบบเวลาท้องถิ่นเป๊ะๆ (ไม่มีอักษร Z และไม่หักลบ 7 ชม.)
-    // เพื่อให้ Database เปรียบเทียบตัวเลข วัน-เวลา ตรงๆ ป้องกันบั๊ก Timezone
-    String formatNaiveLocal(DateTime dt) {
-      String y = dt.year.toString().padLeft(4, '0');
-      String m = dt.month.toString().padLeft(2, '0');
-      String d = dt.day.toString().padLeft(2, '0');
-      return '$y-$m-${d}T00:00:00'; 
+    for (int i = 1; i < dbLevel; i++) {
+      int expUsed = 0;
+      if (i < 6) {
+        expUsed = 40 * i;
+      } else {
+        expUsed = 200 + (i * i);
+      }
+      remainingExp -= expUsed;
     }
 
-    return {
-      'start': formatNaiveLocal(startOfWeekUtc7), // ผลลัพธ์: '2024-05-27T00:00:00'
-      'end': formatNaiveLocal(endOfWeekUtc7),     // ผลลัพธ์: '2024-06-03T00:00:00'
-    };
+    if (dbLevel < 6) {
+      requiredExpForNextLevel = 40 * dbLevel;
+    } else {
+      requiredExpForNextLevel = 200 + (dbLevel * dbLevel);
+    }
+
+    return (requiredExpForNextLevel > 0)
+        ? (remainingExp / requiredExpForNextLevel).clamp(0.0, 1.0)
+        : 0.0;
   }
 
   // ── ดึงข้อมูลทั้งหมด ─────────────────────────────────────────────────────
   Future<void> _fetchAllData() async {
-    try {
-      final supabase = Supabase.instance.client;
-      final userId = supabase.auth.currentUser!.id;
+    setState(() => _isLoading = true);
 
-      // 1. ดึงข้อมูลโปรไฟล์ตัวเอง
-      final myProfile = await supabase
-          .from('user_profiles')
-          .select('name, detail, club_id, club_role')
-          .eq('id', userId)
-          .single();
+    // รอให้ Preload เสร็จ (ถ้ากำลังโหลดอยู่)
+    while (ClubDetailMemberPreloader.isPreloading) {
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
 
-      final clubId = myProfile['club_id'];
-      if (clubId == null) {
-        if (mounted) setState(() => _isLoading = false);
-        return;
-      }
+    // ถ้าไม่มีข้อมูล Cache ค่อยโหลดใหม่
+    if (ClubDetailMemberPreloader.cachedData == null) {
+      await ClubDetailMemberPreloader.preload();
+    }
 
-      // 2. ดึง level จาก characters
-      final myCharacter = await supabase
-          .from('characters')
-          .select('level')
-          .eq('user_id', userId)
-          .maybeSingle();
+    final data = ClubDetailMemberPreloader.cachedData;
 
-      // 3. ดึงข้อมูลชมรม
-      final club = await supabase
-          .from('clubs')
-          .select('name, description')
-          .eq('id', clubId)
-          .single();
+    if (data != null && mounted) {
+      setState(() {
+        _myName = data['myProfile']['name'] ?? '';
+        _myDetail = data['myProfile']['detail'] ?? '';
+        _myRole = data['myProfile']['club_role'] ?? 'member';
+        _myUser = data['myUserObj'];
+        _myLevel = _myUser!.level;
+        
+        _clubName = data['club']['name'] ?? '';
+        _clubDescription = data['club']['description'] ?? '';
+        _inviteCode = data['club']['invite_code'] ?? '------';
 
-      // 4. ดึงสมาชิกทั้งหมดในชมรม
-      final membersResponse = await supabase
-          .from('user_profiles')
-          .select('id, name, detail, club_role')
-          .eq('club_id', clubId);
-
-      // 5. ดึง level ของแต่ละสมาชิก
-      final List<Map<String, dynamic>> membersWithLevel = [];
-      for (final member in membersResponse as List<dynamic>) {
-        final charData = await supabase
-            .from('characters')
-            .select('level')
-            .eq('user_id', member['id'])
-            .maybeSingle();
-        membersWithLevel.add({
-          ...Map<String, dynamic>.from(member),
-          'level': charData?['level'] ?? 1,
-        });
-      }
-
-      // เรียงหัวหน้าขึ้นก่อน
-      membersWithLevel.sort((a, b) {
-        final aRole = a['club_role'] ?? '';
-        final bRole = b['club_role'] ?? '';
-        if (aRole == 'owner' && bRole != 'owner') return -1;
-        if (aRole != 'owner' && bRole == 'owner') return 1;
-        return 0;
+        _members = data['membersWithStats'];
+        _weeklyQuests = data['questsResponse'];
+        _isLoading = false;
       });
 
-      // 6. ดึงภารกิจสัปดาห์นี้ (🌟 สั่ง order by start_date เพื่อให้เรียงลำดับ 1, 2, 3 เป๊ะๆ)
-      final timeRange = _getThisWeekTimeRangeUTC();
-      final questsResponse = await supabase
-          .from('quests')
-          .select('id, name')
-          .eq('club_id', clubId)
-          .gte('start_date', timeRange['start']!)
-          .lt('start_date', timeRange['end']!)
-          .order('start_date', ascending: true);
-
-      // 7. ดึง do_quests สถานะ 'completed'
-      final questIds = (questsResponse as List<dynamic>)
-          .map((q) => q['id'])
-          .toList();
-
-      // 🌟 เปลี่ยนมาเก็บเป็น Set (กลุ่มของ ID) แทนการนับจำนวน
-      final Map<String, Set<int>> completedQuestsMap = {};
-      if (questIds.isNotEmpty) {
-        final doQuestsResponse = await supabase
-            .from('do_quests')
-            .select('user_id, quest_id, status')
-            .inFilter('quest_id', questIds)
-            .eq('status', 'completed');
-
-        for (final dq in doQuestsResponse as List<dynamic>) {
-          final uid = dq['user_id'].toString();
-          final qid = dq['quest_id'] as int;
-          if (!completedQuestsMap.containsKey(uid)) {
-            completedQuestsMap[uid] = {};
-          }
-          completedQuestsMap[uid]!.add(qid); // เก็บ ID ของเควสที่ทำเสร็จ
-        }
-      }
-
-      // ใส่ข้อมูลการทำเควสเข้าไปในสมาชิก
-      final membersWithStats = membersWithLevel.map((m) {
-        final uid = m['id'].toString();
-        return {
-          ...m,
-          'completed_quests': completedQuestsMap[uid] ?? <int>{}, // แนบ Set ลงไป
-        };
-      }).toList();
-
-      if (mounted) {
+      // 🌟 โหลดข้อมูลสมาชิกทั้งหมดและตัวละครใหม่แบบเบื้องหลังเพื่อให้เรียลไทม์
+      await ClubDetailMemberPreloader.preload(forceRefresh: true);
+      
+      final newData = ClubDetailMemberPreloader.cachedData;
+      if (newData != null && mounted) {
         setState(() {
-          _myName = myProfile['name'] ?? '';
-          _myDetail = myProfile['detail'] ?? '';
-          _myRole = myProfile['club_role'] ?? 'member';
-          _myLevel = myCharacter?['level'] ?? 1;
-          _clubName = club['name'] ?? '';
-          _clubDescription = club['description'] ?? '';
-          _members = membersWithStats;
-          _weeklyQuests = questsResponse;
-          _isLoading = false;
+          _members = newData['membersWithStats'];
+          _myUser = newData['myUserObj'];
+          _myLevel = _myUser!.level;
         });
       }
-    } catch (e) {
-      debugPrint("Error fetching club detail data: $e");
+    } else {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _showLeaveClubDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('ลาออกจากชมรม'),
-        content: const Text('คุณต้องการลาออกจากชมรมนี้ใช่ไหม?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('ยกเลิก'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await _leaveClub();
-            },
-            child: const Text('ลาออก', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
+    ConfirmQuitPopup.show(
+      context,
+      onConfirm: () async {
+        Navigator.pop(context); // ปิด Popup ยืนยัน
+        await _leaveClub();
+      },
     );
   }
 
@@ -266,6 +381,17 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
         children: [
           const ClubBackground(),
 
+          // ── Top Bar & Header ───────────────────────
+          Column(
+            children: [
+              ClubTopBar(topPadding: topPadding),
+              ClubBlueHeader(
+                title: _clubName.isEmpty ? 'ชมรม' : _clubName,
+                onBackPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+
           Padding(
             padding: EdgeInsets.only(
               top: topBarHeight + headerHeight + 16,
@@ -282,20 +408,15 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
                       const SizedBox(height: 16),
                       _buildTabs(),
                       const SizedBox(height: 12),
-                      if (!_isShowingMembers)
-                        Expanded(child: _buildDetailsBox())
-                      else
+                      if (!_isShowingMembers) ...[
+                        _buildInviteCodeSection(),
+                        const SizedBox(height: 12),
+                        Expanded(child: _buildDetailsBox()),
+                      ] else ...[
                         Expanded(child: _buildMembersList()),
+                      ],
                     ],
                   ),
-          ),
-
-          ClubTopBar(topPadding: topPadding, height: topBarHeight),
-
-          ClubBlueHeader(
-            topOffset: topBarHeight,
-            title: _clubName.isEmpty ? 'ชมรม' : _clubName,
-            onBackPressed: () => Navigator.pop(context),
           ),
 
           ClubBottomNavBar(
@@ -363,31 +484,42 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
           Stack(
             alignment: Alignment.center,
             children: [
-              Container(
-                width: 110,
-                height: 110,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: SweepGradient(
+              CustomPaint(
+                size: const Size(110, 110),
+                painter: GradientCircularProgressPainter(
+                  progress: _myUser != null ? _getExpPercent(_myUser!.level, _myUser!.exp) : 0.0,
+                  gradient: const LinearGradient(
                     colors: [Color(0xFF88FF40), Color(0xFF66E0FF)],
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
                   ),
-                ),
-                child: Container(
-                  margin: const EdgeInsets.all(5),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
+                  strokeWidth: 6,
                 ),
               ),
               Container(
                 padding: const EdgeInsets.all(6),
-                child: const CircleAvatar(
-                  radius: 50,
-                  backgroundImage: AssetImage(
-                    'assets/images/profile/profile_img.png',
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
                   ),
-                  backgroundColor: Colors.transparent,
+                  clipBehavior: Clip.hardEdge,
+                  child: IgnorePointer(
+                    child: Transform.translate(
+                      offset: const Offset(2, 20),
+                      child: Transform.scale(
+                        scale: 1.6,
+                        child: RepaintBoundary(
+                          child: CharacterWidget(
+                            user: _myUser,
+                            isInteractive: false,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -445,7 +577,7 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
 
   Widget _buildLeaderInfoSection() {
     final bool isLeader = _myRole == 'owner';
-    final String roleLabel = isLeader ? 'เจ้าของชมรม' : 'สมาชิก';
+    final String roleLabel = isLeader ? 'หัวหน้า' : 'สมาชิก';
     final Color roleBgColor =
         isLeader ? const Color(0xFFFFE0B2) : const Color(0xFFCBE7F5);
 
@@ -587,9 +719,9 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               alignment: Alignment.center,
-              child: const Text(
-                "สมาชิก",
-                style: TextStyle(
+              child: Text(
+                "สมาชิก (${_members.length}/50)",
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
@@ -602,28 +734,145 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
     );
   }
 
-  Widget _buildDetailsBox() {
+  Widget _buildInviteCodeSection() {
     return Container(
-      width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(15),
+        color: const Color(0xFF9DD0E7),
+        borderRadius: BorderRadius.circular(10),
       ),
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-      child: ScrollConfiguration(
-        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-        child: SingleChildScrollView(
-          child: Text(
-            _clubDescription.isEmpty
-                ? 'ไม่มีรายละเอียดชมรม'
-                : _clubDescription,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 8, 8),
+            child: Row(
+              children: [
+                const Expanded(flex: 2, child: Text("ชื่อชมรม", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF00385D)))),
+                Expanded(
+                  flex: 3,
+                  child: Container(
+                    height: 35,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 2, offset: const Offset(0, 1))],
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      _clubName,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 8, 8),
+            child: Row(
+              children: [
+                const Expanded(flex: 2, child: Text("รหัสเชิญเข้าชมรม", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF00385D)))),
+                Expanded(
+                  flex: 3,
+                  child: Container(
+                    height: 35,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 2, offset: const Offset(0, 1))],
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(_inviteCode, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87))),
+                        GestureDetector(
+                          onTap: () {
+                            debugPrint("Copy code tapped");
+                          },
+                          child: Container(
+                            width: 40,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF4A7699),
+                              borderRadius: BorderRadius.only(topRight: Radius.circular(18), bottomRight: Radius.circular(18)),
+                            ),
+                            child: Center(child: Image.asset('assets/images/icon/iconCopy.png', width: 20, height: 20)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailsBox() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF9DD0E7), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(10),
+                topRight: Radius.circular(10),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: const [
+                Text(
+                  'รายละเอียด',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF002A50),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Text(
+                      _clubDescription.isEmpty
+                          ? 'ไม่มีรายละเอียดชมรม'
+                          : _clubDescription,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -667,8 +916,13 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
           // 🌟 2. สั่งเปลี่ยนหน้า พร้อมส่ง playerId ไปให้
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => PlayerProfileScreen(playerId: targetId.toString()),
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  PlayerProfileScreen(playerId: targetId.toString()),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                return FadeTransition(opacity: animation, child: child);
+              },
+              transitionDuration: const Duration(milliseconds: 500),
             ),
           );
         }
@@ -705,21 +959,49 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
                         Stack(
                           clipBehavior: Clip.none,
                           children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: const Color(0xFF9DD0E7),
-                                  width: 2,
+                            Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                CustomPaint(
+                                  size: const Size(80, 80),
+                                  painter: GradientCircularProgressPainter(
+                                    progress: member['user_obj'] != null ? _getExpPercent(member['user_obj'].level, member['user_obj'].exp) : 0.0,
+                                    gradient: const LinearGradient(
+                                      colors: [Color(0xFF88FF40), Color(0xFF66E0FF)],
+                                      begin: Alignment.bottomCenter,
+                                      end: Alignment.topCenter,
+                                    ),
+                                    strokeWidth: 4,
+                                  ),
                                 ),
-                              ),
-                              child: const CircleAvatar(
-                                radius: 36,
-                                backgroundImage: AssetImage(
-                                  'assets/images/profile/profile_img.png',
+                                Container(
+                                  width: 72,
+                                  height: 72,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.white,
+                                    border: Border.all(
+                                      color: Colors.transparent,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  clipBehavior: Clip.hardEdge,
+                                  child: IgnorePointer(
+                                    child: Transform.translate(
+                                      offset: const Offset(2, 15),
+                                      child: Transform.scale(
+                                        scale: 1.6,
+                                        child: RepaintBoundary(
+                                          child: CharacterWidget(
+                                            user: member['user_obj'],
+                                            isInteractive: false,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                                backgroundColor: Colors.transparent,
-                              ),
+                              ],
                             ),
                             Positioned(
                               bottom: -4,
@@ -777,7 +1059,7 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
                           ),
                           alignment: Alignment.center,
                           child: Text(
-                            isLeader ? "เจ้าของชมรม" : "สมาชิก",
+                            isLeader ? "หัวหน้า" : "สมาชิก",
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -827,77 +1109,75 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
               ],
             ),
           ),
-          // Lower Row: แสดงวงกลมภารกิจ (ทุกคน)
-          Container(height: 2, color: const Color(0xFF9DD0E7)),
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  width: 105,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isLeader
-                        ? const Color(0xFFFFE0B2)
-                        : const Color(0xFFCBE7F5),
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(8),
+          if (!isLeader) ...[
+            Container(height: 2, color: const Color(0xFF9DD0E7)),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    width: 105,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFCBE7F5),
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(8),
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Text(
+                      "ภารกิจที่เสร็จแล้ว",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.black87,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                  alignment: Alignment.center,
-                  child: const Text(
-                    "ภารกิจที่เสร็จแล้ว",
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.black87,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                Container(width: 2, color: const Color(0xFF9DD0E7)),
-                Expanded(
-                  child: totalQuests == 0
-                      ? const Center(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8),
-                            child: Text(
-                              'ไม่มีภารกิจสัปดาห์นี้',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
+                  Container(width: 2, color: const Color(0xFF9DD0E7)),
+                  Expanded(
+                    child: totalQuests == 0
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                'ไม่มีภารกิจสัปดาห์นี้',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
                               ),
                             ),
+                          )
+                        : Row(
+                            children: List.generate(totalQuests, (qi) {
+                              final int currentQuestId = _weeklyQuests[qi]['id'];
+                              final bool done = completedQuests.contains(currentQuestId);
+                              final bool isLastCell = qi == totalQuests - 1;
+                              
+                              return Expanded(
+                                child: isLastCell
+                                    ? _buildQuestCircle(qi + 1, done)
+                                    : Row(
+                                        children: [
+                                          Expanded(
+                                            child: _buildQuestCircle(
+                                                qi + 1, done),
+                                          ),
+                                          Container(
+                                            width: 2,
+                                            color: const Color(0xFF9DD0E7),
+                                          ),
+                                        ],
+                                      ),
+                              );
+                            }),
                           ),
-                        )
-                      : Row(
-                          children: List.generate(totalQuests, (qi) {
-                            // 🌟 แก้ไข: เทียบ ID ของเควสในตำแหน่งนั้น ว่าอยู่ใน Set ที่ทำเสร็จหรือไม่
-                            final int currentQuestId = _weeklyQuests[qi]['id'];
-                            final bool done = completedQuests.contains(currentQuestId);
-                            final bool isLastCell = qi == totalQuests - 1;
-                            
-                            return Expanded(
-                              child: isLastCell
-                                  ? _buildQuestCircle(qi + 1, done)
-                                  : Row(
-                                      children: [
-                                        Expanded(
-                                          child: _buildQuestCircle(
-                                              qi + 1, done),
-                                        ),
-                                        Container(
-                                          width: 2,
-                                          color: const Color(0xFF9DD0E7),
-                                        ),
-                                      ],
-                                    ),
-                            );
-                          }),
-                        ),
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
       ),

@@ -18,25 +18,17 @@ class ClubBackground extends StatelessWidget {
 
 class ClubTopBar extends StatelessWidget {
   final double topPadding;
-  final double height;
-  const ClubTopBar({super.key, required this.topPadding, required this.height});
+  const ClubTopBar({super.key, required this.topPadding});
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: height,
-        padding: EdgeInsets.only(top: topPadding),
-        color: Colors.black.withValues(alpha: 0.4),
-        alignment: Alignment.bottomCenter,
-        child: CustomTopBar(
-          onNotificationTapped: () =>
-              Navigator.pushNamed(context, '/notification'),
-          onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
-        ),
+    return Container(
+      padding: EdgeInsets.only(top: topPadding),
+      color: Colors.black.withValues(alpha: 0.4),
+      child: CustomTopBar(
+        onNotificationTapped: () =>
+            Navigator.pushNamed(context, '/notification'),
+        onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
       ),
     );
   }
@@ -64,6 +56,7 @@ class ClubBottomNavBar extends StatelessWidget {
         child: CustomBottomNavigationBar(
           selectedIndex: selectedIndex,
           onItemTapped: (index) {
+            if (index == 3) return; // ไม่กดซ้ำปุ่มชมรมเมื่ออยู่หน้าชมรมอยู่แล้ว
             onItemTapped(index);
             const routes = ['/fashion', '/lobby', '/map', '/club'];
             if (index < routes.length) {
@@ -82,13 +75,11 @@ class ClubBottomNavBar extends StatelessWidget {
 }
 
 class ClubBlueHeader extends StatefulWidget {
-  final double topOffset;
   final String title;
   final VoidCallback? onBackPressed;
 
   const ClubBlueHeader({
     super.key,
-    required this.topOffset,
     required this.title,
     this.onBackPressed,
   });
@@ -102,20 +93,16 @@ class _ClubBlueHeaderState extends State<ClubBlueHeader> {
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      top: widget.topOffset,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: 80,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF015496), Color(0xFF2273B4)],
-          ),
+    return Container(
+      height: 80,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF015496), Color(0xFF2273B4)],
         ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
             Positioned.fill(
               child: Center(
                 child: Padding(
@@ -169,7 +156,6 @@ class _ClubBlueHeaderState extends State<ClubBlueHeader> {
               ),
           ],
         ),
-      ),
     );
   }
 }

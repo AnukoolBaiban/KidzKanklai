@@ -84,6 +84,7 @@ class InventoryItem {
   final String type;
   final String id;
   final String name;
+  final String description; // 🌟 เพิ่ม description
   final String category;
   final String imagePath;
   final int riveId;
@@ -92,6 +93,7 @@ class InventoryItem {
     required this.type,
     required this.id,
     this.name = '',
+    this.description = '',
     this.category = '',
     this.imagePath = '',
     this.riveId = 0,
@@ -139,6 +141,7 @@ class InventoryItem {
       type: category,
       id: json['id'].toString(),
       name: name,
+      description: json['description'] ?? '', // 🌟 อ่าน description
       category: category,
       imagePath: json['image'] ?? '',
       riveId: parseRiveId(name),

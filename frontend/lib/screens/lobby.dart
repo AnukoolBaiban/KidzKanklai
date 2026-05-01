@@ -7,12 +7,14 @@ import 'package:flutter_application_1/widgets/right_side_menu.dart';
 import 'package:flutter_application_1/widgets/custom_top_bar.dart';
 import 'package:flutter_application_1/widgets/character_widget.dart';
 import 'package:flutter_application_1/widgets/reward_popup.dart';
+import 'package:flutter_application_1/screens/loading.dart';
 
 
 class LobbyScreen extends StatefulWidget {
   final User? user;
+  final bool showLoading;
 
-  const LobbyScreen({Key? key, this.user}) : super(key: key);
+  const LobbyScreen({Key? key, this.user, this.showLoading = false}) : super(key: key);
 
   @override
   _LobbyScreenState createState() => _LobbyScreenState();
@@ -20,9 +22,9 @@ class LobbyScreen extends StatefulWidget {
 
 class _LobbyScreenState extends State<LobbyScreen> {
   Key _topBarKey = UniqueKey();
-  int _selectedIndex = 1; // Default to Lobby (Room)
-  User? _user; // Local user state
-  bool _isLoading = true;
+  int _selectedIndex = 1;
+  User? _user;
+  late bool _isLoading;
   bool _hasUnclaimedAchievement = false;
 
   void _onReturnFromOtherPage() {
@@ -39,7 +41,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
   @override
   void initState() {
     super.initState();
-    _user = widget.user; // Initialize with passed user
+    _user = widget.user;
+    _isLoading = widget.showLoading; // แสดง Loading เฉพาะตอน login ครั้งแรก
     _loadUserData();
     // สั่งเช็คของรางวัลทันทีที่เปิดหน้านี้
     _checkDailyLoginRewards();
@@ -51,10 +54,12 @@ class _LobbyScreenState extends State<LobbyScreen> {
   }
 
   Future<void> _loadUserData() async {
-    // Always fetch latest data to ensure updates from Fashion/Tasks are reflected
-    // even if widget.user is passed (it might be stale)
     final profile = await ApiService.getProfile(0);
     if (mounted) {
+      if (_isLoading) {
+        // มาจาก login — หน่วงนิดให้ Loading screen โชว์ก่อน
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
       setState(() {
         if (profile != null) {
           _user = profile;
@@ -136,16 +141,27 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage("assets/images/background/bg3.png"),
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: Column(
-          children: [
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 600),
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: child,
+        );
+      },
+      child: _isLoading
+          ? const LoadingScreen(key: ValueKey('loading'), isStandalone: false)
+          : Scaffold(
+              key: const ValueKey('lobby'),
+              body: Container(
+                decoration: const BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage("assets/images/background/bg3.png"),
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                child: Column(
+                  children: [
             // Top Bar - ใช้ CustomTopBar (หุ้มด้วยแถบสีดำบางๆ ให้เหมือนหน้าภารกิจ)
             Container(
               padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
@@ -169,7 +185,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   children: [
                     // Character Widget - อยู่ชั้นล่างสุด
                     Positioned(
-                      bottom: _user?.bodyType.toUpperCase() == 'ADULT' ? 25 :
+                      bottom: _user?.bodyType.toUpperCase() == 'ADULT' ? -5 :
                               _user?.bodyType.toUpperCase() == 'TEEN' ? -40 : -150, // ร่างเด็กตัวเล็กเลยต้องกดลงมา ส่วนวัยรุ่น/ผู้ใหญ่ขยับขึ้นมาหน่อยไม่ให้ขาหลุดขอบ
                       child: _isLoading || _user == null
                           ? const SizedBox() // Or CircularProgressIndicator() if you want to see it loading
@@ -218,6 +234,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
             ],
           ),
         ),
+      ),
     );
   }
 }

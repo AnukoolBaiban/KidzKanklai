@@ -89,12 +89,19 @@ class _CustomBottomNavigationBarState extends State<CustomBottomNavigationBar> {
   int _level = 1;
   double _expPercent = 0.0;
   User? _user;
+  
+  // 🌟 ใช้ Static Cache เพื่อให้ตอนเปลี่ยนหน้าไม่ต้องโชว์โหลดดิ้งหมุนๆ ให้รำคาญ
+  static User? _cachedUser;
 
   @override
   void initState() {
     super.initState();
     if (widget.user != null) {
       _user = widget.user;
+      _cachedUser = widget.user;
+      _updateLevelUI(_user!.level, _user!.exp);
+    } else if (_cachedUser != null) {
+      _user = _cachedUser;
       _updateLevelUI(_user!.level, _user!.exp);
     }
     _setupRealtimeCharacter(); // 🌟 3. สั่งรันตัวดักฟังตอนเปิด UI
@@ -109,6 +116,7 @@ class _CustomBottomNavigationBarState extends State<CustomBottomNavigationBar> {
     if (widget.user != oldWidget.user && widget.user != null) {
       setState(() {
         _user = widget.user;
+        _cachedUser = widget.user;
         _updateLevelUI(_user!.level, _user!.exp);
       });
     }
@@ -119,6 +127,7 @@ class _CustomBottomNavigationBarState extends State<CustomBottomNavigationBar> {
     if (mounted && user != null) {
       setState(() {
         _user = user;
+        _cachedUser = user;
         _updateLevelUI(_user!.level, _user!.exp);
       });
     }
@@ -342,18 +351,29 @@ class _CustomBottomNavigationBarState extends State<CustomBottomNavigationBar> {
                       ),
                       clipBehavior: Clip.hardEdge,
                       child: IgnorePointer(
-                        child: Transform.translate(
-                          offset: const Offset(2, 15), 
-                          child: Transform.scale(
-                            scale: 1.8,
-                            child: RepaintBoundary(
-                              child: CharacterWidget(
-                                user: _user,
-                                isInteractive: false,
+                        child: _user == null
+                            ? const Center(
+                                child: SizedBox(
+                                  width: 25,
+                                  height: 25,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2374B5)),
+                                  ),
+                                ),
+                              )
+                            : Transform.translate(
+                                offset: const Offset(2, 15),
+                                child: Transform.scale(
+                                  scale: 1.8,
+                                  child: RepaintBoundary(
+                                    child: CharacterWidget(
+                                      user: _user,
+                                      isInteractive: false,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                        ),
                       ),
                     ),
                   ),
