@@ -98,8 +98,8 @@ class ClubDetailMemberPreloader {
     );
   }
 
-  static Future<void> preload() async {
-    if (isPreloading || cachedData != null) return;
+  static Future<void> preload({bool forceRefresh = false}) async {
+    if (!forceRefresh && (isPreloading || cachedData != null)) return;
     isPreloading = true;
 
     try {
@@ -305,6 +305,18 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
         _weeklyQuests = data['questsResponse'];
         _isLoading = false;
       });
+
+      // 🌟 โหลดข้อมูลสมาชิกทั้งหมดและตัวละครใหม่แบบเบื้องหลังเพื่อให้เรียลไทม์
+      await ClubDetailMemberPreloader.preload(forceRefresh: true);
+      
+      final newData = ClubDetailMemberPreloader.cachedData;
+      if (newData != null && mounted) {
+        setState(() {
+          _members = newData['membersWithStats'];
+          _myUser = newData['myUserObj'];
+          _myLevel = _myUser!.level;
+        });
+      }
     } else {
       if (mounted) setState(() => _isLoading = false);
     }
