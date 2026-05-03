@@ -318,19 +318,6 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
                                         ),
                                       ),
 
-                                // ลูกศรชี้ขึ้นทางขวา
-                                if (widget.isPassed)
-                                  Positioned(
-                                    right: 20,
-                                    child: const AnimatedUpwardArrow(delayMs: 300),
-                                  ),
-
-                                // ลูกศรชี้ขึ้นทางซ้าย
-                                if (widget.isPassed)
-                                  Positioned(
-                                    left: 20,
-                                    child: const AnimatedUpwardArrow(delayMs: 600), 
-                                  ),
                               ],
                             ),
                           ),
