@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/api_service.dart';
 import 'package:flutter_application_1/widgets/custom_top_bar.dart';
+import 'package:rive/rive.dart' hide LinearGradient, Image;
+import 'package:flutter_application_1/config/rive_cache.dart';
+import 'package:flutter_application_1/screens/result_stat.dart' show AnimatedUpwardArrow;
 
 class ResultExamScreen extends StatefulWidget {
   final User? user;
@@ -25,10 +28,151 @@ class ResultExamScreen extends StatefulWidget {
 }
 
 class _ResultExamScreenState extends State<ResultExamScreen> {
+  SMINumber? _poseInput;
+  SMINumber? _hairInput;
+  SMINumber? _faceInput;
+  SMINumber? _skinInput;
+  SMINumber? _clothInput;
+  StateMachineController? _controller;
+  bool _isRiveLoaded = false;
+  User? _currentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentUser = widget.user;
+    if (_currentUser == null) {
+      _fetchUser();
+    }
+  }
+
+  Future<void> _fetchUser() async {
+    final user = await ApiService.getProfile(0);
+    if (mounted) {
+      setState(() {
+        _currentUser = user;
+      });
+      _syncRiveToEquipped(); // ซิงค์ข้อมูลหลังจากโหลด User เสร็จ
+    }
+  }
+
+  void _onRiveInit(Artboard artboard) {
+    var controller = StateMachineController.fromArtboard(
+      artboard,
+      'State Machine 1',
+    );
+    if (controller == null && artboard.stateMachines.isNotEmpty) {
+      controller = StateMachineController.fromArtboard(
+        artboard,
+        artboard.stateMachines.first.name,
+      );
+    }
+
+    if (controller != null) {
+      artboard.addController(controller);
+      _controller = controller;
+
+      for (var input in controller.inputs) {
+        if (input.name == 'Pose') _poseInput = input as SMINumber;
+        if (input.name == 'HairID') _hairInput = input as SMINumber;
+        if (input.name == 'FaceID') _faceInput = input as SMINumber;
+        if (input.name == 'SkinID') _skinInput = input as SMINumber;
+        if (input.name == 'OutfitID') {
+          _clothInput = input as SMINumber;
+        }
+      }
+
+      _syncRiveToEquipped();
+
+      if (_poseInput != null) {
+        _poseInput!.value = widget.isPassed ? 2.0 : 1.0; 
+      }
+    }
+    if (mounted) setState(() => _isRiveLoaded = true);
+  }
+
+  double _parseId(String s) {
+    if (s.isEmpty) return 0;
+    if (s.contains('_')) {
+      try {
+        return double.parse(s.split('_').last);
+      } catch (_) {}
+    }
+    if (s.contains(' ')) {
+      try {
+        return double.parse(s.split(' ').last);
+      } catch (_) {}
+    }
+    try {
+      return double.parse(s);
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  double _getCorrectHairId(double originalId) {
+    if (originalId == 2.0) return 3.0; 
+    if (originalId == 3.0) return 4.0; 
+    if (originalId == 4.0) return 2.0; 
+    return originalId;
+  }
+
+  void _syncRiveToEquipped() {
+    if (_controller == null || _currentUser == null) return;
+
+    try {
+      if (_hairInput != null) _hairInput!.value = _getCorrectHairId(_parseId(_currentUser!.equippedHair));
+      if (_faceInput != null) _faceInput!.value = _parseId(_currentUser!.equippedFace);
+      if (_skinInput != null) _skinInput!.value = _parseId(_currentUser!.equippedSkin);
+      if (_clothInput != null) {
+        _clothInput!.value = _parseId(_currentUser!.equippedOutfit);
+      }
+      if (_poseInput != null) {
+        _poseInput!.value = widget.isPassed ? 2.0 : 1.0;
+      }
+    } catch (e) {
+      print("Error syncing Rive Profile: $e");
+    }
+  }
+
+  String _getModelAsset() {
+    if (_currentUser != null) {
+      final bt = _currentUser!.bodyType.toUpperCase();
+      if (bt == 'ADULT') return 'assets/animation/adult.riv';
+      if (bt == 'TEEN') return 'assets/animation/teen.riv';
+      return 'assets/animation/kid.riv';
+    }
+    return 'assets/animation/kid.riv';
+  }
+
+  double _getTopSpacing() {
+    if (_currentUser == null) return 40;
+    final bt = _currentUser!.bodyType.toUpperCase();
+    if (bt == 'ADULT') return 100;
+    if (bt == 'TEEN') return 80;
+    return 40;
+  }
+
+  double _getCharacterScale() {
+    if (_currentUser == null) return 1.5;
+    final bt = _currentUser!.bodyType.toUpperCase();
+    if (bt == 'ADULT') return 1.4;
+    if (bt == 'TEEN') return 1.4;
+    return 1.5;
+  }
+
+  Offset _getCharacterOffset() {
+    if (_currentUser == null) return const Offset(0, 10);
+    final bt = _currentUser!.bodyType.toUpperCase();
+    if (bt == 'ADULT') return const Offset(0, -35);
+    if (bt == 'TEEN') return const Offset(0, -35);
+    return const Offset(0, 10);
+  }
+
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
-    final topBarHeight = 75.0 + topPadding;
+    final topBarHeight = 60.0 + topPadding;
     final screenWidth = MediaQuery.of(context).size.width;
     final scale = (screenWidth / 375).clamp(0.8, 1.2);
 
@@ -138,97 +282,106 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
                             ),
                           ),
 
-                          SizedBox(height: 20 * scale),
+                          SizedBox(height: _getTopSpacing()), 
 
-                          // ✅ รูปตัวละครพร้อมแสง Glow ข้างหลัง
-                          Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              if (widget.isPassed)
-                                Container(
-                                  width: 150 * scale,
-                                  height: 150 * scale,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.yellow.withOpacity(0.5),
-                                        blurRadius: 40,
-                                        spreadRadius: 20,
+                          // ✅ รูปตัวละคร Rive + ลูกศรเด้งขึ้น
+                          SizedBox(
+                            height: 200,
+                            width: 200,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                // ตัวละคร Rive
+                                _currentUser == null 
+                                    ? Image.asset(
+                                        widget.isPassed 
+                                            ? 'assets/images/profile/profile-character.png'
+                                            : 'assets/images/profile/sad-character.png',
+                                        height: 250,
+                                      )
+                                    : Transform.scale(
+                                        scale: _getCharacterScale(), 
+                                        alignment: Alignment.center,
+                                        child: Transform.translate(
+                                          offset: _getCharacterOffset(), 
+                                          child: (RiveCache().getFile(_getModelAsset()) != null 
+                                              ? RiveAnimation.direct(
+                                                  RiveCache().getFile(_getModelAsset())!,
+                                                  fit: BoxFit.contain,
+                                                  onInit: _onRiveInit,
+                                                )
+                                              : RiveAnimation.asset(
+                                                  _getModelAsset(), 
+                                                  fit: BoxFit.contain,
+                                                  onInit: _onRiveInit,
+                                                )),
+                                        ),
                                       ),
-                                    ],
+
+                                // ลูกศรชี้ขึ้นทางขวา
+                                if (widget.isPassed)
+                                  Positioned(
+                                    right: 20,
+                                    child: const AnimatedUpwardArrow(delayMs: 300),
                                   ),
-                                ),
-                              Image.asset(
-                                widget.isPassed
-                                    ? 'assets/images/profile/profile-character.png'
-                                    : 'assets/images/profile/sad-character.png',
-                                height: 230 * scale,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Icon(
-                                    widget.isPassed
-                                        ? Icons.sentiment_very_satisfied
-                                        : Icons.sentiment_very_dissatisfied,
-                                    size: 120 * scale,
-                                    color: widget.isPassed
-                                        ? Colors.amber
-                                        : Colors.blueGrey,
-                                  );
-                                },
-                              ),
-                            ],
+
+                                // ลูกศรชี้ขึ้นทางซ้าย
+                                if (widget.isPassed)
+                                  Positioned(
+                                    left: 20,
+                                    child: const AnimatedUpwardArrow(delayMs: 600), 
+                                  ),
+                              ],
+                            ),
                           ),
 
                           SizedBox(height: 20 * scale),
 
                           // 🌟 2. แสดงของรางวัลจริงจาก API
-                          SizedBox(
-                            height: 130 * scale,
-                            child: widget.isPassed
-                                ? Column(
-                                    children: [
-                                      Text(
-                                        'รางวัลที่ได้รับ',
-                                        style: TextStyle(
-                                          fontSize: 20 * scale,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black87,
-                                        ),
+                          widget.isPassed
+                              ? Column(
+                                  children: [
+                                    Text(
+                                      'รางวัลที่ได้รับ',
+                                      style: TextStyle(
+                                        fontSize: 20 * scale,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
                                       ),
-                                      SizedBox(height: 16 * scale),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: _buildRewardList(scale),
+                                    ),
+                                    SizedBox(height: 16 * scale),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: _buildRewardList(scale),
+                                    ),
+                                  ],
+                                )
+                              : Column(
+                                  children: [
+                                    SizedBox(height: 12 * scale),
+                                    Text(
+                                      'โปรดตอบคำถามใหม่อีกครั้ง\n(ติดคูลดาวน์ 10 นาที)', // เพิ่มข้อความคูลดาวน์ให้ชัดเจนขึ้น
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 16 * scale,
+                                        fontWeight: FontWeight.normal,
+                                        color: Colors.black54,
+                                        height: 1.5,
                                       ),
-                                    ],
-                                  )
-                                : Column(
-                                    children: [
-                                      SizedBox(height: 12 * scale),
-                                      Text(
-                                        'โปรดตอบคำถามใหม่อีกครั้ง\n(ติดคูลดาวน์ 10 นาที)', // เพิ่มข้อความคูลดาวน์ให้ชัดเจนขึ้น
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          fontSize: 16 * scale,
-                                          fontWeight: FontWeight.normal,
-                                          color: Colors.black54,
-                                          height: 1.5,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                          ),
+                                    ),
+                                  ],
+                                ),
                         ],
                       ),
                     ),
 
-                    SizedBox(height: 30 * scale),
+                    SizedBox(height: 20),
 
-                    // ✅ ปุ่มรับรางวัล (ลอยอยู่ด้านล่างกล่องขาว เหมือนในภาพ)
+                    // ✅ ปุ่มรับรางวัล 
                     Container(
-                      width: 180 * scale,
-                      height: 52 * scale,
+                      width: 180,
+                      height: 50,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: widget.isPassed
@@ -237,7 +390,7 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                         ),
-                        border: Border.all(color: Colors.white, width: 2.5),
+                        border: Border.all(color: Colors.white, width: 3),
                         borderRadius: BorderRadius.circular(100),
                         boxShadow: [
                           BoxShadow(
@@ -263,7 +416,7 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
                         child: Text(
                           widget.isPassed ? 'รับรางวัล' : 'ย้อนกลับ',
                           style: TextStyle(
-                            fontSize: 18 * scale,
+                            fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
@@ -393,17 +546,13 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
         child: Stack(
           children: [
             /// Title (อยู่กลางจริง)
-            Positioned.fill(
-              child: Align(
-                alignment: Alignment.center,
-                child: Text(
-                  "ผลลัพธ์",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+            const Center(
+              child: Text(
+                "ผลลัพธ์",
+                style: TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -419,10 +568,8 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
       left: 0,
       right: 0,
       child: Container(
-        height: height,
         padding: EdgeInsets.only(top: topPadding),
         color: Colors.black.withOpacity(0.4),
-        alignment: Alignment.bottomCenter,
         child: CustomTopBar(
           // user: widget.user,
           onNotificationTapped: () =>

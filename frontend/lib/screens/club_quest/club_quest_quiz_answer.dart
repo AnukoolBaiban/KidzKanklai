@@ -87,7 +87,6 @@ class _ClubQuestQuizAnswerScreenState
     final size = MediaQuery.of(context).size;
     final topPadding = MediaQuery.of(context).padding.top;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
-    final topBarHeight = 75.0 + topPadding;
 
     return Scaffold(
       body: Stack(
@@ -95,105 +94,111 @@ class _ClubQuestQuizAnswerScreenState
           // Background
           _buildBackground(),
 
-          // Top Bar
-          _buildTopBar(topPadding, topBarHeight),
+          Column(
+            children: [
+              // Top Bar
+              _buildTopBar(topPadding),
 
-          // Main Content
-          Padding(
-            padding: EdgeInsets.only(
-              top: topBarHeight + 10,
-              left: size.width * 0.05,
-              right: size.width * 0.05,
-              bottom: bottomPadding + 20,
-            ),
-            child: Column(
-              children: [
-                // Back Button
-                Row(children: [_buildBackButton()]),
+              // Main Content
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: 10,
+                    left: size.width * 0.05,
+                    right: size.width * 0.05,
+                    bottom: bottomPadding + 20,
+                  ),
+                  child: Column(
+                    children: [
+                      // Back Button
+                      Row(children: [_buildBackButton()]),
 
-                SizedBox(height: 10),
+                      SizedBox(height: 10),
 
-                // Content Card
-                Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Color(0xFFAAD7EA), width: 3),
-                    ),
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        // Scrollable Content
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
-                          child: _isLoading 
-                              ? const Center(child: CircularProgressIndicator()) // 🌟 โชว์ Loading
-                              : _questions.isEmpty
-                                  ? const Center(child: Text("ไม่มีคำถามสำหรับภารกิจนี้", style: TextStyle(color: Colors.grey)))
-                                  : SingleChildScrollView(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          // Notice Banner
-                                          Container(
-                                            width: double.infinity,
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 8,
-                                            ),
-                                            margin: const EdgeInsets.only(bottom: 16),
-                                            decoration: BoxDecoration(
-                                              color: Color(0xFFE3F2FD),
-                                              borderRadius: BorderRadius.circular(8),
-                                              border: Border.all(
-                                                color: Color(0xFF90CAF9),
-                                                width: 1,
-                                              ),
-                                            ),
-                                            child: Row(
+                      // Content Card
+                      Expanded(
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Color(0xFFAAD7EA), width: 3),
+                          ),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              // Scrollable Content
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
+                                child: _isLoading 
+                                    ? const Center(child: CircularProgressIndicator()) // 🌟 โชว์ Loading
+                                    : _questions.isEmpty
+                                        ? const Center(child: Text("ไม่มีคำถามสำหรับภารกิจนี้", style: TextStyle(color: Colors.grey)))
+                                        : SingleChildScrollView(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                Icon(
-                                                  Icons.info_outline,
-                                                  size: 16,
-                                                  color: Color(0xFF1976D2),
-                                                ),
-                                                SizedBox(width: 6),
-                                                Text(
-                                                  'ข้อที่เป็นเครื่องหมายถูกสีน้ำเงินคือเฉลยที่ถูกต้อง',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: Color(0xFF1976D2),
+                                                // Notice Banner
+                                                Container(
+                                                  width: double.infinity,
+                                                  padding: const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 8,
+                                                  ),
+                                                  margin: const EdgeInsets.only(bottom: 16),
+                                                  decoration: BoxDecoration(
+                                                    color: Color(0xFFE3F2FD),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    border: Border.all(
+                                                      color: Color(0xFF90CAF9),
+                                                      width: 1,
+                                                    ),
+                                                  ),
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.info_outline,
+                                                        size: 16,
+                                                        color: Color(0xFF1976D2),
+                                                      ),
+                                                      SizedBox(width: 6),
+                                                      Text(
+                                                        'ข้อที่เป็นเครื่องหมายถูกสีน้ำเงินคือเฉลยที่ถูกต้อง',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color: Color(0xFF1976D2),
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
                                                 ),
+
+                                                // Questions List
+                                                ...List.generate(_questions.length, (qIndex) {
+                                                  final q = _questions[qIndex];
+                                                  return _buildQuestionBlock(qIndex, q);
+                                                }),
                                               ],
                                             ),
                                           ),
+                              ),
 
-                                          // Questions List
-                                          ...List.generate(_questions.length, (qIndex) {
-                                            final q = _questions[qIndex];
-                                            return _buildQuestionBlock(qIndex, q);
-                                          }),
-                                        ],
-                                      ),
-                                    ),
+                              // Header "คำถาม"
+                              Positioned(
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                child: _buildHeaderTitle(),
+                              ),
+                            ],
+                          ),
                         ),
-
-                        // Header "คำถาม"
-                        Positioned(
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          child: _buildHeaderTitle(),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
@@ -219,22 +224,15 @@ class _ClubQuestQuizAnswerScreenState
     );
   }
 
-  Widget _buildTopBar(double topPadding, double height) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: height,
-        padding: EdgeInsets.only(top: topPadding),
-        color: Colors.black.withOpacity(0.4),
-        alignment: Alignment.bottomCenter,
-        child: CustomTopBar(
-          // user: widget.user,
-          onNotificationTapped: () =>
-              Navigator.pushNamed(context, '/notification'),
-          onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
-        ),
+  Widget _buildTopBar(double topPadding) {
+    return Container(
+      padding: EdgeInsets.only(top: topPadding),
+      color: Colors.black.withOpacity(0.4),
+      child: CustomTopBar(
+        // user: widget.user,
+        onNotificationTapped: () =>
+            Navigator.pushNamed(context, '/notification'),
+        onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
       ),
     );
   }

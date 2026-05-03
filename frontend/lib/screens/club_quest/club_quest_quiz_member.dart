@@ -71,7 +71,6 @@ class _ClubQuestQuizMemberScreenState extends State<ClubQuestQuizMemberScreen> {
     final size = MediaQuery.of(context).size;
     final topPadding = MediaQuery.of(context).padding.top;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
-    final topBarHeight = 75.0 + topPadding;
 
     return Scaffold(
       body: Stack(
@@ -79,68 +78,74 @@ class _ClubQuestQuizMemberScreenState extends State<ClubQuestQuizMemberScreen> {
           // Background
           _buildBackground(),
 
-          // Top Bar
-          _buildTopBar(topPadding, topBarHeight),
+          Column(
+            children: [
+              // Top Bar
+              _buildTopBar(topPadding),
 
-          // Main Content
-          Padding(
-            padding: EdgeInsets.only(
-              top: topBarHeight + 10,
-              left: size.width * 0.05,
-              right: size.width * 0.05,
-              bottom: bottomPadding + 100,
-            ),
-            child: _isLoading 
-                ? const Center(child: CircularProgressIndicator()) // 🌟 โชว์ Loading ระหว่างดึงคำถาม
-                : Column(
-              children: [
-                // Back Button
-                Row(children: [_buildBackButton()]),
+              // Main Content
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: 10,
+                    left: size.width * 0.05,
+                    right: size.width * 0.05,
+                    bottom: bottomPadding + 100,
+                  ),
+                  child: _isLoading 
+                      ? const Center(child: CircularProgressIndicator()) // 🌟 โชว์ Loading ระหว่างดึงคำถาม
+                      : Column(
+                    children: [
+                      // Back Button
+                      Row(children: [_buildBackButton()]),
 
-                SizedBox(height: 10),
+                      SizedBox(height: 10),
 
-                // Content Card
-                Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Color(0xFFAAD7EA), width: 3),
-                    ),
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        // Scrollable Content
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
-                          child: SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Questions List
-                                ...List.generate(_questions.length, (qIndex) {
-                                  final q = _questions[qIndex];
-                                  return _buildQuestionBlock(qIndex, q);
-                                }),
-                              ],
-                            ),
+                      // Content Card
+                      Expanded(
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Color(0xFFAAD7EA), width: 3),
+                          ),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              // Scrollable Content
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // Questions List
+                                      ...List.generate(_questions.length, (qIndex) {
+                                        final q = _questions[qIndex];
+                                        return _buildQuestionBlock(qIndex, q);
+                                      }),
+                                    ],
+                                  ),
+                                ),
+                              ),
+
+                              // Header "คำถาม"
+                              Positioned(
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                child: _buildHeaderTitle(),
+                              ),
+                            ],
                           ),
                         ),
-
-                        // Header "คำถาม"
-                        Positioned(
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          child: _buildHeaderTitle(),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
 
           // Bottom Button (ซ่อนปุ่มถ้ายังโหลดคำถามไม่เสร็จ)
@@ -171,22 +176,15 @@ class _ClubQuestQuizMemberScreenState extends State<ClubQuestQuizMemberScreen> {
     );
   }
 
-  Widget _buildTopBar(double topPadding, double height) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: height,
-        padding: EdgeInsets.only(top: topPadding),
-        color: Colors.black.withOpacity(0.4),
-        alignment: Alignment.bottomCenter,
-        child: CustomTopBar(
-          // user: widget.user,
-          onNotificationTapped: () =>
-              Navigator.pushNamed(context, '/notification'),
-          onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
-        ),
+  Widget _buildTopBar(double topPadding) {
+    return Container(
+      padding: EdgeInsets.only(top: topPadding),
+      color: Colors.black.withOpacity(0.4),
+      child: CustomTopBar(
+        // user: widget.user,
+        onNotificationTapped: () =>
+            Navigator.pushNamed(context, '/notification'),
+        onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
       ),
     );
   }
@@ -331,9 +329,9 @@ class _ClubQuestQuizMemberScreenState extends State<ClubQuestQuizMemberScreen> {
 
   Widget _buildBottomButton(double bottomPadding) {
     return Positioned(
-      bottom: bottomPadding + 40,
-      left: MediaQuery.of(context).size.width * 0.2,
-      right: MediaQuery.of(context).size.width * 0.2,
+      bottom: bottomPadding + 20,
+      left: MediaQuery.of(context).size.width * 0.1,
+      right: MediaQuery.of(context).size.width * 0.1,
       child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -421,7 +419,7 @@ class _ClubQuestQuizMemberScreenState extends State<ClubQuestQuizMemberScreen> {
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.transparent,
             shadowColor: Colors.transparent,
-            padding: EdgeInsets.symmetric(vertical: 20),
+            padding: EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(25),
             ),
