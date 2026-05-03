@@ -400,8 +400,10 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
         timeTextColor = Colors.grey;
       } else if (difference.inDays > 0) {
         timeLeftText = "เหลืออีก ${difference.inDays} วัน";
+        timeTextColor = Colors.black87;
       } else {
         timeLeftText = "เหลืออีก ${difference.inHours} ชั่วโมง";
+        timeTextColor = Colors.red;
       }
     }
 
