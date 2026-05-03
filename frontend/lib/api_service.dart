@@ -803,16 +803,42 @@ class ApiService {
       );
 
       if (response.statusCode == 200) {
-        // สำเร็จ จะคืนค่า success, message, club_id
         return jsonDecode(response.body);
       } else {
-        // ล้มเหลว (เช่น รหัสผิด, ชมรมเต็ม, มีชมรมอยู่แล้ว)
         final errorData = jsonDecode(response.body);
         print("Join Club Failed: ${errorData['error']}");
         return {"success": false, "error": errorData['error'] ?? "เกิดข้อผิดพลาด"};
       }
     } catch (e) {
       print("Join Club Error: $e");
+      return {"success": false, "error": "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"};
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // API: อัปเดตข้อมูลชมรม (Update Club)
+  // ------------------------------------------------------------------------
+  static Future<Map<String, dynamic>?> updateClub({String? name, String? description}) async {
+    try {
+      final body = <String, dynamic>{};
+      if (name != null) body['name'] = name;
+      if (description != null) body['description'] = description;
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/clubs/update'),
+        headers: _headers,
+        body: jsonEncode(body),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final errorData = jsonDecode(response.body);
+        print("Update Club Failed: ${errorData['error']}");
+        return {"success": false, "error": errorData['error'] ?? "เกิดข้อผิดพลาด"};
+      }
+    } catch (e) {
+      print("Update Club Error: $e");
       return {"success": false, "error": "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"};
     }
   }

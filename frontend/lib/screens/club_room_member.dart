@@ -210,13 +210,14 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
       onTapDown: (_) => setState(() => _isDetailPressed = true),
       onTapUp: (_) => setState(() => _isDetailPressed = false),
       onTapCancel: () => setState(() => _isDetailPressed = false),
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => const ClubDetailMemberScreen(),
           ),
         );
+        _fetchClubData(); // รีเฟรชข้อมูลเมื่อกลับมา
       },
       child: Container(
         width: 50,

@@ -315,6 +315,8 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
           _members = newData['membersWithStats'];
           _myUser = newData['myUserObj'];
           _myLevel = _myUser!.level;
+          _clubName = newData['club']['name'] ?? '';
+          _clubDescription = newData['club']['description'] ?? '';
         });
       }
     } else {

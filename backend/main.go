@@ -89,6 +89,7 @@ func main() {
 	auth.POST("/clubs/leave", handlers.LeaveClub)
 	auth.POST("/clubs/kick", handlers.KickMember)
 	auth.POST("/clubs/delete", handlers.DeleteClub)
+	auth.POST("/clubs/update", handlers.UpdateClub)
 
 	auth.POST("/clubs/quests/create", handlers.CreateClubQuest)
 	auth.GET("/clubs/quests", handlers.GetClubQuests)
