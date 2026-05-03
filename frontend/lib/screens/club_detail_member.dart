@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_application_1/widgets/club/club_room_components.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_application_1/api_service.dart';
@@ -787,8 +788,17 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
                       children: [
                         Expanded(child: Text(_inviteCode, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87))),
                         GestureDetector(
-                          onTap: () {
-                            debugPrint("Copy code tapped");
+                          onTap: () async {
+                            await Clipboard.setData(ClipboardData(text: _inviteCode));
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('คัดลอกรหัสเชิญแล้ว!'),
+                                  backgroundColor: Color(0xFF2374B5),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            }
                           },
                           child: Container(
                             width: 40,

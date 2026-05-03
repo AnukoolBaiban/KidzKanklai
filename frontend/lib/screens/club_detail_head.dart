@@ -1036,8 +1036,17 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
                       children: [
                         Expanded(child: Text(_inviteCode, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87))),
                         GestureDetector(
-                          onTap: () {
-                            debugPrint("Copy code tapped"); // 🌟 นำไปผูกกับ Clipboard.setData ได้
+                          onTap: () async {
+                            await Clipboard.setData(ClipboardData(text: _inviteCode));
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('คัดลอกรหัสเชิญแล้ว!'),
+                                  backgroundColor: Color(0xFF2374B5),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            }
                           },
                           child: Container(
                             width: 40,
