@@ -21,6 +21,7 @@ class _GashaRatePopupState extends State<GashaRatePopup> {
   List<Map<String, dynamic>> _epicItems = [];
   List<Map<String, dynamic>> _rareItems = [];
   List<Map<String, dynamic>> _commonItems = [];
+  Set<String> _ownedItemNames = {}; // ชื่อ item ที่ user มีแล้ว
 
   @override
   void initState() {
@@ -29,12 +30,22 @@ class _GashaRatePopupState extends State<GashaRatePopup> {
   }
 
   Future<void> _loadRates() async {
-    final rates = await ApiService.getGachaRates();
+    // โหลดพร้อมกันทั้งสองอย่าง
+    final results = await Future.wait([
+      ApiService.getGachaRates(),
+      ApiService.getInventory(),
+    ]);
+
+    final rates = results[0] as List<Map<String, dynamic>>;
+    final inventory = results[1] as List<InventoryItem>;
+
     if (mounted) {
       setState(() {
         _epicItems = rates.where((it) => it['rarity'] == 'EPIC').toList();
         _rareItems = rates.where((it) => it['rarity'] == 'RARE').toList();
         _commonItems = rates.where((it) => it['rarity'] != 'EPIC' && it['rarity'] != 'RARE').toList();
+        // เก็บชื่อ item ที่ user มีแล้ว (lowercase เพื่อเทียบแบบ case-insensitive)
+        _ownedItemNames = inventory.map((e) => e.name.toLowerCase()).toSet();
         _isLoading = false;
       });
     }
@@ -311,33 +322,75 @@ class _GashaRatePopupState extends State<GashaRatePopup> {
             imageOffset = const Offset(2, 2);
           }
 
+          final bool isOwned = _ownedItemNames.contains(itemNameStr.toLowerCase());
+
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
               children: [
-                // Item Image
-                Container(
+                // Item Image + owned badge
+                SizedBox(
                   width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  clipBehavior: Clip.hardEdge,
-                  alignment: Alignment.center,
-                  child: Transform.translate(
-                    offset: imageOffset,
-                    child: Transform.scale(
-                      scale: imageScale,
-                      child: Image.asset(
-                        itemImagePath,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) => const Icon(
-                          Icons.inventory_2,
-                          color: Colors.grey,
-                          size: 32,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        clipBehavior: Clip.hardEdge,
+                        alignment: Alignment.center,
+                        child: ColorFiltered(
+                          colorFilter: isOwned
+                              ? const ColorFilter.matrix([
+                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                  0,      0,      0,      1, 0,
+                                ])
+                              : const ColorFilter.mode(
+                                  Colors.transparent,
+                                  BlendMode.multiply,
+                                ),
+                          child: Transform.translate(
+                            offset: imageOffset,
+                            child: Transform.scale(
+                              scale: imageScale,
+                              child: Image.asset(
+                                itemImagePath,
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) => const Icon(
+                                  Icons.inventory_2,
+                                  color: Colors.grey,
+                                  size: 32,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      if (isOwned) ...
+                        [
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2ECC71),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'มีแล้ว',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                    ],
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -368,4 +421,4 @@ class _GashaRatePopupState extends State<GashaRatePopup> {
       ],
     );
   }
-}
+}
