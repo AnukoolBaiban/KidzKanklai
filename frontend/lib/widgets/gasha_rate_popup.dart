@@ -297,21 +297,47 @@ class _GashaRatePopupState extends State<GashaRatePopup> {
               ? '${(item['rate'] as num).toStringAsFixed(1)}%'
               : '0%';
           final itemImagePath = _getImagePath(item);
+          final int categoryId = item['category_id'] ?? 0;
+
+          // กำหนด scale และ offset ตามประเภทของไอเทมเพื่อให้แสดงพอดีกล่อง
+          double imageScale = 1.5;
+          Offset imageOffset = Offset.zero;
+          if (categoryId == 10) { // Outfit
+            imageScale = 2.6;
+          } else if (categoryId == 12) { // Hair
+            imageScale = 2.2;
+          } else if (categoryId == 13) { // Face
+            imageScale = 2.8;
+            imageOffset = const Offset(2, 2);
+          }
 
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
               children: [
                 // Item Image
-                Image.asset(
-                  itemImagePath,
+                Container(
                   width: 56,
                   height: 56,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) => const Icon(
-                    Icons.inventory_2,
-                    color: Colors.grey,
-                    size: 56,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  clipBehavior: Clip.hardEdge,
+                  alignment: Alignment.center,
+                  child: Transform.translate(
+                    offset: imageOffset,
+                    child: Transform.scale(
+                      scale: imageScale,
+                      child: Image.asset(
+                        itemImagePath,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => const Icon(
+                          Icons.inventory_2,
+                          color: Colors.grey,
+                          size: 32,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),

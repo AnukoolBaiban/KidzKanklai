@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../widgets/custom_top_bar.dart';
 import 'gasha_display.dart';
 import '../widgets/bottom_navigation_bar.dart';
 import '../widgets/gasha_rate_popup.dart';
+import '../widgets/confirm_gasha_popup.dart';
 import '../api_service.dart';
 
 class GashaScreen extends StatefulWidget {
@@ -26,6 +28,9 @@ class _GashaScreenState extends State<GashaScreen> with TickerProviderStateMixin
   }
 
   bool _isLoading = false;
+  List<Map<String, dynamic>> _commonItems = [];
+  Timer? _commonItemTimer;
+  int _currentCommonIndex = 0;
 
   @override
   void initState() {
@@ -34,11 +39,50 @@ class _GashaScreenState extends State<GashaScreen> with TickerProviderStateMixin
       vsync: this,
       duration: const Duration(seconds: 3),
     )..repeat();
+    _loadCommonItems();
+  }
+
+  Future<void> _loadCommonItems() async {
+    try {
+      final rates = await ApiService.getGachaRates();
+      if (mounted) {
+        setState(() {
+          _commonItems = rates.where((it) => it['rarity'] != 'EPIC' && it['rarity'] != 'RARE').toList();
+        });
+        
+        if (_commonItems.isNotEmpty) {
+          _commonItemTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+            if (mounted && _commonItems.isNotEmpty) {
+              setState(() {
+                _currentCommonIndex = (_currentCommonIndex + 1) % _commonItems.length;
+              });
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error loading gacha rates: $e");
+    }
+  }
+
+  String _getImagePath(Map<String, dynamic> item) {
+    final String itemName = item['name'] ?? '';
+    final int categoryId = item['category_id'] ?? 0;
+    
+    if (categoryId == 10) {
+      return 'assets/images/Fashion/Outfit/$itemName.PNG';
+    } else if (categoryId == 12) {
+      return 'assets/images/Fashion/HairStyle/$itemName.PNG';
+    } else if (categoryId == 13) {
+      return 'assets/images/Fashion/FaceStyle/$itemName.PNG';
+    }
+    return 'assets/images/item/EXP.png';
   }
 
   @override
   void dispose() {
     _rainbowController?.dispose();
+    _commonItemTimer?.cancel();
     super.dispose();
   }
 
@@ -177,7 +221,19 @@ class _GashaScreenState extends State<GashaScreen> with TickerProviderStateMixin
               const SizedBox(height: 16),
               _buildCostBox(),
               const SizedBox(height: 16),
-              _RandomButton(onTap: _handleRandom),
+              _RandomButton(
+                isLoading: _isLoading,
+                onTap: () {
+                  if (_isLoading) return;
+                  ConfirmGashaPopup.show(
+                    context,
+                    onConfirm: () {
+                      Navigator.pop(context); // ปิด Popup
+                      _handleRandom();        // เรียกฟังก์ชันสุ่ม
+                    },
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -200,26 +256,109 @@ class _GashaScreenState extends State<GashaScreen> with TickerProviderStateMixin
         const SizedBox(height: 12),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Rare 1
-            _buildRewardItem(
-              imagePath: 'assets/images/Fashion/FaceStyle/Face_04.PNG',
-              color: Colors.orangeAccent,
-              size: size,
+            // Common (Left)
+            Builder(
+              builder: (context) {
+                String imagePath = 'assets/images/Fashion/FaceStyle/Face_04.PNG'; // default
+                double imageScale = 2.8;
+                Offset imageOffset = const Offset(2, 2);
+                
+                if (_commonItems.isNotEmpty) {
+                  final item = _commonItems[_currentCommonIndex];
+                  imagePath = _getImagePath(item);
+                  final int categoryId = item['category_id'] ?? 0;
+                  if (categoryId == 10) {
+                    // ชุด (Outfit)
+                    imageScale = 2.6;
+                    imageOffset = const Offset(-1, 2); // ปรับตำแหน่งแกน X, Y สำหรับชุด
+                  } else if (categoryId == 12) {
+                    // ทรงผม (Hair)
+                    imageScale = 2.2;
+                    imageOffset = const Offset(2, 2); // ปรับตำแหน่งแกน X, Y สำหรับทรงผม
+                  } else if (categoryId == 13) {
+                    // หน้าตา (Face)
+                    imageScale = 2.8;
+                    imageOffset = const Offset(2, 2); // ปรับตำแหน่งแกน X, Y สำหรับหน้าตา
+                  } else {
+                    imageScale = 1.5;
+                    imageOffset = const Offset(2, 2);
+                  }
+                }
+
+                return Column(
+                  children: [
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 400),
+                      transitionBuilder: (Widget child, Animation<double> animation) {
+                        return FadeTransition(opacity: animation, child: child);
+                      },
+                      child: _buildRewardItem(
+                        key: ValueKey<String>(imagePath),
+                        imagePath: imagePath,
+                        color: Colors.blue,
+                        size: size,
+                        imageScale: imageScale,
+                        imageOffset: imageOffset,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Common',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: size.width * 0.03 > 12 ? 12 : size.width * 0.03,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ],
+                );
+              }
             ),
             const SizedBox(width: 12),
             // Epic (Middle)
-            _buildEpicRewardItem(
-              imagePath: 'assets/images/Fashion/Outfit/Outfit_03.PNG',
-              size: size,
+            Column(
+              children: [
+                _buildEpicRewardItem(
+                  imagePath: 'assets/images/Fashion/Outfit/Outfit_03.PNG',
+                  size: size,
+                  imageScale: 2.6,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Epic',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: size.width * 0.03 > 12 ? 12 : size.width * 0.03,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.purple,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(width: 12),
-            // Rare 2
-            _buildRewardItem(
-              imagePath: 'assets/images/Fashion/HairStyle/Hair_04.PNG',
-              color: Colors.orangeAccent,
-              size: size,
+            // Rare 2 (Right)
+            Column(
+              children: [
+                _buildRewardItem(
+                  imagePath: 'assets/images/Fashion/HairStyle/Hair_04.PNG',
+                  color: Colors.orangeAccent,
+                  size: size,
+                  imageScale: 2.2,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Rare',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: size.width * 0.03 > 12 ? 12 : size.width * 0.03,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orangeAccent,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -229,12 +368,16 @@ class _GashaScreenState extends State<GashaScreen> with TickerProviderStateMixin
 
   // ── ส่วนประกอบชิ้นย่อย: Reward Item (Rare/Common) ──
   Widget _buildRewardItem({
+    Key? key,
     required String imagePath,
     required Color color,
     required Size size,
+    double imageScale = 2.4,
+    Offset imageOffset = Offset.zero,
   }) {
     final double itemSize = size.width < 350 ? 65 : 75;
     return Container(
+      key: key,
       width: itemSize,
       height: itemSize,
       decoration: BoxDecoration(
@@ -258,11 +401,14 @@ class _GashaScreenState extends State<GashaScreen> with TickerProviderStateMixin
           color: Colors.white,
           borderRadius: BorderRadius.circular(17),
         ),
+        clipBehavior: Clip.hardEdge,
         alignment: Alignment.center,
-        padding: const EdgeInsets.all(0.0),
-        child: Transform.scale(
-          scale: 2.4,
-          child: Image.asset(imagePath, fit: BoxFit.contain),
+        child: Transform.translate(
+          offset: imageOffset,
+          child: Transform.scale(
+            scale: imageScale,
+            child: Image.asset(imagePath, fit: BoxFit.contain),
+          ),
         ),
       ),
     );
@@ -272,6 +418,8 @@ class _GashaScreenState extends State<GashaScreen> with TickerProviderStateMixin
   Widget _buildEpicRewardItem({
     required String imagePath,
     required Size size,
+    double imageScale = 1.4,
+    Offset imageOffset = Offset.zero,
   }) {
     final double itemSize = size.width < 350 ? 85 : 100;
     if (_rainbowController == null) return const SizedBox();
@@ -310,11 +458,14 @@ class _GashaScreenState extends State<GashaScreen> with TickerProviderStateMixin
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
             ),
+            clipBehavior: Clip.hardEdge,
             alignment: Alignment.center,
-            padding: const EdgeInsets.all(0.0),
-            child: Transform.scale(
-              scale: 1.4,
-              child: Image.asset(imagePath, fit: BoxFit.contain),
+            child: Transform.translate(
+              offset: imageOffset,
+              child: Transform.scale(
+                scale: imageScale,
+                child: Image.asset(imagePath, fit: BoxFit.contain),
+              ),
             ),
           ),
         );
@@ -565,7 +716,8 @@ class _DropRateButtonState extends State<_DropRateButton> {
 
 class _RandomButton extends StatefulWidget {
   final VoidCallback onTap;
-  const _RandomButton({required this.onTap});
+  final bool isLoading;
+  const _RandomButton({required this.onTap, this.isLoading = false});
 
   @override
   State<_RandomButton> createState() => _RandomButtonState();
@@ -608,14 +760,23 @@ class _RandomButtonState extends State<_RandomButton> {
                   ),
                 ],
         ),
-        child: const Text(
-          'สุ่ม',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
+        child: widget.isLoading
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              )
+            : const Text(
+                'สุ่ม',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
       ),
     );
   }
