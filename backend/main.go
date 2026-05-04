@@ -47,6 +47,9 @@ func main() {
 	// Endpoint สำหรับเปลี่ยนร่าง (Kid/Teen/Adult)
 	auth.PUT("/profile/body-type", handlers.UpdateBodyType)
 
+	// Endpoint สำหรับผูกบัญชี Email (เพิ่ม provider)
+	auth.POST("/profile/link-email", handlers.LinkEmailProvider)
+
 	// --- Fashion System ---
 	auth.GET("/inventory", handlers.GetInventory)
 	auth.POST("/equip", handlers.EquipItem)

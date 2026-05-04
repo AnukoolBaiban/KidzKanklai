@@ -226,3 +226,65 @@ func UpdateBodyType(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Body type updated successfully", "body_type": bodyType})
 }
+
+// API: ผูกบัญชี Email (เพิ่ม 'email' เข้า providers ใน app_metadata)
+func LinkEmailProvider(c *gin.Context) {
+	userId, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	ctx := context.Background()
+
+	// พยายามดึง email
+	email, emailExists := c.Get("email")
+	emailStr := ""
+	if emailExists {
+		emailStr = email.(string)
+	} else {
+		configs.DB.QueryRow(ctx, "SELECT email FROM auth.users WHERE id = $1", userId).Scan(&emailStr)
+	}
+
+	// 1. เพิ่มลงใน auth.identities ก่อน เพื่อให้ GoTrue มองเห็น provider 'email' และสร้าง app_metadata.providers ให้ถูกต้องเวลา Refresh Token
+	identityQuery := `
+		INSERT INTO auth.identities (id, provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+		VALUES (gen_random_uuid(), $1::text, $1::uuid, jsonb_build_object('sub', $1::text, 'email', $2::text, 'email_verified', true), 'email', now(), now(), now())
+		ON CONFLICT (provider, provider_id) DO NOTHING
+	`
+	_, err := configs.DB.Exec(ctx, identityQuery, userId, emailStr)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create email identity: " + err.Error()})
+		return
+	}
+
+	// 2. อัปเดต raw_app_meta_data ใน auth.users (เผื่อไว้)
+	query := `
+		UPDATE auth.users 
+		SET raw_app_meta_data = jsonb_set(
+			COALESCE(raw_app_meta_data, '{}'::jsonb),
+			'{providers}',
+			(
+				SELECT jsonb_agg(DISTINCT val)
+				FROM (
+					SELECT jsonb_array_elements_text(
+						CASE 
+							WHEN jsonb_typeof(raw_app_meta_data->'providers') = 'array' THEN raw_app_meta_data->'providers'
+							ELSE '[]'::jsonb
+						END
+					) AS val
+					UNION
+					SELECT 'email'
+				) sub
+			)
+		)
+		WHERE id = $1::uuid
+	`
+	_, err = configs.DB.Exec(ctx, query, userId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to link email: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Email provider linked successfully"})
+}

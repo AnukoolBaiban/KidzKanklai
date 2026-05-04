@@ -195,6 +195,25 @@ class ApiService {
     return null;
   }
 
+  // ผูกบัญชี Email
+  static Future<bool> linkEmailProvider() async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/profile/link-email'),
+        headers: _headers,
+      );
+      ApiService._checkUnauthorized(response.statusCode);
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        print("Link Email Failed: ${response.statusCode} - ${response.body}");
+      }
+    } catch (e) {
+      print("Link Email Error: $e");
+    }
+    return false;
+  }
+
   // Inventory
   static Future<List<InventoryItem>> getInventory() async {
     try {
