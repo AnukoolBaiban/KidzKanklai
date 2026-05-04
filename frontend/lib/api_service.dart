@@ -4,6 +4,8 @@ import 'package:flutter_application_1/config/app_config.dart';
 import 'package:flutter_application_1/globals.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter_application_1/screens/loading.dart';
 
 class User {
   final int id;
@@ -161,7 +163,19 @@ class ApiService {
       print("🚨 Token หมดอายุ หรือไม่ได้รับอนุญาต (401). บังคับ Logout...");
       Supabase.instance.client.auth.signOut();
       authToken = null;
-      navigatorKey.currentState?.pushNamedAndRemoveUntil('/login', (route) => false);
+      
+      // ให้ขึ้นหน้า loading.dart ซักแปปนึงก่อนจะไปหน้า lobby.dart
+      navigatorKey.currentState?.pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) {
+            return const LoadingScreen(
+              isStandalone: true,
+              nextRoute: '/lobby',
+            );
+          },
+        ),
+        (route) => false,
+      );
     }
   }
 

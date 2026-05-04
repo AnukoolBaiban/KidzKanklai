@@ -371,6 +371,7 @@ class _SettingScreenState extends State<SettingScreen> {
     final bool isLoggedIn = _currentUser != null;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           // Background Image
@@ -559,9 +560,24 @@ class _SettingScreenState extends State<SettingScreen> {
               borderRadius: BorderRadius.circular(10),
             ),
             // แสดง Email จริงถ้ามี หรือแสดง default
-            child: Text(
-              "อีเมล : ${_currentUser?.email ?? 'xxxxxx@gmail.com'}",
-              style: const TextStyle(fontSize: 18, color: Colors.black87),
+            child: Row(
+              children: [
+                const Text(
+                  "อีเมล : ",
+                  style: TextStyle(fontSize: 18, color: Colors.black87),
+                ),
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      _currentUser?.email ?? 'xxxxxx@gmail.com',
+                      style: const TextStyle(fontSize: 18, color: Colors.black87),
+                      maxLines: 1,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -899,7 +915,7 @@ class _SettingScreenState extends State<SettingScreen> {
 
           // [UPDATED] Music Slider เชื่อมต่อกับ _audioManager
           _buildVolumeSlider(
-            label: "Music / BGM",
+            label: "เสียงเพลงประกอบฉาก",
             value: _musicVolume,
             onChanged: (val) {
               setState(() => _musicVolume = val); // อัปเดต UI
@@ -910,7 +926,7 @@ class _SettingScreenState extends State<SettingScreen> {
 
           // [UPDATED] SFX Slider เชื่อมต่อกับ _audioManager
           _buildVolumeSlider(
-            label: "Sound Effects / SFX",
+            label: "เสียงเอฟเฟค",
             value: _sfxVolume,
             onChanged: (val) {
               setState(() => _sfxVolume = val); // อัปเดต UI

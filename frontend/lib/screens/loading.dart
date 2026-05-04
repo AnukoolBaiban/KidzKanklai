@@ -5,8 +5,9 @@ import '../config/rive_cache.dart';
 
 class LoadingScreen extends StatefulWidget {
   final bool isStandalone;
+  final String nextRoute;
   
-  const LoadingScreen({super.key, this.isStandalone = true});
+  const LoadingScreen({super.key, this.isStandalone = true, this.nextRoute = '/startgame'});
 
   @override
   State<LoadingScreen> createState() => _LoadingScreenState();
@@ -38,7 +39,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
     
     // 3. Navigate to next screen
     if (mounted) {
-      Navigator.pushReplacementNamed(context, '/startgame'); 
+      Navigator.pushReplacementNamed(context, widget.nextRoute); 
     }
   }
 
