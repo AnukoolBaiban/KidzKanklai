@@ -149,7 +149,7 @@ class _SettingScreenState extends State<SettingScreen> {
   }
 
   // Popup ตั้งรหัสผ่านเพื่อผูกบัญชี Email
-  void _showSetPasswordDialog() {
+  void _showSetPasswordDialog({bool isChangePassword = false}) {
     final TextEditingController passwordController = TextEditingController();
     final TextEditingController confirmPasswordController = TextEditingController();
     bool obscurePassword = true;
@@ -177,8 +177,8 @@ class _SettingScreenState extends State<SettingScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      "ผูกบัญชี Email",
+                    Text(
+                      isChangePassword ? "เปลี่ยนรหัสผ่าน" : "ผูกบัญชี Email",
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
@@ -187,7 +187,7 @@ class _SettingScreenState extends State<SettingScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      "ตั้งรหัสผ่านสำหรับ ${_currentUser?.email ?? ''}",
+                      isChangePassword ? "ตั้งรหัสผ่านใหม่สำหรับ ${_currentUser?.email ?? ''}" : "ตั้งรหัสผ่านสำหรับ ${_currentUser?.email ?? ''}",
                       style: const TextStyle(fontSize: 14, color: Colors.black54),
                       textAlign: TextAlign.center,
                     ),
@@ -319,16 +319,18 @@ class _SettingScreenState extends State<SettingScreen> {
                                     UserAttributes(password: password),
                                   );
 
-                                  // เรียก Backend API เพื่ออัปเดต providers ใน auth.users
-                                  await api.ApiService.linkEmailProvider();
+                                    if (!isChangePassword) {
+                                      // เรียก Backend API เพื่ออัปเดต providers ใน auth.users
+                                      await api.ApiService.linkEmailProvider();
 
-                                  // รีเฟรช session เพื่อให้ app_metadata อัปเดต
-                                  await _supabase.auth.refreshSession();
+                                      // รีเฟรช session เพื่อให้ app_metadata อัปเดต
+                                      await _supabase.auth.refreshSession();
+                                    }
 
                                   if (mounted) {
                                     Navigator.pop(context);
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('ผูกบัญชี Email สำเร็จ!')),
+                                      SnackBar(content: Text(isChangePassword ? 'เปลี่ยนรหัสผ่านสำเร็จ!' : 'ผูกบัญชี Email สำเร็จ!')),
                                     );
                                     setState(() {
                                       _currentUser = _supabase.auth.currentUser;
@@ -629,6 +631,8 @@ class _SettingScreenState extends State<SettingScreen> {
             label: 'Email',
             isConnected: isEmailConnected,
             onTap: isEmailConnected ? null : _linkWithEmail,
+            connectedText: 'เปลี่ยนรหัส',
+            onConnectedTap: isEmailConnected ? () => _showSetPasswordDialog(isChangePassword: true) : null,
           ),
         ],
       ),
@@ -641,6 +645,8 @@ class _SettingScreenState extends State<SettingScreen> {
     required String label,
     required bool isConnected,
     VoidCallback? onTap,
+    String? connectedText,
+    VoidCallback? onConnectedTap,
   }) {
     return Row(
       children: [
@@ -649,18 +655,23 @@ class _SettingScreenState extends State<SettingScreen> {
         Text(label, style: const TextStyle(fontSize: 18, color: Colors.black)),
         const Spacer(),
         if (isConnected)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: const Color(0xFF2374B5),
-              borderRadius: BorderRadius.circular(5),
-            ),
-            child: const Text(
-              "เชื่อมต่อแล้ว",
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+          GestureDetector(
+            onTap: onConnectedTap,
+            child: Container(
+              width: 100, // กำหนดความกว้างให้กล่องเท่ากัน
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2374B5),
+                borderRadius: BorderRadius.circular(5),
+              ),
+              child: Text(
+                connectedText ?? "เชื่อมต่อแล้ว",
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             ),
           )
@@ -915,7 +926,7 @@ class _SettingScreenState extends State<SettingScreen> {
 
           // [UPDATED] Music Slider เชื่อมต่อกับ _audioManager
           _buildVolumeSlider(
-            label: "เสียงเพลงประกอบฉาก",
+            label: "เสียงเพลงประกอบ",
             value: _musicVolume,
             onChanged: (val) {
               setState(() => _musicVolume = val); // อัปเดต UI

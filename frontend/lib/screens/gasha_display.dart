@@ -672,7 +672,7 @@ class _GashaDisplayScreenState extends State<GashaDisplayScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Text(
-                        'มีซ้ำ! แปลงเป็น ',
+                        'มีแฟชั่นนี้อยู่แล้ว! แปลงเป็น ',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -707,7 +707,7 @@ class _GashaDisplayScreenState extends State<GashaDisplayScreen>
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: const Text(
-                    'ใหม่',
+                    'แฟชั่นใหม่',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 22,

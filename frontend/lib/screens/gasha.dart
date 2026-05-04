@@ -17,7 +17,7 @@ class GashaScreen extends StatefulWidget {
 
 class _GashaScreenState extends State<GashaScreen> with TickerProviderStateMixin {
   AnimationController? _rainbowController;
-  int _selectedIndex = 1;
+  int _selectedIndex = -1; // ไม่ highlight tab ใดเพราะ Gasha ไม่ใช่ main tab
   final int _coins = 2000;
   final int _cost = 2000;
 

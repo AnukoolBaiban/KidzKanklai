@@ -678,6 +678,9 @@ class _ContentArea extends StatelessWidget {
        filteredItems = inventory.where((i) => i.category.toLowerCase() == 'skin').toList();
     }
 
+    // Sort items by name to ensure consistent order (e.g., Skin_00, Skin_01, Skin_02)
+    filteredItems.sort((a, b) => a.name.compareTo(b.name));
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
