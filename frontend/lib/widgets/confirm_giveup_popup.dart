@@ -70,7 +70,6 @@ class _ConfirmGiveUpPopupState extends State<ConfirmGiveUpPopup>
     final isSmallScreen = size.width < 360;
     
     final containerWidth = size.width * 0.85;
-    final containerHeight = isSmallScreen ? 160.0 : 180.0;
     final buttonHeight = isSmallScreen ? 40.0 : 45.0;
     final titleFontSize = isSmallScreen ? 14.0 : 16.0;
     final subtitleFontSize = isSmallScreen ? 12.0 : 14.0;
@@ -86,11 +85,8 @@ class _ConfirmGiveUpPopupState extends State<ConfirmGiveUpPopup>
           scale: _scaleAnimation,
           child: Container(
             width: containerWidth,
-            constraints: BoxConstraints(
-              maxWidth: 400,
-              maxHeight: containerHeight,
-            ),
-            decoration: BoxDecoration(color: Colors.transparent),
+            constraints: const BoxConstraints(maxWidth: 400),
+            decoration: const BoxDecoration(color: Colors.transparent),
             child: Stack(
               clipBehavior: Clip.none,
               alignment: Alignment.center,
@@ -98,7 +94,6 @@ class _ConfirmGiveUpPopupState extends State<ConfirmGiveUpPopup>
                 // Main Container
                 Container(
                   padding: EdgeInsets.fromLTRB(20, topPadding, 20, 20),
-                  height: containerHeight,
                   width: double.infinity,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(

@@ -70,7 +70,6 @@ class _ConfirmZeroTicketPopupState extends State<ConfirmZeroTicketPopup>
     final isSmallScreen = size.width < 360;
 
     final containerWidth = size.width * 0.85;
-    final containerHeight = isSmallScreen ? 170.0 : 190.0;
     final buttonHeight = isSmallScreen ? 40.0 : 45.0;
     final titleFontSize = isSmallScreen ? 14.0 : 16.0;
     final subtitleFontSize = isSmallScreen ? 11.0 : 13.0;
@@ -85,19 +84,15 @@ class _ConfirmZeroTicketPopupState extends State<ConfirmZeroTicketPopup>
           scale: _scaleAnimation,
           child: Container(
             width: containerWidth,
-            constraints: BoxConstraints(
-              maxWidth: 400,
-              maxHeight: containerHeight,
-            ),
-            decoration: BoxDecoration(color: Colors.transparent),
+            constraints: const BoxConstraints(maxWidth: 400),
+            decoration: const BoxDecoration(color: Colors.transparent),
             child: Stack(
               clipBehavior: Clip.none,
               alignment: Alignment.center,
               children: [
                 // Main Container
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  height: containerHeight,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                   width: double.infinity,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
