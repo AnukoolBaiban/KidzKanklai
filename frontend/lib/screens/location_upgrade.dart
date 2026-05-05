@@ -454,7 +454,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
         break;
       case 'สวนสาธารณะ':
         // 🌟 ใส่ข้อความแทนตัวเลขไปเลยสำหรับสวนสาธารณะ
-        displayRewards = {'รับพลังงาน': '70 - 90'}; 
+        displayRewards = {'พลังงาน': '70 - 90'}; 
         break;
       case 'สนามสอบ':
         return _buildExamMap();

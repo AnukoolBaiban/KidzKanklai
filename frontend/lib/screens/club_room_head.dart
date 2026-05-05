@@ -1,11 +1,7 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/screens/club_detail_head.dart';
 import 'package:flutter_application_1/widgets/club/club_room_components.dart';
-import 'package:flutter_application_1/api_service.dart';
-import 'package:flutter_application_1/widgets/character_widget.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' hide User; // 🌟 อย่าลืม import
-// 🌟 นำเข้าหน้า Detail (ปรับ Path ให้ตรงกับโปรเจกต์ของคุณ)
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_application_1/screens/all_quest.dart';
 import 'package:flutter_application_1/screens/club_quest/club_quest_detail_leader.dart';
 
@@ -26,8 +22,6 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
   String _clubName = "กำลังโหลด...";
   bool _isLoading = true;
   List<dynamic> _quests = []; // 🌟 เก็บ List ภารกิจ
-  User? _user; // 🌟 เก็บข้อมูลผู้เล่นสำหรับโมเดล Rive
-  List<User> _clubMembers = []; // 🌟 สมาชิกชมรมสำหรับโมเดลซ้ายขวา
 
   @override
   void initState() {
@@ -101,89 +95,6 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
       } else {
         if (mounted) setState(() => _isLoading = false);
       }
-
-      // 🌟 โหลดข้อมูลผู้เล่นสำหรับแสดงตัวโมเดล
-      final userProfile = await ApiService.getProfile(0);
-      if (mounted && userProfile != null) {
-        setState(() => _user = userProfile);
-      }
-
-      // 🌟 ดึงสมาชิกชมรม (ยกเว้นตัวเอง) สุ่มมา 2 คน
-      if (profile['club_id'] != null) {
-        // ดึง user_ids ของสมาชิกทั้งหมดในชมรม (ยกเว้นตัวเอง)
-        final membersRaw = await supabase
-            .from('user_profiles')
-            .select('id')
-            .eq('club_id', profile['club_id'])
-            .neq('id', userId);
-
-        final memberIds = (membersRaw as List<dynamic>)
-            .map((m) => m['id'] as String)
-            .toList();
-
-        if (memberIds.isNotEmpty) {
-          memberIds.shuffle(Random());
-          final pickedIds = memberIds.take(2).toList();
-          
-          // ดึง profile แต่ละคนผ่าน characters + wear (เหมือน Go backend)
-          final List<User> pickedMembers = [];
-          for (final memberId in pickedIds) {
-            try {
-              // ดึง character data
-              final charData = await supabase
-                  .from('characters')
-                  .select('level, experience, body_type, intelligence, strength, creative')
-                  .eq('user_id', memberId)
-                  .single();
-
-              // ดึง equipped items
-              final wearData = await supabase
-                  .from('wear')
-                  .select('type, items(name)')
-                  .eq('character_id', 
-                    (await supabase.from('characters').select('id').eq('user_id', memberId).single())['id']
-                  );
-
-              final equipped = <String, String>{'Skin': '', 'Hair': '', 'Face': '', 'Outfit': ''};
-              for (final w in (wearData as List<dynamic>)) {
-                final wType = w['type'] as String? ?? '';
-                final itemName = (w['items'] as Map<String, dynamic>?)?['name'] as String? ?? '';
-                if (equipped.containsKey(wType)) {
-                  equipped[wType] = itemName;
-                }
-              }
-
-              pickedMembers.add(User(
-                id: 0,
-                username: '',
-                email: '',
-                level: charData['level'] ?? 1,
-                exp: charData['experience'] ?? 0,
-                coins: 0,
-                tickets: 0,
-                vouchers: 0,
-                bio: '',
-                soundBGM: 50,
-                soundSFX: 50,
-                equippedSkin: equipped['Skin'] ?? '',
-                equippedHair: equipped['Hair'] ?? '',
-                equippedFace: equipped['Face'] ?? '',
-                equippedOutfit: equipped['Outfit'] ?? '',
-                statIntellect: charData['intelligence'] ?? 10,
-                statStrength: charData['strength'] ?? 10,
-                statCreativity: charData['creative'] ?? 10,
-                bodyType: charData['body_type'] ?? 'KID',
-              ));
-            } catch (e) {
-              debugPrint('Error fetching member $memberId: $e');
-            }
-          }
-
-          if (mounted && pickedMembers.isNotEmpty) {
-            setState(() => _clubMembers = pickedMembers);
-          }
-        }
-      }
     } catch (e) {
       debugPrint("Error fetching club data: $e");
       if (mounted) setState(() => _isLoading = false);
@@ -210,77 +121,6 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
               ClubBlueHeader(title: _clubName),
             ],
           ),
-
-          // ── Character Model (ด้านหลัง content) ─────
-          // 🌟 สมาชิกชมรมฝั่งซ้าย
-          if (_clubMembers.isNotEmpty)
-            Builder(builder: (_) {
-              final m = _clubMembers[0];
-              final bt = m.bodyType.toUpperCase();
-              final double charH = bt == 'ADULT' ? 170 : bt == 'TEEN' ? 150 : 120;
-              final double charW = bt == 'ADULT' ? 150 : bt == 'TEEN' ? 130 : 110;
-              final double charBottom = bt == 'ADULT' ? 80 : bt == 'TEEN' ? 75 : 65;
-              final double charLeft = bt == 'ADULT' ? 5 : bt == 'TEEN' ? 15 : 25;
-              return Positioned(
-                bottom: charBottom,
-                left: charLeft,
-                child: Opacity(
-                  opacity: 0.85,
-                  child: CharacterWidget(
-                    user: m,
-                    height: charH,
-                    width: charW,
-                    isInteractive: false,
-                  ),
-                ),
-              );
-            }),
-
-          // 🌟 สมาชิกชมรมฝั่งขวา
-          if (_clubMembers.length >= 2)
-            Builder(builder: (_) {
-              final m = _clubMembers[1];
-              final bt = m.bodyType.toUpperCase();
-              final double charH = bt == 'ADULT' ? 170 : bt == 'TEEN' ? 150 : 120;
-              final double charW = bt == 'ADULT' ? 150 : bt == 'TEEN' ? 130 : 110;
-              final double charBottom = bt == 'ADULT' ? 80 : bt == 'TEEN' ? 75 : 65;
-              final double charRight = bt == 'ADULT' ? 5 : bt == 'TEEN' ? 15 : 25;
-              return Positioned(
-                bottom: charBottom,
-                right: charRight,
-                child: Opacity(
-                  opacity: 0.85,
-                  child: CharacterWidget(
-                    user: m,
-                    height: charH,
-                    width: charW,
-                    isInteractive: false,
-                  ),
-                ),
-              );
-            }),
-
-          // 🌟 ตัวโมเดลผู้เล่น (ตรงกลาง)
-          if (_user != null)
-            Builder(builder: (_) {
-              final bt = _user!.bodyType.toUpperCase();
-              final double charH = bt == 'ADULT' ? 220 : bt == 'TEEN' ? 190 : 150;
-              final double charW = bt == 'ADULT' ? 200 : bt == 'TEEN' ? 170 : 160;
-              final double charBottom = bt == 'KID' ? 75 : 85;
-              return Positioned(
-                bottom: charBottom,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: CharacterWidget(
-                    user: _user,
-                    height: charH,
-                    width: charW,
-                    isInteractive: false,
-                  ),
-                ),
-              );
-            }),
 
           // ── Main Content ────────────────────────────
           Padding(

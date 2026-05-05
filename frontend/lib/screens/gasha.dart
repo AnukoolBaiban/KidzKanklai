@@ -305,7 +305,7 @@ class _GashaScreenState extends State<GashaScreen> with TickerProviderStateMixin
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Common',
+                      'ธรรมดา',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: size.width * 0.03 > 12 ? 12 : size.width * 0.03,
@@ -328,7 +328,7 @@ class _GashaScreenState extends State<GashaScreen> with TickerProviderStateMixin
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Epic',
+                  'อีปิค',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: size.width * 0.03 > 12 ? 12 : size.width * 0.03,
@@ -350,7 +350,7 @@ class _GashaScreenState extends State<GashaScreen> with TickerProviderStateMixin
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Rare',
+                  'แรร์',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: size.width * 0.03 > 12 ? 12 : size.width * 0.03,
