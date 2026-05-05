@@ -684,9 +684,9 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                       if (mounted) {
                         // 🌟 เตรียมของรางวัลที่จะส่งไปโชว์
                         Map<String, int> correctRewards = {};
-                        if (widget.locationName == 'หอสมุด') correctRewards = {'ความฉลาด': 1};
-                        if (widget.locationName == 'โรงยิม') correctRewards = {'ความแข็งแรง': 1};
-                        if (widget.locationName == 'สวนสนุก') correctRewards = {'ความคิดสร้างสรรค์': 1};
+                        if (widget.locationName == 'หอสมุด') correctRewards = {'ความฉลาด': 1, 'พลังงาน': result['stamina_change'] ?? 0};
+                        if (widget.locationName == 'โรงยิม') correctRewards = {'ความแข็งแรง': 1, 'พลังงาน': result['stamina_change'] ?? 0};
+                        if (widget.locationName == 'สวนสนุก') correctRewards = {'ความคิดสร้างสรรค์': 1, 'พลังงาน': result['stamina_change'] ?? 0};
                         if (widget.locationName == 'สวนสาธารณะ') {
                            // ถ้าเป็นสวนสาธารณะ ให้ดึงค่าที่ได้ฟื้นฟูจริงจาก API มาโชว์
                            correctRewards = {'พลังงาน': result['stamina_change'] ?? 0};
@@ -727,9 +727,9 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                         
                         // 🌟 1. สร้าง Map เพื่อบอกว่าเราพยายามฝึกอะไรอยู่ (ใส่ค่า +0 เพราะไม่ได้เพิ่ม) หรือ เสียพลังงานไปเท่าไหร่
                         Map<String, int> failedStat = {};
-                        if (widget.locationName == 'หอสมุด') failedStat = {'ความฉลาด': 0};
-                        if (widget.locationName == 'โรงยิม') failedStat = {'ความแข็งแรง': 0};
-                        if (widget.locationName == 'สวนสนุก') failedStat = {'ความคิดสร้างสรรค์': 0};
+                        if (widget.locationName == 'หอสมุด') failedStat = {'ความฉลาด': 0, 'พลังงาน': result['stamina_change'] ?? 0};
+                        if (widget.locationName == 'โรงยิม') failedStat = {'ความแข็งแรง': 0, 'พลังงาน': result['stamina_change'] ?? 0};
+                        if (widget.locationName == 'สวนสนุก') failedStat = {'ความคิดสร้างสรรค์': 0, 'พลังงาน': result['stamina_change'] ?? 0};
                         if (widget.locationName == 'สวนสาธารณะ') failedStat = {'พลังงาน': result['stamina_change'] ?? 0};
 
                         await Navigator.push(

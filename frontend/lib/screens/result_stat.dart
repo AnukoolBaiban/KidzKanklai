@@ -279,7 +279,7 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
 
                           // ✅ Title
                           Text(
-                            'ค่าสถานะที่ได้รับ',
+                            'ค่าสถานะที่เปลี่ยนแปลง',
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -379,11 +379,11 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
       }
     }
 
-    // 🌟 4. กำหนดสี: ถ้าสำเร็จและเป็นบวก ให้สีเขียว, ถ้าล้มเหลวและค่าลดลง ให้สีแดง ถ้าไม่ได้ลดให้สีดำ
+    // 🌟 4. กำหนดสี: ถ้าเป็นบวก ให้สีเขียว, ถ้าลดลง ให้สีแดง ถ้าไม่เปลี่ยนให้สีดำ (ทั้งกรณีสำเร็จและไม่สำเร็จ)
     Color statColor = Colors.black;
-    if (widget.isSuccess && value > 0) {
+    if (value > 0) {
       statColor = const Color(0xFF4CAF50);
-    } else if (!widget.isSuccess && value < 0) {
+    } else if (value < 0) {
       statColor = Colors.red;
     }
 
