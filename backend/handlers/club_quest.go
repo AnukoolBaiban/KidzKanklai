@@ -498,6 +498,12 @@ func SubmitClubQuest(c *gin.Context) {
 
 	tx.Commit(ctx)
 
+	go func(u uuid.UUID) {
+		CheckCoinAchievement(context.Background(), u)
+	}(userID)
+
+	CheckLevelAchievement(ctx, userID)
+
 	// สร้างตัวแปร msg ขึ้นมาก่อน
 	msg := "คะแนนไม่ถึงเกณฑ์ กรุณารอ 10 นาที"
 	if isPassed {

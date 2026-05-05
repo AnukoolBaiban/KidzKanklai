@@ -431,6 +431,8 @@ func CompleteNormalQuest(c *gin.Context) {
 		CheckCoinAchievement(context.Background(), u)
 	}(userID)
 
+	CheckLevelAchievement(ctx, userID)
+
 	c.JSON(http.StatusOK, gin.H{
 		"success":    true,
 		"message":    "Quest completed successfully",
@@ -766,6 +768,8 @@ func CompleteInstantQuest(c *gin.Context) {
 		CheckCoinAchievement(context.Background(), u)
 	}(userID)
 
+	CheckLevelAchievement(ctx, userID)
+
 	c.JSON(http.StatusOK, gin.H{
 		"success":    true,
 		"message":    "Instant quest completed",
@@ -1097,6 +1101,8 @@ func CompleteSystemQuest(c *gin.Context) {
 	go func(u uuid.UUID) {
 		CheckAndInitRecommendedQuest(context.Background(), u)
 	}(userID)
+
+	CheckLevelAchievement(ctx, userID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success":    true,
