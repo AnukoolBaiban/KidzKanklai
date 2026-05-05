@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/screens/club_detail_head.dart';
 import 'package:flutter_application_1/widgets/club/club_room_components.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // 🌟 อย่าลืม import
-// 🌟 นำเข้าหน้า Detail (ปรับ Path ให้ตรงกับโปรเจกต์ของคุณ)
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_application_1/screens/all_quest.dart';
 import 'package:flutter_application_1/screens/club_quest/club_quest_detail_leader.dart';
 
@@ -140,8 +139,8 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
                   children: [_buildMissionTitle(), _buildActionButtonsRow()],
                 ),
                 const SizedBox(height: 10),
-                Expanded(flex: 5, child: _buildMissionBox()), // 🌟 เปลี่ยนมาใช้ Box ที่มี Data
-                const Spacer(flex: 3),
+                Expanded(flex: 5, child: _buildMissionBox()), // 🌟 กล่องภารกิจคงที่
+                const Spacer(flex: 3), // พื้นที่ว่างด้านล่าง (โมเดลอยู่ด้านหลัง)
               ],
             ),
           ),
@@ -207,11 +206,12 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
       onTapDown: (_) => setState(() => _isDetailPressed = true),
       onTapUp: (_) => setState(() => _isDetailPressed = false),
       onTapCancel: () => setState(() => _isDetailPressed = false),
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        await Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const ClubDetailHeadScreen()),
         );
+        _fetchClubData(); // รีเฟรชข้อมูลเมื่อกลับมา
       },
       child: Container(
         width: 50,
@@ -399,8 +399,10 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
         timeTextColor = Colors.grey;
       } else if (difference.inDays > 0) {
         timeLeftText = "เหลืออีก ${difference.inDays} วัน";
+        timeTextColor = Colors.black87;
       } else {
         timeLeftText = "เหลืออีก ${difference.inHours} ชั่วโมง";
+        timeTextColor = Colors.red;
       }
     }
 

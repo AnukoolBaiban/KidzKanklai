@@ -352,8 +352,6 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
 
                   if (widget.locationName != 'สนามสอบ') ...[
                     SizedBox(height: 20),
-                    EnergyBar(key: ValueKey(_energyBarKey)), // 🌟 2. ใส่ key ให้ EnergyBar
-                    SizedBox(height: 20),
                     /// Stat Box
                     _buildStatBox(),
                     SizedBox(height: 20),
@@ -456,7 +454,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
         break;
       case 'สวนสาธารณะ':
         // 🌟 ใส่ข้อความแทนตัวเลขไปเลยสำหรับสวนสาธารณะ
-        displayRewards = {'ฟื้นฟูพลังงาน': '70 - 90'}; 
+        displayRewards = {'พลังงาน': '70 - 90'}; 
         break;
       case 'สนามสอบ':
         return _buildExamMap();
@@ -686,9 +684,9 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                       if (mounted) {
                         // 🌟 เตรียมของรางวัลที่จะส่งไปโชว์
                         Map<String, int> correctRewards = {};
-                        if (widget.locationName == 'หอสมุด') correctRewards = {'ความฉลาด': 1};
-                        if (widget.locationName == 'โรงยิม') correctRewards = {'ความแข็งแรง': 1};
-                        if (widget.locationName == 'สวนสนุก') correctRewards = {'ความคิดสร้างสรรค์': 1};
+                        if (widget.locationName == 'หอสมุด') correctRewards = {'ความฉลาด': 1, 'พลังงาน': result['stamina_change'] ?? 0};
+                        if (widget.locationName == 'โรงยิม') correctRewards = {'ความแข็งแรง': 1, 'พลังงาน': result['stamina_change'] ?? 0};
+                        if (widget.locationName == 'สวนสนุก') correctRewards = {'ความคิดสร้างสรรค์': 1, 'พลังงาน': result['stamina_change'] ?? 0};
                         if (widget.locationName == 'สวนสาธารณะ') {
                            // ถ้าเป็นสวนสาธารณะ ให้ดึงค่าที่ได้ฟื้นฟูจริงจาก API มาโชว์
                            correctRewards = {'พลังงาน': result['stamina_change'] ?? 0};
@@ -724,22 +722,23 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
 
                       // _fetchUserProfile(); // รีเฟรชให้เห็นหลอดพลังงานลด (ย้ายไปทำด้านล่าง)
 
-                      // 🌟 เช็คว่าถ้าไม่ใช่สวนสาธารณะ ให้โชว์หน้าจอฝึกไม่สำเร็จ
-                      if (widget.locationName != 'สวนสาธารณะ' && mounted) {
+                      // 🌟 โชว์หน้าจอฝึกไม่สำเร็จสำหรับทุกสถานที่ (รวมถึงสวนสาธารณะเวลาตั๋วไม่พอ)
+                      if (mounted) {
                         
-                        // 🌟 1. สร้าง Map เพื่อบอกว่าเราพยายามฝึกอะไรอยู่ (ใส่ค่า +0 เพราะไม่ได้เพิ่ม)
+                        // 🌟 1. สร้าง Map เพื่อบอกว่าเราพยายามฝึกอะไรอยู่ (ใส่ค่า +0 เพราะไม่ได้เพิ่ม) หรือ เสียพลังงานไปเท่าไหร่
                         Map<String, int> failedStat = {};
-                        if (widget.locationName == 'หอสมุด') failedStat = {'ความฉลาด': 0};
-                        if (widget.locationName == 'โรงยิม') failedStat = {'ความแข็งแรง': 0};
-                        if (widget.locationName == 'สวนสนุก') failedStat = {'ความคิดสร้างสรรค์': 0};
+                        if (widget.locationName == 'หอสมุด') failedStat = {'ความฉลาด': 0, 'พลังงาน': result['stamina_change'] ?? 0};
+                        if (widget.locationName == 'โรงยิม') failedStat = {'ความแข็งแรง': 0, 'พลังงาน': result['stamina_change'] ?? 0};
+                        if (widget.locationName == 'สวนสนุก') failedStat = {'ความคิดสร้างสรรค์': 0, 'พลังงาน': result['stamina_change'] ?? 0};
+                        if (widget.locationName == 'สวนสาธารณะ') failedStat = {'พลังงาน': result['stamina_change'] ?? 0};
 
                         await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => ResultStatScreen(
-                              isSuccess: false, // บอกว่าล้มเหลว (จะโชว์รูปตัวละครเศร้าและเลขสีแดง)
+                              isSuccess: false, // บอกว่าล้มเหลว (จะโชว์รูปตัวละครเศร้าและเลขสีแดง/ดำ)
                               
-                              // 🌟 2. ส่ง stat ที่พยายามฝึก ไปแทนคำว่าพลังงาน!
+                              // 🌟 2. ส่ง stat ที่พยายามฝึก ไปโชว์
                               statusRewards: failedStat, 
                               oldStats: oldStatsData,
                               user: _user, // 🌟 ส่ง user ไปให้โชว์แอนิเมชัน
@@ -788,7 +787,6 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
           title: _displayName,
         ),
         Container(
-          height: 200,
           width: double.infinity,
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.8),
@@ -824,34 +822,41 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.all(15),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildAvatarSection(),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _buildStatRowWithIcon(
-                            'assets/images/profile/stat-int-img.png',
-                            "ความฉลาด",
-                            _intStat,
+                    EnergyBar(key: ValueKey(_energyBarKey)),
+                    const SizedBox(height: 15),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        _buildAvatarSection(),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildStatRowWithIcon(
+                                'assets/images/profile/stat-int-img.png',
+                                "ความฉลาด",
+                                _intStat,
+                              ),
+                              const SizedBox(height: 8),
+                              _buildStatRowWithIcon(
+                                'assets/images/profile/stat-str-img.png',
+                                "ความแข็งแรง",
+                                _strStat,
+                              ),
+                              const SizedBox(height: 8),
+                              _buildStatRowWithIcon(
+                                'assets/images/profile/stat-cre-img.png',
+                                "ความคิดสร้างสรรค์",
+                                _creStat,
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 8),
-                          _buildStatRowWithIcon(
-                            'assets/images/profile/stat-str-img.png',
-                            "ความแข็งแรง",
-                            _strStat,
-                          ),
-                          const SizedBox(height: 8),
-                          _buildStatRowWithIcon(
-                            'assets/images/profile/stat-cre-img.png',
-                            "ความคิดสร้างสรรค์",
-                            _creStat,
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

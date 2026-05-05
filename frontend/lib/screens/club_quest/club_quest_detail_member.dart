@@ -151,178 +151,180 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
           // Background
           _buildBackground(),
 
-          // Top Bar
-          _buildTopBar(topPadding, topBarHeight),
+          Column(
+            children: [
+              // Top Bar
+              _buildTopBar(topPadding),
 
-          // Main Content
-          Padding(
-            padding: EdgeInsets.only(
-              top: topBarHeight + 10,
-              left: size.width * 0.05,
-              right: size.width * 0.05,
-              bottom: bottomPadding + 100, 
-            ),
-            child: Column(
-              children: [
-                // Back Button
-                Row(children: [_buildBackButton()]),
+              // Main Content
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: 10,
+                    left: size.width * 0.05,
+                    right: size.width * 0.05,
+                    bottom: bottomPadding + 100,
+                  ),
+                  child: Column(
+                    children: [
+                      // Back Button
+                      Row(children: [_buildBackButton()]),
 
-                SizedBox(height: 10),
+                      SizedBox(height: 10),
 
-                // Content Card
-                Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Color(0xFFAAD7EA), width: 3),
-                    ),
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        // Scrollable Content
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
-                          child: SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        _title, 
-                                        style: TextStyle(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF447199),
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(width: 8),
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          'วันที่สิ้นสุด $_endDate', 
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey.shade600,
+                      // Content Card
+                      Expanded(
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Color(0xFFAAD7EA), width: 3),
+                          ),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              // Scrollable Content
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              _title,
+                                              style: TextStyle(
+                                                fontSize: 24,
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFF447199),
+                                              ),
+                                            ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                SizedBox(height: 5),
-
-                                Container(height: 2, color: Color(0xFFB3E5FC)),
-
-                                SizedBox(height: 20),
-
-                                if (_imagePath != null) ...[
-                                  Container(
-                                    width: double.infinity,
-                                    padding: EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(5),
-                                      border: Border.all(
-                                        color: Color(0xFF9DD0E7),
-                                        width: 2,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.1),
-                                          blurRadius: 8,
-                                          offset: Offset(0, 4),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'รูปภาพ',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xFF002A50),
-                                          ),
-                                        ),
-                                        SizedBox(height: 12),
-                                        LayoutBuilder(
-                                          builder: (context, constraints) {
-                                            return Center(
-                                              child: Container(
-                                                width: constraints.maxWidth * 0.6, 
-                                                constraints: BoxConstraints(
-                                                  maxWidth: 300,
-                                                  maxHeight: 300,
-                                                ),
-                                                child: AspectRatio(
-                                                  aspectRatio: 1, 
-                                                  child: ClipRRect(
-                                                    borderRadius:
-                                                        BorderRadius.circular(12),
-                                                    child: Image.network(
-                                                      _imagePath!,
-                                                      fit: BoxFit.cover,
-                                                      errorBuilder: (context, error, stackTrace) {
-                                                        return Container(
-                                                          color: Color(0xFFE8F4F8),
-                                                          child: Center(
-                                                            child: Icon(
-                                                              Icons.broken_image,
-                                                              size: 60,
-                                                              color: Colors.grey,
-                                                            ),
-                                                          ),
-                                                        );
-                                                      },
-                                                    ),
-                                                  ),
+                                          SizedBox(width: 8),
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment.end,
+                                            children: [
+                                              Text(
+                                                'วันที่สิ้นสุด $_endDate',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey.shade600,
                                                 ),
                                               ),
-                                            );
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  SizedBox(height: 20),
-                                ],
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                      SizedBox(height: 5),
 
-                                Text(
-                                  _description, 
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Color(0xFF313131),
-                                    height: 1.5,
+                                      Container(height: 2, color: Color(0xFFB3E5FC)),
+
+                                      SizedBox(height: 20),
+
+                                      if (_imagePath != null) ...[
+                                        Container(
+                                          width: double.infinity,
+                                          padding: EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(5),
+                                            border: Border.all(
+                                              color: Color(0xFF9DD0E7),
+                                              width: 2,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withOpacity(0.1),
+                                                blurRadius: 8,
+                                                offset: Offset(0, 4),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'รูปภาพ',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF002A50),
+                                                ),
+                                              ),
+                                              SizedBox(height: 12),
+                                              LayoutBuilder(
+                                                builder: (context, constraints) {
+                                                  return Center(
+                                                    child: Container(
+                                                      width: constraints.maxWidth * 0.6,
+                                                      constraints: BoxConstraints(
+                                                        maxWidth: 300,
+                                                        maxHeight: 300,
+                                                      ),
+                                                      child: AspectRatio(
+                                                        aspectRatio: 1,
+                                                        child: ClipRRect(
+                                                          borderRadius: BorderRadius.circular(12),
+                                                          child: Image.network(
+                                                            _imagePath!,
+                                                            fit: BoxFit.cover,
+                                                            errorBuilder: (context, error, stackTrace) {
+                                                              return Container(
+                                                                color: Color(0xFFE8F4F8),
+                                                                child: Center(
+                                                                  child: Icon(
+                                                                    Icons.broken_image,
+                                                                    size: 60,
+                                                                    color: Colors.grey,
+                                                                  ),
+                                                                ),
+                                                              );
+                                                            },
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        SizedBox(height: 20),
+                                      ],
+
+                                      Text(
+                                        _description,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Color(0xFF313131),
+                                          height: 1.5,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+
+                              Positioned(
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                child: _buildHeaderTitle(),
+                              ),
+                            ],
                           ),
                         ),
-
-                        Positioned(
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          child: _buildHeaderTitle(),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
 
           // Bottom Buttons
@@ -353,22 +355,15 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
     );
   }
 
-  Widget _buildTopBar(double topPadding, double height) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: height,
+  Widget _buildTopBar(double topPadding) {
+    return Container(
         padding: EdgeInsets.only(top: topPadding),
         color: Colors.black.withOpacity(0.4),
-        alignment: Alignment.bottomCenter,
         child: CustomTopBar(
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
           onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
         ),
-      ),
     );
   }
 
@@ -429,7 +424,7 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
 
   Widget _buildBottomButtons(double bottomPadding) {
     return Positioned(
-      bottom: bottomPadding + 40,
+      bottom: bottomPadding + 20,
       left: MediaQuery.of(context).size.width * 0.1,
       right: MediaQuery.of(context).size.width * 0.1,
       child: Row(
@@ -495,7 +490,7 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
-          padding: EdgeInsets.symmetric(vertical: 20),
+          padding: EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(25),
           ),

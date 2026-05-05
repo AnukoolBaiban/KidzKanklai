@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_application_1/screens/club_detail_member.dart';
 import 'package:flutter_application_1/widgets/club/club_room_components.dart';
 import 'package:flutter_application_1/screens/all_quest.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // 🌟 อย่าลืม import
-import 'package:flutter_application_1/screens/club_quest/club_quest_detail_member.dart'; // แก้ path ให้ตรงกับที่เก็บไฟล์จริง
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_application_1/screens/club_quest/club_quest_detail_member.dart';
 
 class ClubRoomMemberScreen extends StatefulWidget {
   const ClubRoomMemberScreen({super.key});
@@ -168,7 +168,7 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
                 ),
                 const SizedBox(height: 10),
                 Expanded(flex: 5, child: _buildMissionBox()),
-                const Spacer(flex: 3), // พื้นที่ว่างสำหรับตัวละครด้านล่าง
+                const Spacer(flex: 3), // พื้นที่ว่างด้านล่าง (โมเดลอยู่ด้านหลัง)
               ],
             ),
           ),
@@ -210,13 +210,14 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
       onTapDown: (_) => setState(() => _isDetailPressed = true),
       onTapUp: (_) => setState(() => _isDetailPressed = false),
       onTapCancel: () => setState(() => _isDetailPressed = false),
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => const ClubDetailMemberScreen(),
           ),
         );
+        _fetchClubData(); // รีเฟรชข้อมูลเมื่อกลับมา
       },
       child: Container(
         width: 50,
@@ -359,8 +360,10 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
         timeTextColor = Colors.grey;
       } else if (difference.inDays > 0) {
         timeLeftText = "เหลืออีก ${difference.inDays} วัน";
+        timeTextColor = Colors.black87;
       } else {
         timeLeftText = "เหลืออีก ${difference.inHours} ชั่วโมง";
+        timeTextColor = Colors.red;
       }
     }
 
@@ -386,15 +389,18 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
         value: valueText,
         color: badgeColor,
         iconPath: imagePath,
+        isClaimed: isCompleted,
       );
     }).toList();
 
     return Container(
       decoration: BoxDecoration(
-        color: isCompleted ? Colors.grey.shade100 : Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        color: isCompleted
+            ? Colors.grey.shade300.withOpacity(0.85)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(15), // เปลี่ยนเป็น 15 ให้เหมือน all_quest
         border: Border.all(
-          color: isCompleted ? Colors.grey.shade400 : const Color(0xFF9DD0E7),
+          color: isCompleted ? Colors.grey : const Color(0xFF9DD0E7),
           width: 2,
         ),
       ),
@@ -418,29 +424,23 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            gradient: isCompleted
-                                ? const LinearGradient(
-                                    colors: [Color(0xFFE0E0E0), Color(0xFFBDBDBD)],
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                  )
-                                : const LinearGradient(
-                                    colors: [Color(0xFFFFB775), Color(0xFFFFD4A9)],
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                  ),
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFFB775), Color(0xFFFFD4A9)],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: isCompleted ? Colors.grey.shade600 : Colors.black,
+                              color: Colors.black,
                               width: 1,
                             ),
                           ),
-                          child: Text(
+                          child: const Text(
                             'ชมรม',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: isCompleted ? Colors.black54 : Colors.black,
+                              color: Colors.black,
                             ),
                           ),
                         ),
@@ -451,7 +451,7 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: isCompleted ? Colors.grey.shade600 : Colors.black87,
+                              color: Colors.black87, // ให้เป็นสีดำเหมือน all_quest
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -471,7 +471,7 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
             ),
             Container(
               width: 1,
-              color: isCompleted ? Colors.grey.shade400 : const Color(0xFF9DD0E7),
+              color: isCompleted ? Colors.grey : const Color(0xFF9DD0E7),
             ),
             Expanded(
               flex: 2,
@@ -496,9 +496,7 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
                           );
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isCompleted
-                              ? Colors.grey.shade500
-                              : const Color(0xFF536DFE),
+                          backgroundColor: const Color(0xFF536DFE),
                           padding: const EdgeInsets.symmetric(horizontal: 10),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
@@ -518,16 +516,26 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    FittedBox(
-                      child: Text(
-                        timeLeftText,
+                    if (isCompleted)
+                      const Text(
+                        "สำเร็จ",
                         style: TextStyle(
-                          color: timeTextColor,
-                          fontSize: 10,
+                          color: Color(0xFF34C759),
+                          fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
+                      )
+                    else
+                      FittedBox(
+                        child: Text(
+                          timeLeftText,
+                          style: TextStyle(
+                            color: timeTextColor,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),

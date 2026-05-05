@@ -4,6 +4,8 @@ import 'package:flutter_application_1/config/app_config.dart';
 import 'package:flutter_application_1/globals.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
+import 'package:flutter/material.dart';
+
 
 class User {
   final int id;
@@ -161,7 +163,12 @@ class ApiService {
       print("🚨 Token หมดอายุ หรือไม่ได้รับอนุญาต (401). บังคับ Logout...");
       Supabase.instance.client.auth.signOut();
       authToken = null;
-      navigatorKey.currentState?.pushNamedAndRemoveUntil('/login', (route) => false);
+      
+      // ไปหน้า Login โดยตรง ล้าง stack ทั้งหมด
+      navigatorKey.currentState?.pushNamedAndRemoveUntil(
+        '/login',
+        (route) => false,
+      );
     }
   }
 
@@ -193,6 +200,25 @@ class ApiService {
       print("Get Profile Error: $e");
     }
     return null;
+  }
+
+  // ผูกบัญชี Email
+  static Future<bool> linkEmailProvider() async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/profile/link-email'),
+        headers: _headers,
+      );
+      ApiService._checkUnauthorized(response.statusCode);
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        print("Link Email Failed: ${response.statusCode} - ${response.body}");
+      }
+    } catch (e) {
+      print("Link Email Error: $e");
+    }
+    return false;
   }
 
   // Inventory
@@ -272,6 +298,24 @@ class ApiService {
       print("Pull Gacha Error: $e");
       return {"error": "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"};
     }
+  }
+
+  // Gacha Rates — ดึงข้อมูล pool items พร้อมโอกาสได้รับจาก DB
+  static Future<List<Map<String, dynamic>>> getGachaRates() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/gacha/rates'),
+        headers: _headers,
+      );
+      ApiService._checkUnauthorized(response.statusCode);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(data['items'] ?? []);
+      }
+    } catch (e) {
+      print("Get Gacha Rates Error: $e");
+    }
+    return [];
   }
 
   // ฟังก์ชันเคลมโบนัสล็อกอินรายวัน/รายสัปดาห์
@@ -785,16 +829,42 @@ class ApiService {
       );
 
       if (response.statusCode == 200) {
-        // สำเร็จ จะคืนค่า success, message, club_id
         return jsonDecode(response.body);
       } else {
-        // ล้มเหลว (เช่น รหัสผิด, ชมรมเต็ม, มีชมรมอยู่แล้ว)
         final errorData = jsonDecode(response.body);
         print("Join Club Failed: ${errorData['error']}");
         return {"success": false, "error": errorData['error'] ?? "เกิดข้อผิดพลาด"};
       }
     } catch (e) {
       print("Join Club Error: $e");
+      return {"success": false, "error": "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"};
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // API: อัปเดตข้อมูลชมรม (Update Club)
+  // ------------------------------------------------------------------------
+  static Future<Map<String, dynamic>?> updateClub({String? name, String? description}) async {
+    try {
+      final body = <String, dynamic>{};
+      if (name != null) body['name'] = name;
+      if (description != null) body['description'] = description;
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/clubs/update'),
+        headers: _headers,
+        body: jsonEncode(body),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final errorData = jsonDecode(response.body);
+        print("Update Club Failed: ${errorData['error']}");
+        return {"success": false, "error": errorData['error'] ?? "เกิดข้อผิดพลาด"};
+      }
+    } catch (e) {
+      print("Update Club Error: $e");
       return {"success": false, "error": "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"};
     }
   }

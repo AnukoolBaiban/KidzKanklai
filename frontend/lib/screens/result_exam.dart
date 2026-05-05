@@ -290,9 +290,7 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
 
                           SizedBox(height: 20 * scale),
 
-                          SizedBox(
-                            height: 130 * scale,
-                            child: widget.isPassed
+                          widget.isPassed
                                 ? Column(
                                     children: [
                                       Text(
@@ -359,7 +357,6 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
                                       ),
                                     ],
                                   ),
-                          ),
                         ],
                       ),
                     ),

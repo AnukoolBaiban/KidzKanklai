@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/widgets/ticket_box.dart';
 
-class ConfirmZeroTicketPopup extends StatefulWidget {
+class ConfirmGashaPopup extends StatefulWidget {
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
 
-  const ConfirmZeroTicketPopup({
+  const ConfirmGashaPopup({
     Key? key,
     required this.onConfirm,
     required this.onCancel,
@@ -18,7 +19,7 @@ class ConfirmZeroTicketPopup extends StatefulWidget {
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.black.withOpacity(0.6),
-      builder: (context) => ConfirmZeroTicketPopup(
+      builder: (context) => ConfirmGashaPopup(
         onConfirm: onConfirm,
         onCancel: () => Navigator.pop(context),
       ),
@@ -26,10 +27,10 @@ class ConfirmZeroTicketPopup extends StatefulWidget {
   }
 
   @override
-  State<ConfirmZeroTicketPopup> createState() => _ConfirmZeroTicketPopupState();
+  State<ConfirmGashaPopup> createState() => _ConfirmGashaPopupState();
 }
 
-class _ConfirmZeroTicketPopupState extends State<ConfirmZeroTicketPopup>
+class _ConfirmGashaPopupState extends State<ConfirmGashaPopup>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
@@ -74,6 +75,7 @@ class _ConfirmZeroTicketPopupState extends State<ConfirmZeroTicketPopup>
     final titleFontSize = isSmallScreen ? 14.0 : 16.0;
     final subtitleFontSize = isSmallScreen ? 11.0 : 13.0;
     final buttonFontSize = isSmallScreen ? 14.0 : 16.0;
+    final topPadding = isSmallScreen ? 15.0 : 20.0;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -84,15 +86,17 @@ class _ConfirmZeroTicketPopupState extends State<ConfirmZeroTicketPopup>
           scale: _scaleAnimation,
           child: Container(
             width: containerWidth,
-            constraints: const BoxConstraints(maxWidth: 400),
-            decoration: const BoxDecoration(color: Colors.transparent),
+            constraints: BoxConstraints(
+              maxWidth: 400,
+            ),
+            decoration: BoxDecoration(color: Colors.transparent),
             child: Stack(
               clipBehavior: Clip.none,
               alignment: Alignment.center,
               children: [
                 // Main Container
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                  padding: EdgeInsets.fromLTRB(20, topPadding, 20, 20),
                   width: double.infinity,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -123,11 +127,10 @@ class _ConfirmZeroTicketPopupState extends State<ConfirmZeroTicketPopup>
                     ],
                   ),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'คุณมีตั๋วไม่เพียงพอ!',
+                        'ยืนยันการสุ่มกาชา?',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white,
@@ -137,7 +140,7 @@ class _ConfirmZeroTicketPopupState extends State<ConfirmZeroTicketPopup>
                       ),
                       SizedBox(height: 8),
                       Text(
-                        'คุณสามารถสร้างภารกิจได้\nแต่จะไม่ได้รับของรางวัลเมื่อทำสำเร็จ',
+                        'แน่ใจนะว่าต้องการใช้ 2,000 เหรียญเพื่อสุ่ม',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white70,
@@ -173,34 +176,79 @@ class _ConfirmZeroTicketPopupState extends State<ConfirmZeroTicketPopup>
                             ),
                           ),
 
-                          // 🔵 ยืนยัน
+                          // 🔵 ยืนยัน with Badge
                           Expanded(
                             child: GestureDetector(
                               onTap: widget.onConfirm,
-                              child: Container(
-                                height: buttonHeight,
-                                margin: EdgeInsets.only(left: 8),
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      Color(0xFF556AEB),
-                                      Color(0xFF59ABEC),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(30),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    'ยืนยัน',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: buttonFontSize,
+                              child: Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  Container(
+                                    height: buttonHeight,
+                                    margin: EdgeInsets.only(left: 8),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          Color(0xFF556AEB),
+                                          Color(0xFF59ABEC),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(30),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'ยืนยัน',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: buttonFontSize,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                ),
+
+                                  // Badge
+                                  Positioned(
+                                    top: -15,
+                                    right: -6,
+                                    child: TicketBox(
+                                      slant: 12,
+                                      borderRadius: 4,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Image.asset(
+                                              'assets/images/item/coin.png',
+                                              width: 16,
+                                              height: 16,
+                                              errorBuilder: (context, error, stackTrace) => const Icon(
+                                                Icons.monetization_on,
+                                                color: Colors.amber,
+                                                size: 16,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              "-2,000",
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),

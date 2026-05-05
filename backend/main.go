@@ -47,6 +47,9 @@ func main() {
 	// Endpoint สำหรับเปลี่ยนร่าง (Kid/Teen/Adult)
 	auth.PUT("/profile/body-type", handlers.UpdateBodyType)
 
+	// Endpoint สำหรับผูกบัญชี Email (เพิ่ม provider)
+	auth.POST("/profile/link-email", handlers.LinkEmailProvider)
+
 	// --- Fashion System ---
 	auth.GET("/inventory", handlers.GetInventory)
 	auth.POST("/equip", handlers.EquipItem)
@@ -54,6 +57,7 @@ func main() {
 	
 	// --- Gacha System ---
 	auth.POST("/gacha/pull", handlers.PullGacha)
+	auth.GET("/gacha/rates", handlers.GetGachaRates)
 
 	// --- Rewards ---
 	auth.POST("/rewards/login-bonus", handlers.ClaimLoginTickets)
@@ -88,6 +92,7 @@ func main() {
 	auth.POST("/clubs/leave", handlers.LeaveClub)
 	auth.POST("/clubs/kick", handlers.KickMember)
 	auth.POST("/clubs/delete", handlers.DeleteClub)
+	auth.POST("/clubs/update", handlers.UpdateClub)
 
 	auth.POST("/clubs/quests/create", handlers.CreateClubQuest)
 	auth.GET("/clubs/quests", handlers.GetClubQuests)

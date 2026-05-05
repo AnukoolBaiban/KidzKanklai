@@ -71,7 +71,6 @@ class _ClubConfirmSavePopupState extends State<ClubConfirmSavePopup>
     final isSmallScreen = size.width < 360;
 
     final containerWidth = size.width * 0.85;
-    final containerHeight = isSmallScreen ? 170.0 : 190.0;
     final buttonHeight = isSmallScreen ? 40.0 : 45.0;
     final titleFontSize = isSmallScreen ? 14.0 : 16.0;
     final subtitleFontSize = isSmallScreen ? 11.0 : 13.0;
@@ -88,11 +87,8 @@ class _ClubConfirmSavePopupState extends State<ClubConfirmSavePopup>
           scale: _scaleAnimation,
           child: Container(
             width: containerWidth,
-            constraints: BoxConstraints(
-              maxWidth: 400,
-              maxHeight: containerHeight,
-            ),
-            decoration: BoxDecoration(color: Colors.transparent),
+            constraints: const BoxConstraints(maxWidth: 400),
+            decoration: const BoxDecoration(color: Colors.transparent),
             child: Stack(
               clipBehavior: Clip.none,
               alignment: Alignment.center,
@@ -100,7 +96,6 @@ class _ClubConfirmSavePopupState extends State<ClubConfirmSavePopup>
                 // Main Container
                 Container(
                   padding: EdgeInsets.fromLTRB(20, topPadding, 20, 20),
-                  height: containerHeight,
                   width: double.infinity,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(

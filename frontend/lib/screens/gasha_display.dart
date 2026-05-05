@@ -637,6 +637,7 @@ class _GashaDisplayScreenState extends State<GashaDisplayScreen>
     final coinReward = widget.gachaResult?['coin_reward'] ?? 0;
     
     final itemName = itemData['name'] ?? 'EXP';
+    final itemDescription = itemData['description'] ?? itemName;
     final int categoryId = itemData['category_id'] ?? 0;
     
     String itemImage = 'assets/images/item/EXP.png';
@@ -671,7 +672,7 @@ class _GashaDisplayScreenState extends State<GashaDisplayScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Text(
-                        'มีซ้ำ! แปลงเป็น ',
+                        'มีแฟชั่นนี้อยู่แล้ว! แปลงเป็น ',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -706,7 +707,7 @@ class _GashaDisplayScreenState extends State<GashaDisplayScreen>
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: const Text(
-                    'ใหม่',
+                    'แฟชั่นใหม่',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 22,
@@ -797,7 +798,7 @@ class _GashaDisplayScreenState extends State<GashaDisplayScreen>
 
               // ── ชื่อไอเทม ──
               Text(
-                itemName,
+                itemDescription,
                 style: TextStyle(
                   color: const Color(0xFF313131),
                   fontSize: titleSize,

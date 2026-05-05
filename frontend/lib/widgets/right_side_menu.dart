@@ -28,29 +28,52 @@ class RightSideMenu extends StatelessWidget {
       right: 10,
       top: 20,
       child: Column(
-        children: menuItems.map((item) => _buildMenuItem(item)).toList(),
+        children: menuItems.map((item) => _MenuItemButton(item: item)).toList(),
       ),
     );
   }
+}
 
-  Widget _buildMenuItem(MenuItem item) {
+class _MenuItemButton extends StatefulWidget {
+  final MenuItem item;
+  const _MenuItemButton({required this.item});
+
+  @override
+  State<_MenuItemButton> createState() => _MenuItemButtonState();
+}
+
+class _MenuItemButtonState extends State<_MenuItemButton> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: item.onTap,
-      child: Container(
-        margin: EdgeInsets.only(bottom: 16),
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        widget.item.onTap();
+      },
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        margin: const EdgeInsets.only(bottom: 16),
+        transform: Matrix4.identity()
+          ..translate(30.0, 30.0)
+          ..scale(_isPressed ? 0.88 : 1.0)
+          ..translate(-30.0, -30.0),
         child: Column(
           children: [
-            // รูปภาพ (ไม่มีกล่อง)
+            // รูปภาพ
             Stack(
               clipBehavior: Clip.none,
               children: [
                 Image.asset(
-                  item.imagePath,
+                  widget.item.imagePath,
                   width: 60,
                   height: 60,
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) {
-                    // ถ้ารูปโหลดไม่ได้ แสดง Icon แทน
                     return Container(
                       width: 60,
                       height: 60,
@@ -58,7 +81,7 @@ class RightSideMenu extends StatelessWidget {
                         color: Colors.white.withOpacity(0.8),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.image_not_supported,
                         size: 30,
                         color: Colors.grey,
@@ -66,7 +89,7 @@ class RightSideMenu extends StatelessWidget {
                     );
                   },
                 ),
-                if (item.hasNotification)
+                if (widget.item.hasNotification)
                   Positioned(
                     top: -2,
                     right: -2,
@@ -82,20 +105,20 @@ class RightSideMenu extends StatelessWidget {
                   ),
               ],
             ),
-            
-            SizedBox(height: 4),
-            
+
+            const SizedBox(height: 4),
+
             // ข้อความ
             Text(
-              item.label,
+              widget.item.label,
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF5D4037),
+                color: const Color(0xFF5D4037),
                 shadows: [
                   Shadow(
                     color: Colors.white.withOpacity(0.8),
-                    offset: Offset(1, 1),
+                    offset: const Offset(1, 1),
                     blurRadius: 2,
                   ),
                 ],

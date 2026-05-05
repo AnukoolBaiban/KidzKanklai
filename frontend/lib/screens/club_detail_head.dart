@@ -424,15 +424,30 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
     }
   }
 
-  // 🌟 บันทึกการแก้ไขชื่อ/รายละเอียด ลง Supabase ตรงๆ (ง่ายกว่ารอ API)
+  // 🌟 บันทึกการแก้ไขชื่อ/รายละเอียด ลง Supabase ผ่าน API
   Future<bool> _updateClubInfo(String column, String value) async {
     try {
-      await Supabase.instance.client
-          .from('clubs')
-          .update({column: value})
-          .eq('id', _clubId);
+      String? name;
+      String? description;
+
+      if (column == 'name') {
+        name = value;
+      } else if (column == 'description') {
+        description = value;
+      }
+
+      final result = await ApiService.updateClub(name: name, description: description);
       
-      return true;
+      if (result != null && result['success'] == true) {
+        // 🌟 อัปเดต Cache ทันที เพื่อไม่ให้ตอนกลับเข้ามาใหม่แล้วยังแสดงชื่อเก่า
+        if (ClubDetailHeadPreloader.cachedData != null && ClubDetailHeadPreloader.cachedData!['club'] != null) {
+          ClubDetailHeadPreloader.cachedData!['club'][column] = value;
+        }
+        return true;
+      } else {
+        debugPrint("Update Club error: ${result?['error']}");
+        return false;
+      }
     } catch (e) {
       debugPrint("Update Club error: $e");
       return false;
@@ -1021,8 +1036,17 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
                       children: [
                         Expanded(child: Text(_inviteCode, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87))),
                         GestureDetector(
-                          onTap: () {
-                            debugPrint("Copy code tapped"); // 🌟 นำไปผูกกับ Clipboard.setData ได้
+                          onTap: () async {
+                            await Clipboard.setData(ClipboardData(text: _inviteCode));
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('คัดลอกรหัสเชิญแล้ว!'),
+                                  backgroundColor: Color(0xFF2374B5),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            }
                           },
                           child: Container(
                             width: 40,

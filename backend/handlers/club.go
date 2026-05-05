@@ -454,3 +454,72 @@ func DeleteClub(c *gin.Context) {
 		"message": "ยุบชมรมเรียบร้อยแล้ว",
 	})
 }
+
+// ------------------------------------------------------------------------
+// API 6: อัปเดตข้อมูลชมรม (Update Club) - เฉพาะหัวหน้าชมรม
+// ------------------------------------------------------------------------
+type UpdateClubInput struct {
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+}
+
+// POST /clubs/update
+func UpdateClub(c *gin.Context) {
+	userIdVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	userIDStr := fmt.Sprintf("%v", userIdVal)
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	var input UpdateClubInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง"})
+		return
+	}
+
+	ctx := context.Background()
+	tx, err := configs.DB.Begin(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction failed"})
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// ตรวจสอบสิทธิ์ (ต้องเป็นเจ้าของชมรมเท่านั้น)
+	var clubID *int64
+	var clubRole *string
+	err = tx.QueryRow(ctx, `SELECT club_id, club_role FROM public.user_profiles WHERE id = $1 FOR UPDATE`, userID).Scan(&clubID, &clubRole)
+	if err != nil || clubID == nil || clubRole == nil || *clubRole != "owner" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "เฉพาะหัวหน้าชมรมเท่านั้นที่สามารถแก้ไขข้อมูลชมรมได้"})
+		return
+	}
+
+	if input.Name != nil && input.Description != nil {
+		_, err = tx.Exec(ctx, `UPDATE public.clubs SET name = $1, description = $2 WHERE id = $3`, *input.Name, *input.Description, *clubID)
+	} else if input.Name != nil {
+		_, err = tx.Exec(ctx, `UPDATE public.clubs SET name = $1 WHERE id = $2`, *input.Name, *clubID)
+	} else if input.Description != nil {
+		_, err = tx.Exec(ctx, `UPDATE public.clubs SET description = $1 WHERE id = $2`, *input.Description, *clubID)
+	}
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถอัปเดตข้อมูลชมรมได้"})
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction commit failed"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "อัปเดตข้อมูลชมรมเรียบร้อยแล้ว",
+	})
+}

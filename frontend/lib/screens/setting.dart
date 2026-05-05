@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_application_1/screens/lobby.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_application_1/services/audio_manager.dart';
@@ -38,11 +39,51 @@ class _SettingScreenState extends State<SettingScreen> {
     super.initState();
     _currentUser = _supabase.auth.currentUser;
 
-    _supabase.auth.onAuthStateChange.listen((data) {
+    _supabase.auth.onAuthStateChange.listen((data) async {
       if (mounted) {
-        setState(() {
-          _currentUser = data.session?.user;
-        });
+        final newUser = data.session?.user;
+        
+        // ตรวจสอบการผูกบัญชี (ถ้ามี)
+        final prefs = await SharedPreferences.getInstance();
+        final linkOriginalEmail = prefs.getString('linking_original_email');
+        final savedRefreshToken = prefs.getString('linking_original_refresh_token');
+        
+        if (linkOriginalEmail != null && linkOriginalEmail.isNotEmpty && newUser != null) {
+          // กำลังอยู่ในโหมดผูกบัญชี
+          if (newUser.email != linkOriginalEmail) {
+            // อีเมลไม่ตรงกัน → กู้คืน Session เดิม
+            await prefs.remove('linking_original_email');
+            await prefs.remove('linking_original_refresh_token');
+            
+            if (savedRefreshToken != null && savedRefreshToken.isNotEmpty) {
+              // ออกจาก Google session ที่เพิ่งเข้ามา แล้วกู้คืนบัญชีเดิม
+              await _supabase.auth.setSession(savedRefreshToken);
+            }
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('อีเมลไม่ตรงกับบัญชีเดิม การผูกบัญชีล้มเหลว')),
+              );
+            }
+            return; // หยุด ไม่ต้อง setState เพราะ setSession จะ trigger onAuthStateChange อีกรอบ
+          } else {
+            // อีเมลตรงกัน (ผูกสำเร็จ)
+            await prefs.remove('linking_original_email');
+            await prefs.remove('linking_original_refresh_token');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('ผูกบัญชีสำเร็จ!')),
+              );
+            }
+          }
+        }
+
+        if (mounted) {
+          setState(() {
+            _currentUser = newUser;
+            _topBarKey = UniqueKey(); // รีเฟรช TopBar ทุกครั้งที่ Session เปลี่ยน
+          });
+        }
       }
     });
 
@@ -77,12 +118,262 @@ class _SettingScreenState extends State<SettingScreen> {
     Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
   }
 
+  // ผูกบัญชี Google
+  Future<void> _linkWithGoogle() async {
+    try {
+      // 1. บันทึก Email และ Refresh Token ปัจจุบันไว้ก่อน (เพื่อกู้คืนถ้าล้มเหลว)
+      final currentSession = _supabase.auth.currentSession;
+      if (_currentUser?.email != null && currentSession != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('linking_original_email', _currentUser!.email!);
+        await prefs.setString('linking_original_refresh_token', currentSession.refreshToken ?? '');
+      }
+
+      // 2. เรียก OAuth (จะเด้งไปหน้าเว็บ)
+      await _supabase.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: 'io.supabase.flutter://login-callback',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Google link failed: $e')),
+        );
+      }
+    }
+  }
+
+  // ผูกบัญชี Email (ตั้งรหัสผ่าน)
+  void _linkWithEmail() {
+    _showSetPasswordDialog();
+  }
+
+  // Popup ตั้งรหัสผ่านเพื่อผูกบัญชี Email
+  void _showSetPasswordDialog({bool isChangePassword = false}) {
+    final TextEditingController passwordController = TextEditingController();
+    final TextEditingController confirmPasswordController = TextEditingController();
+    bool obscurePassword = true;
+    bool obscureConfirm = true;
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.95),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: const Color(0xFFAAD7EA),
+                    width: 3,
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      isChangePassword ? "เปลี่ยนรหัสผ่าน" : "ผูกบัญชี Email",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF00385D),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      isChangePassword ? "ตั้งรหัสผ่านใหม่สำหรับ ${_currentUser?.email ?? ''}" : "ตั้งรหัสผ่านสำหรับ ${_currentUser?.email ?? ''}",
+                      style: const TextStyle(fontSize: 14, color: Colors.black54),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    // รหัสผ่าน
+                    TextField(
+                      controller: passwordController,
+                      obscureText: obscurePassword,
+                      style: const TextStyle(fontSize: 16),
+                      decoration: InputDecoration(
+                        hintText: "รหัสผ่าน",
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscurePassword ? Icons.visibility_off : Icons.visibility,
+                            color: Colors.grey,
+                          ),
+                          onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFAAD7EA), width: 2),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF2374B5), width: 2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // ยืนยันรหัสผ่าน
+                    TextField(
+                      controller: confirmPasswordController,
+                      obscureText: obscureConfirm,
+                      style: const TextStyle(fontSize: 16),
+                      decoration: InputDecoration(
+                        hintText: "ยืนยันรหัสผ่าน",
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscureConfirm ? Icons.visibility_off : Icons.visibility,
+                            color: Colors.grey,
+                          ),
+                          onPressed: () => setDialogState(() => obscureConfirm = !obscureConfirm),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFAAD7EA), width: 2),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF2374B5), width: 2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        // ยกเลิก
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.grey.shade400,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
+                            ),
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text("ยกเลิก", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        // บันทึก
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF85D755), Color(0xFF34C759)],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: isLoading ? null : () async {
+                                final password = passwordController.text.trim();
+                                final confirmPassword = confirmPasswordController.text.trim();
+
+                                if (password.isEmpty || confirmPassword.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('กรุณากรอกรหัสผ่านให้ครบ')),
+                                  );
+                                  return;
+                                }
+                                if (password.length < 6) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร')),
+                                  );
+                                  return;
+                                }
+                                if (password != confirmPassword) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('รหัสผ่านไม่ตรงกัน')),
+                                  );
+                                  return;
+                                }
+
+                                setDialogState(() => isLoading = true);
+
+                                try {
+                                  await _supabase.auth.updateUser(
+                                    UserAttributes(password: password),
+                                  );
+
+                                    if (!isChangePassword) {
+                                      // เรียก Backend API เพื่ออัปเดต providers ใน auth.users
+                                      await api.ApiService.linkEmailProvider();
+
+                                      // รีเฟรช session เพื่อให้ app_metadata อัปเดต
+                                      await _supabase.auth.refreshSession();
+                                    }
+
+                                  if (mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text(isChangePassword ? 'เปลี่ยนรหัสผ่านสำเร็จ!' : 'ผูกบัญชี Email สำเร็จ!')),
+                                    );
+                                    setState(() {
+                                      _currentUser = _supabase.auth.currentUser;
+                                    });
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
+                                    );
+                                  }
+                                } finally {
+                                  if (mounted) setDialogState(() => isLoading = false);
+                                }
+                              },
+                              child: isLoading
+                                  ? const SizedBox(
+                                      width: 20, height: 20,
+                                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                    )
+                                  : const Text("บันทึก", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // ตรวจสอบสถานะล็อกอิน
     final bool isLoggedIn = _currentUser != null;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           // Background Image
@@ -271,9 +562,24 @@ class _SettingScreenState extends State<SettingScreen> {
               borderRadius: BorderRadius.circular(10),
             ),
             // แสดง Email จริงถ้ามี หรือแสดง default
-            child: Text(
-              "อีเมล : ${_currentUser?.email ?? 'xxxxxx@gmail.com'}",
-              style: const TextStyle(fontSize: 18, color: Colors.black87),
+            child: Row(
+              children: [
+                const Text(
+                  "อีเมล : ",
+                  style: TextStyle(fontSize: 18, color: Colors.black87),
+                ),
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      _currentUser?.email ?? 'xxxxxx@gmail.com',
+                      style: const TextStyle(fontSize: 18, color: Colors.black87),
+                      maxLines: 1,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -314,6 +620,7 @@ class _SettingScreenState extends State<SettingScreen> {
             iconPath: 'assets/images/icon/iconGoogle.png',
             label: 'Google',
             isConnected: isGoogleConnected,
+            onTap: isGoogleConnected ? null : _linkWithGoogle,
           ),
 
           const SizedBox(height: 6),
@@ -323,6 +630,9 @@ class _SettingScreenState extends State<SettingScreen> {
             iconPath: 'assets/images/icon/iconEmail.png',
             label: 'Email',
             isConnected: isEmailConnected,
+            onTap: isEmailConnected ? null : _linkWithEmail,
+            connectedText: 'เปลี่ยนรหัส',
+            onConnectedTap: isEmailConnected ? () => _showSetPasswordDialog(isChangePassword: true) : null,
           ),
         ],
       ),
@@ -334,6 +644,9 @@ class _SettingScreenState extends State<SettingScreen> {
     required String iconPath,
     required String label,
     required bool isConnected,
+    VoidCallback? onTap,
+    String? connectedText,
+    VoidCallback? onConnectedTap,
   }) {
     return Row(
       children: [
@@ -342,20 +655,16 @@ class _SettingScreenState extends State<SettingScreen> {
         Text(label, style: const TextStyle(fontSize: 18, color: Colors.black)),
         const Spacer(),
         if (isConnected)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: const Color(0xFF2374B5),
-              borderRadius: BorderRadius.circular(5),
-            ),
-            child: const Text(
-              "เชื่อมต่อแล้ว",
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
+          _HoverButton(
+            text: connectedText ?? "เชื่อมต่อแล้ว",
+            onTap: onConnectedTap,
+            isOutline: false,
+          )
+        else if (onTap != null)
+          _HoverButton(
+            text: "ผูกบัญชี",
+            onTap: onTap,
+            isOutline: true,
           ),
       ],
     );
@@ -588,7 +897,7 @@ class _SettingScreenState extends State<SettingScreen> {
 
           // [UPDATED] Music Slider เชื่อมต่อกับ _audioManager
           _buildVolumeSlider(
-            label: "Music / BGM",
+            label: "เสียงเพลงประกอบ",
             value: _musicVolume,
             onChanged: (val) {
               setState(() => _musicVolume = val); // อัปเดต UI
@@ -599,7 +908,7 @@ class _SettingScreenState extends State<SettingScreen> {
 
           // [UPDATED] SFX Slider เชื่อมต่อกับ _audioManager
           _buildVolumeSlider(
-            label: "Sound Effects / SFX",
+            label: "เสียงเอฟเฟค",
             value: _sfxVolume,
             onChanged: (val) {
               setState(() => _sfxVolume = val); // อัปเดต UI
@@ -867,5 +1176,65 @@ class GradientRectSliderTrackShape extends SliderTrackShape
     );
     context.canvas.drawRRect(fullRRect, activePaint);
     context.canvas.restore();
+  }
+}
+
+// [ADDED] Widget สำหรับปุ่มที่แสดง Hover Effect (สีเข้มขึ้น)
+class _HoverButton extends StatefulWidget {
+  final String text;
+  final VoidCallback? onTap;
+  final bool isOutline;
+
+  const _HoverButton({
+    required this.text,
+    this.onTap,
+    required this.isOutline,
+  });
+
+  @override
+  State<_HoverButton> createState() => _HoverButtonState();
+}
+
+class _HoverButtonState extends State<_HoverButton> {
+  bool _isHovered = false;
+  bool _isPressed = false;
+
+  bool get _isActive => _isHovered || _isPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: widget.onTap != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapUp: (_) => setState(() => _isPressed = false),
+        onTapCancel: () => setState(() => _isPressed = false),
+        onTap: widget.onTap,
+        child: Container(
+          width: widget.isOutline ? null : 100,
+          alignment: Alignment.center,
+          padding: widget.isOutline
+              ? const EdgeInsets.symmetric(horizontal: 20, vertical: 5)
+              : const EdgeInsets.symmetric(vertical: 5),
+          decoration: BoxDecoration(
+            color: widget.isOutline
+                ? (_isActive && widget.onTap != null ? const Color(0xFFE8F4FA) : Colors.transparent)
+                : (_isActive && widget.onTap != null ? const Color(0xFF135080) : const Color(0xFF2374B5)),
+            border: widget.isOutline ? Border.all(color: const Color(0xFF2374B5), width: 2) : null,
+            borderRadius: BorderRadius.circular(5),
+          ),
+          child: Text(
+            widget.text,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: widget.isOutline ? Colors.black : Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
