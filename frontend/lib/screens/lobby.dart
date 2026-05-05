@@ -8,6 +8,7 @@ import 'package:flutter_application_1/widgets/custom_top_bar.dart';
 import 'package:flutter_application_1/widgets/character_widget.dart';
 import 'package:flutter_application_1/widgets/reward_popup.dart';
 import 'package:flutter_application_1/screens/loading.dart';
+import 'package:flutter_application_1/services/audio_manager.dart';
 
 
 class LobbyScreen extends StatefulWidget {
@@ -51,6 +52,11 @@ class _LobbyScreenState extends State<LobbyScreen> {
     
     // 🌟 แอบสั่งให้ Backend เช็คและสร้างข้อสอบประจำสัปดาห์
     ApiService.generateWeeklyExams();
+
+    // เล่นเพลง lobby ตรงนี้ด้วย เพื่อรองรับกรณี User login ค้างไว้
+    // AuthGate render LobbyScreen โดยตรงโดยไม่ผ่าน navigation → Observer ไม่รู้ว่ามาถึง /lobby จึงไม่เล่นเพลง
+    // ปลอดภัย: playBGM มี guard ตรวจสอบว่าเล่นเพลงเดิมอยู่แล้วหรือไม่ จึงไม่เล่นซ้ำซ้อน
+    AudioManager().playBGM('lobby.mp3');
   }
 
   Future<void> _loadUserData() async {
