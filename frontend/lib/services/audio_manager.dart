@@ -2,7 +2,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class AudioManager {
+class AudioManager with WidgetsBindingObserver {
   // 1. ทำเป็น Singleton เพื่อให้เรียกใช้ได้จากทุกหน้า
   static final AudioManager _instance = AudioManager._internal();
   factory AudioManager() => _instance;
@@ -22,6 +22,9 @@ class AudioManager {
   double get sfxVolume => _sfxVolume;
   bool get isMuted => _isMuted;
 
+  // เพิ่มตัวแปรเก็บชื่อเพลงที่กำลังเล่นอยู่
+  String? _currentBGM;
+
   // 4. เริ่มต้นโหลดค่า (ควรเรียกตอนเปิดแอป)
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
@@ -35,18 +38,27 @@ class AudioManager {
     // ตั้งค่า Mode ให้เล่นทับกันได้ (Low Latency)
     await _musicPlayer.setReleaseMode(ReleaseMode.loop); // BGM วนซ้ำ
     await _sfxPlayer.setReleaseMode(ReleaseMode.stop);
-  }
 
-  // เพิ่มตัวแปรเก็บชื่อเพลงที่กำลังเล่นอยู่
-  String? _currentBGM;
+    // ลงทะเบียน lifecycle observer เพื่อจัดการเพลงตอนกด Home / ออกแอป
+    WidgetsBinding.instance.addObserver(this);
+  }
 
   // 5. ฟังก์ชันเล่นเพลง BGM (ฉบับอัปเดต)
   Future<void> playBGM(String fileName) async {
     // ถ้าไฟล์ที่จะเล่น เป็นไฟล์เดียวกับที่กำลังเล่นอยู่ ให้ข้ามคำสั่งไปเลย เพลงจะได้เล่นต่อเนื่อง
     if (_currentBGM == fileName) return;
 
+    // stop เพลงเก่าก่อนเสมอ เพื่อไม่ให้เพลงเล่นซ้อนกัน
+    await _musicPlayer.stop();
+
     _currentBGM = fileName; // อัปเดตชื่อเพลงปัจจุบัน
     await _musicPlayer.play(AssetSource('audio/$fileName'));
+  }
+
+  // ฟังก์ชันหยุดเพลง BGM (ใช้สำหรับหน้าที่ต้องเงียบ เช่น loading)
+  Future<void> stopBGM() async {
+    _currentBGM = null;
+    await _musicPlayer.stop();
   }
 
   // 6. ฟังก์ชันเล่น SFX
@@ -94,15 +106,79 @@ class AudioManager {
     await prefs.setDouble('sfxVolume', _sfxVolume);
     await prefs.setBool('isMuted', _isMuted);
   }
+
+  // ─── Lifecycle Handler ────────────────────────────────────────────────────
+  // จัดการเพลงเมื่อกด Home หรือออกจากแอป (ผ่าน WidgetsBindingObserver)
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        // กด Home / ออกแอป → หยุดเพลงทันที
+        // ใช้ stop() แทน pause() เพราะบาง device ไม่ยอมหยุดถ้าใช้แค่ pause()
+        _musicPlayer.stop();
+        break;
+      case AppLifecycleState.resumed:
+        // กลับเข้าแอป → เล่นเพลงต่อจากหน้าที่ค้างอยู่
+        if (_currentBGM != null && !_isMuted) {
+          _musicPlayer.play(AssetSource('audio/$_currentBGM!'));
+        }
+        break;
+      case AppLifecycleState.inactive:
+        // ระหว่างเปลี่ยน state ไม่ต้องทำอะไร
+        break;
+    }
+  }
+
+  // ล้าง observer เมื่อไม่ใช้งาน
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _musicPlayer.dispose();
+    _sfxPlayer.dispose();
+  }
 }
+
+// ─── Route Music Observer ─────────────────────────────────────────────────────
+
+// ค่าพิเศษสำหรับหน้าที่ต้อง "เงียบ" (ไม่มีเพลง เช่น loading screen)
+const String _kSilent = '__SILENT__';
+
+// TODO: เมื่อมีไฟล์เพลงพร้อมแล้ว ให้ทำ 2 ขั้นตอน:
+//   1. วางไฟล์ .mp3 ไว้ที่ → assets/audio/<ชื่อไฟล์>.mp3
+//   2. แก้ชื่อไฟล์ด้านล่างให้ตรงกับไฟล์จริง
+// ทุกหน้าใน group (startgame, login, register, forgotpw, resetpw) ใช้เพลงเดียวกัน
+// เมื่อออกจาก group เพลงจะหยุดอัตโนมัติ
+const String _kMenuMusic = 'menu.mp3'; // ← แก้ชื่อไฟล์ตรงนี้จุดเดียว
 
 class MusicRouteObserver extends NavigatorObserver {
   // 1. สร้าง Stack เพื่อเก็บประวัติเพลงของแต่ละหน้า
   final List<String> _musicHistory = [];
 
   // ฟังก์ชันสำหรับเช็คว่าแต่ละหน้าควรใช้เพลงอะไร
+  /// คืนค่า:
+  ///   - ชื่อไฟล์ mp3  → เล่นเพลงนั้น
+  ///   - _kSilent       → หยุดเพลง (หน้า login / loading ฯลฯ)
+  ///   - null           → ไม่รู้จัก route → สืบทอดเพลงจากหน้าก่อน (เช่น Dialog)
   String? _getMusicForRoute(String? routeName) {
     switch (routeName) {
+      // หน้าที่ต้องเงียบสนิท (ยังไม่มีเพลง) ──────────────────────────────────
+      case '/':
+      case '/load':
+      case '/auth':
+      case '/me':
+        return _kSilent;
+
+      // หน้า Menu/Login group (ใช้เพลงเดียวกัน รอใส่ไฟล์เพลงภายหลัง) ──────────
+      // TODO: เมื่อมีไฟล์เพลงพร้อม แก้ค่า _kMenuMusic ด้านบนได้เลย
+      case '/startgame':
+      case '/login':
+      case '/register':
+      case '/forgotpw':
+      case '/resetpw':
+        return _kMenuMusic;
+
+      // หน้าที่มีเพลงเฉพาะ ──────────────────────────────────────────────────
       case '/lobby':
       case '/achievement':
         return 'lobby.mp3';
@@ -127,110 +203,113 @@ class MusicRouteObserver extends NavigatorObserver {
       case '/clubquestdetail':
       case '/clubroom':
         return 'club.mp3';
+
       default:
-        return null;
+        return null; // ไม่รู้จัก → สืบทอดเพลงปัจจุบัน
     }
   }
 
   // ฟังก์ชันดึงชื่อหน้าจอ (รองรับกรณี MaterialPageRoute ไม่ได้ระบุชื่อ)
   String? _extractRouteName(Route<dynamic>? route) {
     if (route == null) return null;
-    
+
     // 1. ใช้ชื่อจาก settings.name (จากการใช้ Navigator.pushNamed)
-    if (route.settings.name != null) {
-      return route.settings.name;
-    }
-    
+    if (route.settings.name != null) return route.settings.name;
+
     // 2. กรณีไม่มีชื่อ (จากการใช้ Navigator.push + MaterialPageRoute)
     // ให้ใช้การตรวจสอบจาก runtimeType ของ builder
     if (route is MaterialPageRoute) {
-      final builderStr = route.builder.runtimeType.toString();
-      if (builderStr.contains('LobbyScreen')) return '/lobby';
-      if (builderStr.contains('Quest') || builderStr.contains('Countdown')) return '/all_quest';
-      if (builderStr.contains('Club')) return '/club';
-      if (builderStr.contains('Achievement')) return '/achievement';
-      if (builderStr.contains('Map') || builderStr.contains('LocationUpgrade')) return '/map';
-      if (builderStr.contains('Fashion')) return '/fashion';
-      if (builderStr.contains('Gasha') || builderStr.contains('Gacha')) return '/gacha';
-      if (builderStr.contains('Profile')) return '/profile';
+      final s = route.builder.runtimeType.toString();
+      if (s.contains('LobbyScreen')) return '/lobby';
+      if (s.contains('Quest') || s.contains('Countdown')) return '/all_quest';
+      if (s.contains('Club')) return '/club';
+      if (s.contains('Achievement')) return '/achievement';
+      if (s.contains('Map') || s.contains('LocationUpgrade')) return '/map';
+      if (s.contains('Fashion')) return '/fashion';
+      if (s.contains('Gasha') || s.contains('Gacha')) return '/gacha';
+      if (s.contains('Profile')) return '/profile';
+      if (s.contains('Login')) return '/login';
+      if (s.contains('Register')) return '/register';
+      if (s.contains('Loading')) return '/load';
+      if (s.contains('StartGame')) return '/startgame';
     }
     return null;
+  }
+
+  // ฟังก์ชัน apply เพลง ใช้ร่วมกันทุก event เพื่อไม่ให้โค้ดซ้ำ
+  void _applyMusic(String? musicKey) {
+    if (musicKey == null) return; // ไม่รู้จัก route → ไม่ทำอะไร
+    if (musicKey == _kSilent) {
+      AudioManager().stopBGM(); // หน้าเงียบ → หยุดเพลง
+    } else {
+      AudioManager().playBGM(musicKey); // หน้ามีเพลง → เล่น
+    }
   }
 
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPush(route, previousRoute);
-    
-    final routeName = _extractRouteName(route);
-    final newMusic = _getMusicForRoute(routeName);
 
-    if (newMusic != null) {
-      // ถ้าหน้านี้มีเพลงเฉพาะของมัน ให้บันทึกลงประวัติและเล่นเพลงนั้น
-      _musicHistory.add(newMusic);
-      AudioManager().playBGM(newMusic);
+    final routeName = _extractRouteName(route);
+    final music = _getMusicForRoute(routeName);
+
+    if (music != null) {
+      // ถ้าหน้านี้มีเพลงเฉพาะของมัน (หรือเงียบ) ให้บันทึกลงประวัติและ apply
+      _musicHistory.add(music);
+      _applyMusic(music);
     } else {
       // ถ้าหน้าใหม่ไม่มีชื่อ route ชัดเจน (เช่น Dialog)
       // ให้คัดลอกเพลงล่าสุดใส่ประวัติเพิ่มไป เพื่อให้ตอนกดย้อนกลับ (Pop) ลบออกได้อย่างถูกต้อง
-      if (_musicHistory.isNotEmpty) {
-        _musicHistory.add(_musicHistory.last);
-      } else {
-        _musicHistory.add('lobby.mp3');
-        AudioManager().playBGM('lobby.mp3');
-      }
+      // ถ้า history ว่าง (เช่น เปิดแอปครั้งแรก) ให้เงียบแทนการเล่น lobby.mp3 อัตโนมัติ
+      final inherited = _musicHistory.isNotEmpty ? _musicHistory.last : _kSilent;
+      _musicHistory.add(inherited);
+      // ไม่ต้อง applyMusic เพราะเพลงเดิมก็กำลังเล่นอยู่แล้ว
     }
   }
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPop(route, previousRoute);
-    
-    // เมื่อกดย้อนกลับ ให้ลบเพลงของหน้าปัจจุบันที่กำลังจะปิด ออกจากประวัติ
-    if (_musicHistory.isNotEmpty) {
-      _musicHistory.removeLast();
-    }
 
-    // 1. ตรวจสอบชื่อ Route ของหน้าที่เรากำลังจะย้อนกลับไปแบบเจาะลึก
+    // เมื่อกดย้อนกลับ ให้ลบเพลงของหน้าปัจจุบันที่กำลังจะปิด ออกจากประวัติ
+    if (_musicHistory.isNotEmpty) _musicHistory.removeLast();
+
+    // ตรวจสอบชื่อ Route ของหน้าที่เรากำลังจะย้อนกลับไปแบบเจาะลึก
     final routeName = _extractRouteName(previousRoute);
     final explicitMusic = _getMusicForRoute(routeName);
 
     if (explicitMusic != null) {
-      AudioManager().playBGM(explicitMusic);
+      // หน้าที่กลับไปมี mapping ชัดเจน → ใช้ค่านั้น และอัปเดต history ด้วย
       if (_musicHistory.isNotEmpty) {
         _musicHistory[_musicHistory.length - 1] = explicitMusic;
       } else {
         _musicHistory.add(explicitMusic);
       }
+      _applyMusic(explicitMusic);
     } else {
-      if (_musicHistory.isNotEmpty) {
-        AudioManager().playBGM(_musicHistory.last);
-      } else {
-        AudioManager().playBGM('lobby.mp3');
-      }
+      // ไม่รู้จัก → ใช้ history ล่าสุด
+      final fallback = _musicHistory.isNotEmpty ? _musicHistory.last : _kSilent;
+      _applyMusic(fallback);
     }
   }
 
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
-    
-    if (_musicHistory.isNotEmpty) {
-      _musicHistory.removeLast();
-    }
+
+    // เมื่อใช้ pushReplacementNamed ให้ลบ history ของหน้าเก่าออกก่อน
+    if (_musicHistory.isNotEmpty) _musicHistory.removeLast();
 
     final routeName = _extractRouteName(newRoute);
-    final newMusic = _getMusicForRoute(routeName);
+    final music = _getMusicForRoute(routeName);
 
-    if (newMusic != null) {
-      _musicHistory.add(newMusic);
-      AudioManager().playBGM(newMusic);
+    if (music != null) {
+      _musicHistory.add(music);
+      // เรียก _applyMusic ซึ่งจะ stop เพลงเก่าก่อนเล่นใหม่เสมอ
+      _applyMusic(music);
     } else {
-      if (_musicHistory.isNotEmpty) {
-        _musicHistory.add(_musicHistory.last);
-        AudioManager().playBGM(_musicHistory.last);
-      } else {
-        _musicHistory.add('lobby.mp3');
-        AudioManager().playBGM('lobby.mp3');
-      }
+      final inherited = _musicHistory.isNotEmpty ? _musicHistory.last : _kSilent;
+      _musicHistory.add(inherited);
     }
   }
 }
