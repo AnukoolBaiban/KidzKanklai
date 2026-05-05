@@ -349,6 +349,10 @@ func ClaimAchievementReward(c *gin.Context) {
 		return
 	}
 
+	go func(u uuid.UUID) {
+		CheckCoinAchievement(context.Background(), u)
+	}(userID)
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "Reward claimed successfully",

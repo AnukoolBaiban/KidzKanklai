@@ -154,6 +154,8 @@ func PerformLocationAction(c *gin.Context) {
 		return
 	}
 
+	CheckStatAchievement(ctx, userID)
+
 	// 🌟 5. ส่ง Response กลับไปให้ Flutter
 	c.JSON(http.StatusOK, gin.H{
 		"success":         isSuccess,        // บอกว่าฝึกสำเร็จหรือล้มเหลว (ถ้าฟื้นฟูจะได้ true เสมอ)
