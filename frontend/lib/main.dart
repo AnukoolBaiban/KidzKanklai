@@ -168,8 +168,7 @@ class AuthGate extends StatelessWidget {
         final session = Supabase.instance.client.auth.currentSession;
 
         if (session != null) {
-          // ✅ login แล้ว
-          AudioManager().playBGM('lobby.mp3');
+          // ✅ login แล้ว (MusicRouteObserver จัดการเพลงให้อัตโนมัติเมื่อถึงหน้า /lobby)
           return const LobbyScreen(showLoading: true);
         } else {
           // ❌ ยังไม่ login
