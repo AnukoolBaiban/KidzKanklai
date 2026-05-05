@@ -368,9 +368,9 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
           endValue = 100;
         }
       } else {
-        // ถ้าฝึกฝนไม่สำเร็จ (ล้มเหลว) ให้โชว์เลขเดิมของสถานะที่พยายามจะฝึก 
-        // (เราไม่ต้องเอาค่าที่ติดลบไปคำนวณ ให้มันวิ่งจากค่าเดิมไปค่าเดิม จะได้นิ่งๆ)
-        endValue = startValue;
+        // ถ้าฝึกฝนไม่สำเร็จ (ล้มเหลว) ยอมให้ค่าลดลง (กรณีเสียพลังงาน)
+        endValue = startValue + value;
+        if (endValue < 0) endValue = 0;
       }
     } else {
       // สำหรับสเตตัสอื่นๆ ถ้าไม่สำเร็จก็ให้โชว์เลขเดิม
@@ -379,9 +379,13 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
       }
     }
 
-    // 🌟 4. กำหนดสี: ถ้าสำเร็จและเป็นบวก ให้สีเขียว, ถ้าล้มเหลว (isSuccess เป็น false) ให้สีดำ
-    // หมายเหตุ: แม้ค่า value จะเป็นลบ (เสียพลังงานตอนฝึกไม่ผ่าน) แต่เราโชว์เลขเดิมแล้ว เลยใช้ตัวแปร isSuccess เช็คสีแทนเลยจะชัวร์สุดครับ
-    Color statColor = widget.isSuccess ? Color(0xFF4CAF50) : Colors.black;
+    // 🌟 4. กำหนดสี: ถ้าสำเร็จและเป็นบวก ให้สีเขียว, ถ้าล้มเหลวและค่าลดลง ให้สีแดง ถ้าไม่ได้ลดให้สีดำ
+    Color statColor = Colors.black;
+    if (widget.isSuccess && value > 0) {
+      statColor = const Color(0xFF4CAF50);
+    } else if (!widget.isSuccess && value < 0) {
+      statColor = Colors.red;
+    }
 
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 4),

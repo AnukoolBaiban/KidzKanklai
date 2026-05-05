@@ -55,21 +55,21 @@ func PerformLocationAction(c *gin.Context) {
 	}
 	defer tx.Rollback(ctx)
 
-	// 🌟 1. ตรวจสอบและหักตั๋ว Energy Ticket (Item ID = 21)
+	// 🌟 1. ตรวจสอบตั๋ว Energy Ticket (Item ID = 21)
 	var ticketQuantity int
 	checkTicketQuery := `SELECT quantity FROM public.collect WHERE user_id = $1 AND item_id = 21 FOR UPDATE`
 	err = tx.QueryRow(ctx, checkTicketQuery, userID).Scan(&ticketQuantity)
+	hasTicket := true
 	if err != nil || ticketQuantity <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Not enough ENERGY_TICKET (Item ID: 21)"})
-		return
-	}
-
-	// หักตั๋ว 1 ใบ
-	updateTicketQuery := `UPDATE public.collect SET quantity = quantity - 1 WHERE user_id = $1 AND item_id = 21`
-	_, err = tx.Exec(ctx, updateTicketQuery, userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to consume Energy Ticket"})
-		return
+		hasTicket = false
+	} else {
+		// หักตั๋ว 1 ใบ
+		updateTicketQuery := `UPDATE public.collect SET quantity = quantity - 1 WHERE user_id = $1 AND item_id = 21`
+		_, err = tx.Exec(ctx, updateTicketQuery, userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to consume Energy Ticket"})
+			return
+		}
 	}
 
 	// 🌟 2. ดึงข้อมูลตัวละคร (สเตตัสปัจจุบัน)
@@ -94,7 +94,19 @@ func PerformLocationAction(c *gin.Context) {
 	statGained := ""
 
 	// 🌟 3. ลอจิกคำนวณตามสถานที่
-	if input.Location == "park" {
+	if !hasTicket {
+		// --- ตั๋วไม่พอ แต่มีพลังงาน -> กิจกรรมล้มเหลวและเสียพลังงานแบบสุ่ม ---
+		staminaCost := rand.Intn(11) + 10 // สุ่มใช้พลังงาน 10 ถึง 20
+		staminaChange = -staminaCost
+		if stamina >= staminaCost {
+			stamina -= staminaCost
+		} else {
+			staminaChange = -stamina
+			stamina = 0
+		}
+		isSuccess = false
+		message = "ตั๋วทำกิจกรรมไม่เพียงพอ ทำกิจกรรมล้มเหลวและเสียพลังงานไปเปล่าๆ!"
+	} else if input.Location == "park" {
 		// --- สวนสาธารณะ (ฟื้นฟูพลังงาน) ---
 		staminaChange = rand.Intn(21) + 70 // สุ่ม 70 ถึง 90
 		stamina += staminaChange

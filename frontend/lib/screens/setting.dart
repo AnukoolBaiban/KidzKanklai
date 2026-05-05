@@ -655,45 +655,16 @@ class _SettingScreenState extends State<SettingScreen> {
         Text(label, style: const TextStyle(fontSize: 18, color: Colors.black)),
         const Spacer(),
         if (isConnected)
-          GestureDetector(
+          _HoverButton(
+            text: connectedText ?? "เชื่อมต่อแล้ว",
             onTap: onConnectedTap,
-            child: Container(
-              width: 100, // กำหนดความกว้างให้กล่องเท่ากัน
-              alignment: Alignment.center,
-              padding: const EdgeInsets.symmetric(vertical: 5),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2374B5),
-                borderRadius: BorderRadius.circular(5),
-              ),
-              child: Text(
-                connectedText ?? "เชื่อมต่อแล้ว",
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
+            isOutline: false,
           )
         else if (onTap != null)
-          GestureDetector(
+          _HoverButton(
+            text: "ผูกบัญชี",
             onTap: onTap,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
-              decoration: BoxDecoration(
-                color: Colors.transparent,
-                border: Border.all(color: const Color(0xFF2374B5), width: 2),
-                borderRadius: BorderRadius.circular(5),
-              ),
-              child: const Text(
-                "ผูกบัญชี",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-            ),
+            isOutline: true,
           ),
       ],
     );
@@ -1205,5 +1176,65 @@ class GradientRectSliderTrackShape extends SliderTrackShape
     );
     context.canvas.drawRRect(fullRRect, activePaint);
     context.canvas.restore();
+  }
+}
+
+// [ADDED] Widget สำหรับปุ่มที่แสดง Hover Effect (สีเข้มขึ้น)
+class _HoverButton extends StatefulWidget {
+  final String text;
+  final VoidCallback? onTap;
+  final bool isOutline;
+
+  const _HoverButton({
+    required this.text,
+    this.onTap,
+    required this.isOutline,
+  });
+
+  @override
+  State<_HoverButton> createState() => _HoverButtonState();
+}
+
+class _HoverButtonState extends State<_HoverButton> {
+  bool _isHovered = false;
+  bool _isPressed = false;
+
+  bool get _isActive => _isHovered || _isPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: widget.onTap != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapUp: (_) => setState(() => _isPressed = false),
+        onTapCancel: () => setState(() => _isPressed = false),
+        onTap: widget.onTap,
+        child: Container(
+          width: widget.isOutline ? null : 100,
+          alignment: Alignment.center,
+          padding: widget.isOutline
+              ? const EdgeInsets.symmetric(horizontal: 20, vertical: 5)
+              : const EdgeInsets.symmetric(vertical: 5),
+          decoration: BoxDecoration(
+            color: widget.isOutline
+                ? (_isActive && widget.onTap != null ? const Color(0xFFE8F4FA) : Colors.transparent)
+                : (_isActive && widget.onTap != null ? const Color(0xFF135080) : const Color(0xFF2374B5)),
+            border: widget.isOutline ? Border.all(color: const Color(0xFF2374B5), width: 2) : null,
+            borderRadius: BorderRadius.circular(5),
+          ),
+          child: Text(
+            widget.text,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: widget.isOutline ? Colors.black : Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

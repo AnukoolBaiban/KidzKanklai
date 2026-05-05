@@ -491,10 +491,7 @@ class _ExamScreenState extends State<ExamScreen> {
                   if (widget.locationName == 'สนามสอบ' && _selectedExam != null)
                     SizedBox(height: 20),
 
-                  if (true) ...[
-                    EnergyBar(),
-                    SizedBox(height: 20),
-                  ],
+
 
                   /// Stat Box
                   _buildStatBox(),
@@ -1256,7 +1253,6 @@ class _ExamScreenState extends State<ExamScreen> {
           title: _displayName,
         ),
         Container(
-          height: 200,
           width: double.infinity,
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.8),
@@ -1292,34 +1288,41 @@ class _ExamScreenState extends State<ExamScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.all(15),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildAvatarSection(),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _buildStatRowWithIcon(
-                            'assets/images/profile/stat-int-img.png',
-                            "ความฉลาด",
-                            _intStat.toString(),
+                    EnergyBar(),
+                    const SizedBox(height: 15),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        _buildAvatarSection(),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildStatRowWithIcon(
+                                'assets/images/profile/stat-int-img.png',
+                                "ความฉลาด",
+                                _intStat.toString(),
+                              ),
+                              const SizedBox(height: 8),
+                              _buildStatRowWithIcon(
+                                'assets/images/profile/stat-str-img.png',
+                                "ความแข็งแรง",
+                                _strStat.toString(),
+                              ),
+                              const SizedBox(height: 8),
+                              _buildStatRowWithIcon(
+                                'assets/images/profile/stat-cre-img.png',
+                                "ความคิดสร้างสรรค์",
+                                _creStat.toString(),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 8),
-                          _buildStatRowWithIcon(
-                            'assets/images/profile/stat-str-img.png',
-                            "ความแข็งแรง",
-                            _strStat.toString(),
-                          ),
-                          const SizedBox(height: 8),
-                          _buildStatRowWithIcon(
-                            'assets/images/profile/stat-cre-img.png',
-                            "ความคิดสร้างสรรค์",
-                            _creStat.toString(),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
