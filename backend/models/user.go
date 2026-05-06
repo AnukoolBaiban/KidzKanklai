@@ -41,6 +41,7 @@ type Club struct {
 	Description *string    `json:"description"`
 	InviteCode  string     `json:"invite_code"` // 🌟 เพิ่มใหม่: รหัสเข้าร่วมชมรม (e.g., ABCDEF)
 	CreatedAt   *time.Time `json:"created_at"`
+	IsJoinable  bool       `json:"is_joinable"` // 🌟 เพิ่มใหม่: เช็คว่าชมรมเปิดรับสมาชิกใหม่หรือไม่ (true/false)
 }
 
 // Table: achievements

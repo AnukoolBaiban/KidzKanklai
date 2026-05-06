@@ -842,6 +842,35 @@ class ApiService {
   }
 
   // ------------------------------------------------------------------------
+  // API: เปิด/ปิด การรับสมาชิกชมรม (Toggle Joinable Status)
+  // ------------------------------------------------------------------------
+  static Future<Map<String, dynamic>?> toggleClubJoinStatus(bool isJoinable) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/clubs/toggle_join'), // 🌟 ตรวจสอบ Path ให้ตรงกับใน main.go
+        headers: _headers,
+        body: jsonEncode({
+          "is_joinable": isJoinable,
+        }),
+      );
+
+      var responseBody = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200) {
+        return responseBody;
+      } else {
+        return {
+          "success": false,
+          "error": responseBody['error'] ?? "ไม่สามารถเปลี่ยนสถานะได้",
+        };
+      }
+    } catch (e) {
+      debugPrint("Toggle Join API Error: $e");
+      return {"success": false, "error": "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"};
+    }
+  }
+
+  // ------------------------------------------------------------------------
   // API: อัปเดตข้อมูลชมรม (Update Club)
   // ------------------------------------------------------------------------
   static Future<Map<String, dynamic>?> updateClub({String? name, String? description}) async {
