@@ -128,7 +128,7 @@ class ClubDetailHeadPreloader {
 
       final club = await supabase
           .from('clubs')
-          .select('name, description, invite_code')
+          .select('name, description, invite_code, is_joinable') // 🌟 เพิ่ม is_joinable
           .eq('id', clubId)
           .single();
 
@@ -246,6 +246,44 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
   int _clubId = 0;
   String _inviteCode = '';
   String _clubName = ''; // เก็บค่าเดิมไว้เทียบบันทึก
+
+  // 🌟 เพิ่มตัวแปรสำหรับระบบเปิด/ปิดเข้าร่วมชมรม
+  bool _isJoinable = true;
+  bool _isToggling = false;
+
+  // 🌟 ฟังก์ชันเรียก API เปิด/ปิด
+  Future<void> _updateClubJoinStatus(bool value) async {
+    if (_isToggling) return; // กันกดรัวๆ
+    setState(() => _isToggling = true);
+
+    final result = await ApiService.toggleClubJoinStatus(value);
+
+    setState(() => _isToggling = false);
+
+    if (mounted) {
+      if (result != null && result['success'] == true) {
+        setState(() => _isJoinable = value);
+        // อัปเดตข้อมูลใน Cache ด้วย
+        if (ClubDetailHeadPreloader.cachedData != null && ClubDetailHeadPreloader.cachedData!['club'] != null) {
+          ClubDetailHeadPreloader.cachedData!['club']['is_joinable'] = value;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? (value ? 'เปิดรับสมาชิกแล้ว' : 'ปิดรับสมาชิกแล้ว')),
+            backgroundColor: value ? Colors.green : Colors.orange,
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result?['error'] ?? 'เกิดข้อผิดพลาด'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   // ข้อมูลสมาชิก
   List<Map<String, dynamic>> _members = [];
@@ -400,6 +438,7 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
         
         _clubName = data['club']['name'] ?? '';
         _inviteCode = data['club']['invite_code'] ?? '------';
+        _isJoinable = data['club']['is_joinable'] ?? true; // 🌟 รับค่าที่ดึงมา
         _clubNameController.text = _clubName;
         _clubDetailController.text = data['club']['description'] ?? '';
 
@@ -1057,6 +1096,63 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
                             child: Center(child: Image.asset('assets/images/icon/iconCopy.png', width: 20, height: 20)),
                           ),
                         ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 🌟 สิ่งที่ต้องเพิ่ม: แถวเปิด/ปิดการเข้าร่วมชมรม
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 8, 12),
+            child: Row(
+              children: [
+                const Expanded(
+                  flex: 2,
+                  child: Text("การเข้าร่วมชมรม", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF00385D)))
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Container(
+                    height: 35,
+                    padding: const EdgeInsets.only(left: 16, right: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 2, offset: const Offset(0, 1))],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _isJoinable ? "เปิดรับสมาชิก" : "ปิดรับสมาชิก",
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: _isJoinable ? Colors.green : Colors.grey.shade600,
+                          ),
+                        ),
+                        _isToggling
+                            ? const Padding(
+                                padding: EdgeInsets.only(right: 8.0),
+                                child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                              )
+                            : SizedBox(
+                                height: 24, // บีบขนาด switch ให้พอดีกับกรอบ
+                                child: FittedBox(
+                                  fit: BoxFit.contain,
+                                  child: Switch(
+                                    value: _isJoinable,
+                                    activeColor: const Color(0xFF8CD853), // สีเขียวตอนเปิด
+                                    inactiveThumbColor: Colors.white,
+                                    inactiveTrackColor: Colors.grey.shade400,
+                                    onChanged: (bool value) {
+                                      _updateClubJoinStatus(value);
+                                    },
+                                  ),
+                                ),
+                              ),
                       ],
                     ),
                   ),

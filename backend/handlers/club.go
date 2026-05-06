@@ -180,10 +180,19 @@ func JoinClub(c *gin.Context) {
 	// 2. ค้นหาชมรมจากรหัสเชิญ
 	var targetClubID int64
 	var targetClubName string
-	err = tx.QueryRow(ctx, `SELECT id, name FROM public.clubs WHERE invite_code = $1`, input.InviteCode).Scan(&targetClubID, &targetClubName)
+	var isJoinable bool // 🌟 1. เพิ่มตัวแปรมารับค่า is_joinable
+
+	// 🌟 2. เพิ่ม is_joinable ลงในคำสั่ง SELECT
+	err = tx.QueryRow(ctx, `SELECT id, name, is_joinable FROM public.clubs WHERE invite_code = $1`, input.InviteCode).Scan(&targetClubID, &targetClubName, &isJoinable)
 	if err != nil {
 		// ค้นหาไม่เจอ
 		c.JSON(http.StatusBadRequest, gin.H{"error": "รหัสเชิญไม่ถูกต้อง หรือไม่มีชมรมนี้อยู่"})
+		return
+	}
+
+	// 🌟 3. เช็คว่าชมรมเปิดรับคนอยู่หรือไม่
+	if !isJoinable {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ชมรมนี้ปิดรับสมาชิกชั่วคราว ไม่สามารถเข้าร่วมได้"})
 		return
 	}
 
@@ -221,6 +230,71 @@ func JoinClub(c *gin.Context) {
 		"success": true,
 		"message": fmt.Sprintf("เข้าร่วมชมรม '%s' สำเร็จ!", targetClubName),
 		"club_id": targetClubID,
+	})
+}
+
+// ------------------------------------------------------------------------
+// API: เปิด/ปิด การรับสมาชิกชมรม (Toggle Joinable Status)
+// ------------------------------------------------------------------------
+
+type ToggleJoinInput struct {
+	IsJoinable bool `json:"is_joinable"` // รับค่า true (เปิดรับ) หรือ false (ปิดรับ)
+}
+
+// POST /clubs/toggle_join
+func ToggleJoinStatus(c *gin.Context) {
+	userIdVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	userIDStr := fmt.Sprintf("%v", userIdVal)
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	var input ToggleJoinInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง กรุณาส่งค่า is_joinable (boolean)"})
+		return
+	}
+
+	ctx := context.Background()
+
+	// 1. ตรวจสอบว่าผู้ใช้เป็นเจ้าของชมรมหรือไม่
+	var clubID int64
+	var clubRole string
+	err = configs.DB.QueryRow(ctx, `SELECT COALESCE(club_id, 0), COALESCE(club_role, '') FROM public.user_profiles WHERE id = $1`, userID).Scan(&clubID, &clubRole)
+	if err != nil || clubID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "คุณยังไม่มีชมรม"})
+		return
+	}
+	
+	if clubRole != "owner" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "เฉพาะหัวหน้าชมรมเท่านั้นที่สามารถเปลี่ยนสถานะการรับสมาชิกได้"})
+		return
+	}
+
+	// 2. อัปเดตสถานะ is_joinable ของชมรม
+	updateQuery := `UPDATE public.clubs SET is_joinable = $1 WHERE id = $2`
+	_, err = configs.DB.Exec(ctx, updateQuery, input.IsJoinable, clubID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถเปลี่ยนสถานะชมรมได้ โปรดลองอีกครั้ง"})
+		return
+	}
+
+	// 3. เตรียมข้อความตอบกลับ
+	statusMsg := "ปิด"
+	if input.IsJoinable {
+		statusMsg = "เปิด"
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":     true,
+		"message":     fmt.Sprintf("%sรับสมาชิกเรียบร้อยแล้ว", statusMsg),
+		"is_joinable": input.IsJoinable,
 	})
 }
 
@@ -522,4 +596,4 @@ func UpdateClub(c *gin.Context) {
 		"success": true,
 		"message": "อัปเดตข้อมูลชมรมเรียบร้อยแล้ว",
 	})
-}
+}
