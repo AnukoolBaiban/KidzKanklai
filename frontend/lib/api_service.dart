@@ -787,6 +787,50 @@ class ApiService {
   }
 
   // ------------------------------------------------------------------------
+  // API: กดรับรางวัลจากจดหมายแจ้งเตือน
+  // ------------------------------------------------------------------------
+  static Future<Map<String, dynamic>?> claimNotificationReward(int id) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/notifications/$id/claim'),
+        headers: _headers,
+      );
+
+      final responseBody = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200) {
+        return responseBody;
+      } else {
+        return {
+          "success": false, 
+          "error": responseBody['error'] ?? "ไม่สามารถรับรางวัลได้"
+        };
+      }
+    } catch (e) {
+      debugPrint("Claim Reward Error: $e");
+      return {"success": false, "error": "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"};
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // API: ดึงรายละเอียดของรางวัลของจดหมายฉบับนั้น
+  // ------------------------------------------------------------------------
+  static Future<Map<String, dynamic>?> getNotificationRewards(int id) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/notifications/$id/rewards'),
+        headers: _headers,
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(utf8.decode(response.bodyBytes));
+      }
+    } catch (e) {
+      debugPrint("Get Notif Rewards Error: $e");
+    }
+    return null;
+  }
+
+  // ------------------------------------------------------------------------
   // API: สร้างชมรม (Create Club)
   // ------------------------------------------------------------------------
   static Future<Map<String, dynamic>?> createClub(String name, String description) async {
@@ -977,17 +1021,26 @@ class ApiService {
       final uri = Uri.parse('$baseUrl/clubs/quests/create');
       final request = http.MultipartRequest('POST', uri);
 
-      // ใส่ Token Authorization (อย่าลืมเรียก _getAuthHeader() แบบในฟังก์ชันอื่นๆ)
+      // ใส่ Token Authorization
       final token = Supabase.instance.client.auth.currentSession?.accessToken;
-      request.headers['Authorization'] = 'Bearer $token';
+      if (token != null) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
 
       // 🌟 ใส่ข้อมูลแบบ Form-Data
       request.fields['name'] = questData['name'].toString();
       request.fields['detail'] = questData['detail']?.toString() ?? '';
-      request.fields['passing_score'] = questData['passing_score'].toString();
+      
+      // 🌟 [สิ่งที่เพิ่ม] ส่งวันหมดเขต (due_date) ไปด้วย! (ต้องเป็น ISO 8601 string เช่น "2026-05-14T23:59:59Z")
+      if (questData['due_date'] != null) {
+        request.fields['due_date'] = questData['due_date'].toString();
+      }
 
-      // 🌟 แปลงข้อมูลชุดคำถามให้กลายเป็นข้อความ String ก่อนส่ง
-      request.fields['questions'] = jsonEncode(questData['questions']);
+      // ป้องกันกรณีไม่ได้ส่งคะแนนมา ให้เป็น 0
+      request.fields['passing_score'] = (questData['passing_score'] ?? 0).toString();
+
+      // 🌟 แปลงข้อมูลชุดคำถามให้กลายเป็นข้อความ String ก่อนส่ง (ถ้าไม่มีให้ส่ง '[]' ไป)
+      request.fields['questions'] = jsonEncode(questData['questions'] ?? []);
 
       // 🌟 แนบไฟล์รูปภาพ (ถ้ามี)
       if (imageFile != null) {
@@ -1000,12 +1053,14 @@ class ApiService {
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
+      // 🌟 [สิ่งที่ปรับแก้] ใช้ utf8.decode ป้องกันภาษาไทยเพี้ยน
+      final responseBody = jsonDecode(utf8.decode(response.bodyBytes));
+
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        return responseBody;
       } else {
-        final errorData = jsonDecode(response.body);
-        print("Create Quest Failed: ${errorData['error']}");
-        return {"success": false, "error": errorData['error'] ?? "เกิดข้อผิดพลาด"};
+        print("Create Quest Failed: ${responseBody['error']}");
+        return {"success": false, "error": responseBody['error'] ?? "เกิดข้อผิดพลาด"};
       }
     } catch (e) {
       print("Create Quest Error: $e");
@@ -1024,15 +1079,86 @@ class ApiService {
         body: jsonEncode(data),
       );
 
+      // 🌟 [สิ่งที่ปรับแก้] ใช้ utf8.decode ป้องกันภาษาไทยเพี้ยน
+      final responseBody = jsonDecode(utf8.decode(response.bodyBytes));
+
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        return responseBody;
       } else {
-        final errorData = jsonDecode(response.body);
-        print("Submit Quest Failed: ${errorData['error']}");
-        return {"success": false, "error": errorData['error'] ?? "เกิดข้อผิดพลาด", "cooldown_seconds": errorData['cooldown_seconds']};
+        print("Submit Quest Failed: ${responseBody['error']}");
+        return {
+          "success": false, 
+          "error": responseBody['error'] ?? "เกิดข้อผิดพลาด", 
+          "cooldown_seconds": responseBody['cooldown_seconds']
+        };
       }
     } catch (e) {
       print("Submit Quest Error: $e");
+      return {"success": false, "error": "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"};
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // API: แก้ไขภารกิจชมรม (Update Club Quest)
+  // ------------------------------------------------------------------------
+  static Future<Map<String, dynamic>?> updateClubQuest(
+    Map<String, dynamic> data, {
+    File? imageFile,
+    bool deleteImage = false, // แฟลกว่าผู้ใช้กดลบรูปทิ้งหรือไม่
+  }) async {
+    try {
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/clubs/quests/update'),
+      );
+
+      // ใส่ Token Authorization
+      final token = Supabase.instance.client.auth.currentSession?.accessToken;
+      if (token != null) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+
+      // 🌟 ใส่ข้อมูลหลักแบบ Form-Data
+      request.fields['quest_id'] = data['id'].toString();
+      request.fields['name'] = data['name'].toString();
+      request.fields['detail'] = data['detail']?.toString() ?? '';
+      
+      // ส่งวันหมดเขต (due_date)
+      if (data['due_date'] != null) {
+        request.fields['due_date'] = data['due_date'].toString();
+      }
+
+      // ป้องกันกรณีไม่ได้ส่งคะแนนมา ให้เป็น 0
+      request.fields['passing_score'] = (data['passing_score'] ?? 0).toString();
+
+      // แปลงข้อมูลชุดคำถาม (ถ้าไม่มีให้ส่ง '[]')
+      request.fields['questions'] = jsonEncode(data['questions'] ?? []);
+      
+      // ส่ง flag ลบรูปลงไป
+      request.fields['delete_image'] = deleteImage ? 'true' : 'false';
+
+      // 🌟 แนบไฟล์รูปภาพใหม่ (ถ้ามีการเลือกรูปใหม่)
+      if (imageFile != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath('image', imageFile.path),
+        );
+      }
+
+      // ยิง API
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      // ใช้ utf8.decode ป้องกันภาษาไทยเพี้ยน
+      final responseBody = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200) {
+        return responseBody;
+      } else {
+        print("Update Quest Failed: ${responseBody['error']}");
+        return {"success": false, "error": responseBody['error'] ?? "อัปเดตภารกิจล้มเหลว"};
+      }
+    } catch (e) {
+      print("Update Quest Error: $e");
       return {"success": false, "error": "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"};
     }
   }

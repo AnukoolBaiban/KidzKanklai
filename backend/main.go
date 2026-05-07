@@ -85,6 +85,8 @@ func main() {
 	auth.PUT("/notifications/:id/read", handlers.MarkNotificationRead)
 	auth.DELETE("/notifications/:id", handlers.DeleteNotification)
 	auth.DELETE("/notifications", handlers.DeleteAllNotifications)
+	auth.POST("/notifications/:id/claim", handlers.ClaimNotificationReward)
+	auth.GET("/notifications/:id/rewards", handlers.GetNotificationRewards)
 
 	// --- Clubs ---
 	auth.POST("/clubs/create", handlers.CreateClub)
@@ -98,6 +100,7 @@ func main() {
 	auth.POST("/clubs/quests/create", handlers.CreateClubQuest)
 	auth.GET("/clubs/quests", handlers.GetClubQuests)
 	auth.POST("/clubs/quests/submit", handlers.SubmitClubQuest)
+	auth.POST("/clubs/quests/update", handlers.UpdateClubQuest)
 
 	r.Run(":8080")
 }

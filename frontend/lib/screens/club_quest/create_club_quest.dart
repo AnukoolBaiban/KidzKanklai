@@ -87,7 +87,18 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
     if (widget.initialData != null) {
       _nameController.text = widget.initialData!['name'] ?? '';
       _detailController.text = widget.initialData!['detail'] ?? '';
-      _selectedDate = widget.initialData!['date'];
+      
+      // 🌟 ดึงข้อมูลวันที่ (รองรับทั้ง DateTime และ String จาก DB)
+      if (widget.initialData!['date'] is DateTime) {
+        _selectedDate = widget.initialData!['date'];
+      } else if (widget.initialData!['due_date'] != null) {
+        _selectedDate = DateTime.parse(widget.initialData!['due_date']).toLocal();
+      }
+
+      // 🌟 เช็คว่ามีรูปภาพเดิมอยู่หรือไม่
+      if (widget.initialData!['imageUrl'] != null || widget.initialData!['image'] != null) {
+        _hasImage = true;
+      }
     }
   }
 
@@ -102,46 +113,10 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
   }
 
   Future<void> _selectDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate ?? DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime(2100),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: Color(0xFF2374B5),
-              onPrimary: Colors.white,
-              onSurface: Colors.black87,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
-    }
-  }
-
-  void _submit() {
-    if (_nameController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('กรุณากรอกชื่อภารกิจ'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-    Future<void> _selectDate() async {
-    // 🌟 1. คำนวณ "วันพรุ่งนี้" โดยเอาเวลาปัจจุบันมาบวกไป 1 วัน
+    // 🌟 คำนวณ "วันพรุ่งนี้"
     final DateTime tomorrow = DateTime.now().add(const Duration(days: 1));
     
-    // 🌟 2. เช็คค่าเริ่มต้น ถ้ายังไม่ได้เลือกเวลา หรือเวลาที่เลือกไว้น้อยกว่าวันพรุ่งนี้ ให้ใช้พรุ่งนี้เป็นจุดเริ่มต้น
+    // 🌟 เช็คค่าเริ่มต้น ถ้าเวลาน้อยกว่าวันพรุ่งนี้ ให้เด้งไปพรุ่งนี้
     DateTime initial = _selectedDate ?? tomorrow;
     if (initial.isBefore(tomorrow)) {
       initial = tomorrow;
@@ -149,8 +124,8 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
 
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: initial, 
-      firstDate: tomorrow,  // 🌟 3. บังคับให้ปฏิทินเริ่มต้นคลิกได้ตั้งแต่วันพรุ่งนี้เป็นต้นไป (คลิกวันนี้ไม่ได้)
+      initialDate: initial,
+      firstDate: tomorrow, // 🌟 บังคับให้ปฏิทินเริ่มต้นคลิกได้ตั้งแต่วันพรุ่งนี้
       lastDate: DateTime(2100),
       builder: (context, child) {
         return Theme(
@@ -172,25 +147,86 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
     }
   }
 
-    final data = {
-      'name': _nameController.text,
-      'detail': _detailController.text,
-      'date': _selectedDate,
-      'image': _hasImage,
-      'minScore': _minScore,
-      'questions': _questions
-          .map(
-            (q) => {
-              'question': q.textController.text,
-              'options': q.optionControllers.map((c) => c.text).toList(),
-              'correctOptionIndex': q.correctOptionIndex,
-            },
-          )
-          .toList(),
+  // 🌟 ฟังก์ชันสำหรับสร้างภารกิจแบบ "ไม่มีคำถาม"
+  Future<void> _submitWithoutQuestions() async {
+    // 1. ดักเช็คชื่อภารกิจ
+    if (_nameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กรุณากรอกชื่อภารกิจ'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    // 2. ดักเช็ควันหมดเขต
+    if (_selectedDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กรุณาเลือกวันที่สิ้นสุดภารกิจ'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    // 3. โชว์ Loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    // 4. เตรียมข้อมูลส่งให้ API (คำถามเป็นว่าง, passing_score เป็น 0)
+    Map<String, dynamic> requestData = {
+      "name": _nameController.text.trim(),
+      "detail": _detailController.text.trim(),
+      "due_date": _selectedDate!.toUtc().toIso8601String(), // 🌟 เติม .toUtc() เข้าไป!
+      "passing_score": 0, 
+      "questions": [], 
     };
 
-    widget.onSubmit(data);
+    Map<String, dynamic>? result;
+
+    // 5. แยกว่าเป็นการสร้างใหม่ หรือ แก้ไขของเดิม
+    if (widget.isEditing) {
+      requestData['id'] = widget.initialData?['id'];
+      bool shouldDeleteImage = false;
+      if (_selectedImage == null && widget.initialData?['imageUrl'] != null && widget.initialData?['imageFile'] == null) {
+        shouldDeleteImage = true;
+      }
+      result = await ApiService.updateClubQuest(
+        requestData,
+        imageFile: _selectedImage,
+        deleteImage: shouldDeleteImage,
+      );
+    } else {
+      result = await ApiService.createClubQuest(
+        requestData,
+        imageFile: _selectedImage,
+      );
+    }
+
+    if (mounted) Navigator.pop(context); // ปิด Loading
+
+    // 6. จัดการผลลัพธ์
+    if (mounted) {
+      if (result != null && result['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.isEditing ? 'อัปเดตภารกิจสำเร็จ!' : 'สร้างภารกิจสำเร็จ!'), 
+            backgroundColor: const Color(0xFF2374B5),
+          ),
+        );
+        // เด้งกลับไปหน้าหลักชมรม
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const ClubRoomHeadScreen()),
+          (route) => route.isFirst,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result?['error'] ?? 'เกิดข้อผิดพลาด'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
+
 
   bool _hasUnsavedChanges() {
     bool nameChanged = _nameController.text.trim().isNotEmpty;
@@ -726,76 +762,60 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
   }
 
   Widget _buildImagePreview() {
+    // 🌟 เช็คว่าจะโชว์รูปจากไฟล์ที่เพิ่งเลือก หรือรูปจาก URL เดิม
+    Widget imageWidget;
+    if (_selectedImage != null) {
+      imageWidget = Image.file(_selectedImage!, fit: BoxFit.cover);
+    } else if (widget.initialData?['imageUrl'] != null) {
+      imageWidget = Image.network(widget.initialData!['imageUrl'], fit: BoxFit.cover);
+    } else if (widget.initialData?['image'] != null) {
+      imageWidget = Image.network(widget.initialData!['image'], fit: BoxFit.cover);
+    } else {
+      imageWidget = const Icon(Icons.image, size: 60, color: Color(0xFF64B5F6));
+    }
+
     return GestureDetector(
-      onTap: () {
-        _handleImagePick();
-      },
+      onTap: _handleImagePick,
       child: Container(
-        width: 800,
-        height: 500,
+        width: double.infinity, // 🌟 ให้ขยายเต็มพื้นที่
+        height: 200, // 🌟 กำหนดความสูงให้เหมาะสม
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Color(0xFF9DD0E7), width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: Offset(0, 4),
-            ),
-          ],
+          border: Border.all(color: const Color(0xFF9DD0E7), width: 2),
         ),
         child: Stack(
           children: [
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.image, size: 60, color: Color(0xFF64B5F6)),
-                  SizedBox(height: 8),
-                  Text(
-                    'รูปภาพที่เลือก',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                  ),
-                ],
+            // 🌟 นำ Widget รูปภาพมาแสดงเต็มกรอบ
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                width: double.infinity,
+                height: double.infinity,
+                child: imageWidget,
               ),
             ),
-
+            
+            // ปุ่มกากบาทลบรูป
             Positioned(
               top: 8,
-              left: 8,
               right: 8,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'รูปภาพ',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF002A50),
-                    ),
-                  ),
-
-                  Spacer(),
-
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _hasImage = false;
-                        _selectedImage = null; // 🌟 เคลียร์ไฟล์ทิ้งด้วย
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('ลบรูปภาพแล้ว'),
-                          backgroundColor: Colors.orange,
-                          duration: Duration(seconds: 1),
-                        ),
-                      );
-                    },
-                    child: const Icon(Icons.close, color: Color(0xFF447199), size: 28),
-                  ),
-                ],
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _hasImage = false;
+                    _selectedImage = null;
+                    if (widget.initialData != null) {
+                      widget.initialData!['imageUrl'] = null; // ล้าง URL เดิมทิ้งด้วย
+                      widget.initialData!['image'] = null;
+                    }
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(color: Colors.white70, shape: BoxShape.circle),
+                  child: const Icon(Icons.close, color: Color(0xFF447199), size: 24),
+                ),
               ),
             ),
           ],
@@ -809,6 +829,7 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Expanded(child: _buildSubmitButtonNew()),
+        Expanded(child: _buildSubmitWithoutQuizButton()),
       ],
     );
   }
@@ -832,6 +853,29 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
       ),
       child: ElevatedButton(
         onPressed: () {
+          // 🌟 1. ดักเช็คชื่อภารกิจ
+          if (_nameController.text.trim().isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('กรุณากรอกชื่อภารกิจ'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return;
+          }
+
+          // 🌟 2. ดักเช็ควันหมดเขต (สำคัญมาก เพราะ API ใหม่บังคับ)
+          if (_selectedDate == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('กรุณาเลือกวันที่สิ้นสุดภารกิจ'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return;
+          }
+
+          // 🌟 3. ผ่านเงื่อนไข ให้เปลี่ยนไปหน้าตั้งคำถาม
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -839,16 +883,14 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
                 user: widget.user,
                 isEditing: widget.isEditing,
                 initialData: {
-                  // 🌟 เพิ่ม ID และรูปเดิม เพื่อให้หน้าถัดไปเอาไปยิง API Update ได้ถูกข้อ
                   'id': widget.initialData?['id'], 
                   'imageUrl': widget.initialData?['imageUrl'], 
                   
-                  'name': _nameController.text,
-                  'detail': _detailController.text,
-                  'date': _selectedDate,
+                  'name': _nameController.text.trim(),
+                  'detail': _detailController.text.trim(),
+                  'date': _selectedDate, // ส่งวันที่ไปหน้า Quiz
                   'imageFile': _selectedImage, 
                   
-                  // 🌟 ส่งคำถามเดิมและคะแนนผ่านไปยังหน้า Quiz ต่อ
                   'questions': widget.initialData?['questions'],
                   'minScore': widget.initialData?['minScore'],
                 },
@@ -865,10 +907,50 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
             borderRadius: BorderRadius.circular(25),
           ),
         ),
-        child: Text(
-          'ถัดไป',
+        child: const Text(
+          'เพิ่มคำถาม',
           style: TextStyle(
             fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 🌟 UI ปุ่มสร้างภารกิจแบบไม่มีคำถาม
+  Widget _buildSubmitWithoutQuizButton() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF8CD853), Color(0xFF4CB050)], // โทนสีเขียวให้ดูแตกต่าง
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.circular(25),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4CB050).withOpacity(0.4),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ElevatedButton(
+        onPressed: _submitWithoutQuestions, // เรียกฟังก์ชันที่เราเพิ่งสร้าง
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(25),
+          ),
+        ),
+        child: Text(
+          widget.isEditing ? 'บันทึก' : 'สร้างภารกิจชมรม', // 🌟 ถ้าเป็นโหมดแก้ไขให้ขึ้นว่า "บันทึก"
+          style: TextStyle(
+            fontSize: 16,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
