@@ -4,6 +4,7 @@ import '../../api_service.dart';
 import 'club_quest_quiz_answer.dart';
 import 'create_club_quest.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; // 🌟 เพิ่มบรรทัดนี้
+import 'incomplete_member.dart'; // 🌟 Import ไฟล์ใหม่
 
 class ClubQuestDetailLeaderScreen extends StatefulWidget {
   final Map<String, dynamic> questData; // 🌟 รับข้อมูลเควส
@@ -25,6 +26,9 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
   late String _description;
   late String _endDate;
   String? _imagePath;
+
+  int _totalMembers = 0;
+  int _completedMembers = 0;
 
   @override
   void initState() {
@@ -56,6 +60,8 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
     } else {
       _imagePath = null;
     }
+
+    _fetchQuestProgress(); // 🌟 เรียกใช้ตอนเปิดหน้า
   }
 
   // 🌟 ฟังก์ชันดึงข้อมูลคำถามและส่งไปหน้าแก้ไข
@@ -105,6 +111,50 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('ไม่สามารถดึงข้อมูลคำถามได้'), backgroundColor: Colors.red),
       );
+    }
+  }
+
+  // 🌟 ฟังก์ชันดึงสถิติคนที่ทำเควสนี้
+  Future<void> _fetchQuestProgress() async {
+    try {
+      final supabase = Supabase.instance.client;
+      
+      // ดึงค่า ID มาเช็คก่อนว่าไม่เป็น null
+      final clubId = widget.questData['club_id'];
+      final questId = widget.questData['id'];
+
+      if (clubId == null || questId == null) {
+        debugPrint("❌ Error: clubId หรือ questId เป็น null");
+        return;
+      }
+
+      // 1. นับจำนวนลูกน้องในคลับ (user_profiles มีคอลัมน์ id)
+      final membersRes = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('club_id', clubId)
+          .neq('club_role', 'owner');
+      
+      final total = (membersRes as List).length;
+
+      // 2. นับคนที่ทำเควสนี้เสร็จ (🌟 เปลี่ยนจาก 'id' เป็น 'user_id' ป้องกัน Error คอลัมน์ไม่มี)
+      final doQuestsRes = await supabase
+          .from('do_quests')
+          .select('user_id') 
+          .eq('quest_id', questId)
+          .eq('status', 'completed');
+          
+      final completed = (doQuestsRes as List).length;
+
+      if (mounted) {
+        setState(() {
+          _totalMembers = total;
+          _completedMembers = completed;
+        });
+      }
+    } catch (e) {
+      // 🌟 พิมพ์ Error ออกมาดูว่าติดปัญหาอะไร
+      debugPrint("❌ Error fetching progress: $e");
     }
   }
 
@@ -281,6 +331,64 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
                                           fontSize: 14,
                                           color: Color(0xFF313131),
                                           height: 1.5,
+                                        ),
+                                      ),
+
+                                      const SizedBox(height: 24), // 🌟 เพิ่มระยะห่าง
+
+                                      // 🌟 1. ข้อความสรุปจำนวน
+                                      Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFE8F4F8),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: const Color(0xFF9DD0E7)),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            const Text(
+                                              'ความคืบหน้าภารกิจ',
+                                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF002A50)),
+                                            ),
+                                            Text(
+                                              '$_completedMembers / $_totalMembers คน',
+                                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2374B5)),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+
+                                      const SizedBox(height: 12),
+
+                                      // 🌟 2. ปุ่มดูรายชื่อคนที่ยังไม่เสร็จ
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton.icon(
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) => IncompleteMembersScreen(
+                                                  questId: widget.questData['id'],
+                                                  clubId: widget.questData['club_id'],
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          icon: const Icon(Icons.people_alt, color: Colors.white),
+                                          label: const Text(
+                                            'สมาชิกที่ยังไม่เสร็จภารกิจ',
+                                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                                          ),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFFEA4444),
+                                            padding: const EdgeInsets.symmetric(vertical: 12),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ],
