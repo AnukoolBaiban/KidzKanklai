@@ -7,6 +7,7 @@ import '../../widgets/confirm_giveup_popup.dart';
 import '../../widgets/reward_popup.dart';
 import 'club_quest_quiz_member.dart';
 
+
 class ClubQuestDetailScreen extends StatefulWidget {
   final Map<String, dynamic> questData; 
   final bool isCompleted; 
@@ -58,7 +59,7 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
     }
   }
 
-  // 🌟 2. ฟังก์ชันเช็คคูลดาวน์ก่อนไปหน้าตอบคำถาม
+  // 🌟 2. ฟังก์ชันเช็คคูลดาวน์ และตรวจสอบว่ามีคำถามหรือไม่
   Future<void> _checkCooldownAndProceed() async {
     // แสดง Loading ระหว่างเช็คข้อมูล
     showDialog(
@@ -71,6 +72,9 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
       final supabase = Supabase.instance.client;
       final userId = supabase.auth.currentUser!.id;
       final questId = widget.questData['id'];
+      
+      // ดึง passing_score มาเพื่อเช็คว่ามีคำถามไหม
+      final int passingScore = widget.questData['passing_score'] ?? 1;
 
       // ดึงประวัติการทำเควสนี้ของผู้ใช้
       final doQuest = await supabase
@@ -80,20 +84,23 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
           .eq('quest_id', questId)
           .maybeSingle();
 
-      if (mounted) Navigator.pop(context); // ปิด Loading
+      if (mounted && passingScore > 0) {
+        Navigator.pop(context); // ปิด Loading (เฉพาะกรณีที่มีคำถาม เพราะต้องไปหน้าถัดไป)
+      }
 
       if (doQuest != null) {
         final status = doQuest['status'];
         final lastAttemptStr = doQuest['last_attempt_date'];
 
-        // ถ้าสถานะคือ failed และมีเวลาครั้งล่าสุดบอกไว้ ให้เช็คว่าครบ 10 นาทีหรือยัง
+        // เช็คคูลดาวน์ 10 นาที
         if (status == 'failed' && lastAttemptStr != null) {
           final lastAttempt = DateTime.parse(lastAttemptStr).toLocal();
           final now = DateTime.now();
           final difference = now.difference(lastAttempt);
           
           if (difference.inMinutes < 10) {
-            // คำนวณเวลาที่เหลือ
+            if (mounted && passingScore == 0) Navigator.pop(context); // ปิด Loading
+
             final remainingSeconds = 600 - difference.inSeconds;
             final minutes = remainingSeconds ~/ 60;
             final seconds = remainingSeconds % 60;
@@ -101,27 +108,111 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('คุณตอบผิดไป! โปรดรออีก $minutes นาที $seconds วินาที ถึงจะตอบใหม่ได้'),
+                  content: Text('โปรดรออีก $minutes นาที $seconds วินาที ถึงจะทำภารกิจใหม่ได้'),
                   backgroundColor: Colors.orange.shade800,
                   duration: const Duration(seconds: 3),
                 ),
               );
             }
-            return; // หยุดการทำงาน ไม่ให้ข้ามหน้า
+            return; // หยุดการทำงาน
           }
         }
       }
 
-      // 🌟 ถ้าไม่ติดคูลดาวน์ หรือไม่เคยทำมาก่อน ให้ไปหน้าตอบคำถามได้
-      if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ClubQuestQuizMemberScreen(
-              questId: questId,
+      // 🌟 แยกลอจิก: ถ้า "ไม่มีคำถาม" ให้ยิง API และโชว์ RewardPopup
+      if (passingScore == 0) {
+        // 1. ดึง Profile ก่อนเรียก API เพื่อบันทึก Level เดิม
+        final profileBefore = await ApiService.getProfile(0);
+        final oldLevel = profileBefore?.level ?? 0;
+
+        // 2. ยิง API ส่งเควส (ส่ง array ว่างเพราะไม่มีคำถาม)
+        Map<String, dynamic> requestData = {
+          "quest_id": questId,
+          "answers": [], 
+        };
+        final result = await ApiService.submitClubQuest(requestData);
+        
+        if (mounted) Navigator.pop(context); // ปิด Loading หลังยิง API เสร็จ
+
+        // 3. จัดการผลลัพธ์
+        if (mounted) {
+          if (result != null && result['success'] == true) {
+            
+            // ดึง Profile ใหม่หลัง API ทำงานเสร็จเพื่อเปรียบเทียบ Level
+            final freshProfile = await ApiService.getProfile(0);
+            final actualNewLevel = freshProfile?.level ?? oldLevel;
+            final didLevelUp = actualNewLevel > oldLevel;
+
+            final apiRewards = (result['rewards'] as List?) ?? [];
+
+            // 🌟 เช็คว่ามีของรางวัลให้โชว์หรือไม่
+            if (apiRewards.isNotEmpty) {
+              // แปลงข้อมูลจาก API เป็น RewardData
+              List<RewardData> popupRewards = apiRewards.map<RewardData>((rw) {
+                return RewardData(
+                  type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM',
+                  amount: rw['amount'] ?? 0, // API ชมรมส่งกลับมาเป็นคีย์ 'amount'
+                  itemName: rw['name'],
+                  itemImage: rw['image'], // โชว์รูปภาพไอเทมถ้า API มีส่งมา
+                );
+              }).toList();
+
+              // เรียกหน้าต่างของรางวัล (แบบที่คุณทำใน QuestDetailScreen)
+              await RewardPopup.show(
+                context, 
+                rewards: popupRewards,
+                leveledUp: didLevelUp,
+                baseLevel: oldLevel,
+                newLevel: actualNewLevel,
+                user: freshProfile,
+              );
+            } else {
+              // ถ้าสำเร็จแต่ไม่มีของรางวัล
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('ทำภารกิจสำเร็จ!'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+              await Future.delayed(const Duration(seconds: 1));
+              
+              // 🌟 กรณีไม่มีของรางวัล แต่มีการเลเวลอัพ
+              if (mounted && didLevelUp) {
+                await RewardPopup.show(
+                  context, 
+                  rewards: [],
+                  leveledUp: true,
+                  baseLevel: oldLevel,
+                  newLevel: actualNewLevel,
+                  user: freshProfile,
+                );
+              }
+            }
+
+            // 🌟 เด้งกลับหน้าเดิม พร้อมส่งค่า true ไปบอกให้รีเฟรชข้อมูลเควส
+            if (mounted) {
+              Navigator.pop(context, true); 
+            }
+
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(result?['error'] ?? 'เกิดข้อผิดพลาด'), backgroundColor: Colors.red),
+            );
+          }
+        }
+
+      } else {
+        // 🌟 ลอจิกเดิม: ถ้า "มีคำถาม" ก็เด้งไปหน้าทำ Quiz ตามปกติ
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ClubQuestQuizMemberScreen(
+                questId: questId,
+              ),
             ),
-          ),
-        );
+          );
+        }
       }
 
     } catch (e) {
@@ -423,6 +514,12 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
   }
 
   Widget _buildBottomButtons(double bottomPadding) {
+    // 🌟 1. ดึงค่า passing_score เพื่อเช็คว่ามีคำถามหรือไม่ (ถ้าเป็น 0 คือไม่มีคำถาม)
+    final int passingScore = widget.questData['passing_score'] ?? 1;
+    
+    // 🌟 2. กำหนดข้อความปุ่มตามเงื่อนไข
+    final String buttonText = passingScore > 0 ? 'ตอบคำถาม' : 'สำเร็จภารกิจ';
+
     return Positioned(
       bottom: bottomPadding + 20,
       left: MediaQuery.of(context).size.width * 0.1,
@@ -448,10 +545,9 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
                     ],
                   )
                 : _buildButton(
-                    text: 'ตอบคำถาม',
+                    text: buttonText, // 🌟 3. นำข้อความปุ่มที่เช็คแล้วมาใส่ตรงนี้
                     color: Color(0xFF4A8FE7),
                     useGradient: true,
-                    // 🌟 3. เปลี่ยนจากกดแล้วไปเลย เป็นเรียกฟังก์ชันเช็คคูลดาวน์ก่อน
                     onPressed: _checkCooldownAndProceed, 
                   ),
           ),

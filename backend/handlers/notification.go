@@ -406,3 +406,200 @@ func createQuestNotificationTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID,
 		fmt.Printf("❌ [createQuestNotificationTx] Failed to link user-notification: %v\n", err)
 	}
 }
+
+// POST /notifications/:id/claim — กดรับของรางวัลจากจดหมาย
+func ClaimNotificationReward(c *gin.Context) {
+	userIdVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	userIDStr := fmt.Sprintf("%v", userIdVal)
+	userID, _ := uuid.Parse(userIDStr)
+
+	notifIDStr := c.Param("id")
+	notifID, err := strconv.ParseInt(notifIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid notification ID"})
+		return
+	}
+
+	ctx := context.Background()
+	tx, err := configs.DB.Begin(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction failed"})
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// 1. เช็คว่ามีจดหมายนี้อยู่จริง และยังไม่ได้กดรับ
+	var isClaimed bool
+	err = tx.QueryRow(ctx, `SELECT COALESCE(reward_claimed, false) FROM public.get_notifications WHERE user_id = $1 AND notification_id = $2 FOR UPDATE`, userID, notifID).Scan(&isClaimed)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบการแจ้งเตือนนี้"})
+		return
+	}
+	if isClaimed {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "คุณรับของรางวัลนี้ไปแล้ว"})
+		return
+	}
+
+	// 🌟 2. ดึงของรางวัลจากตาราง obtain (ใช้ COALESCE ป้องกัน quantity เป็น NULL)
+	rows, err := tx.Query(ctx, `
+		SELECT o.item_id, COALESCE(o.quantity, 1), COALESCE(i.name, 'Item'), COALESCE(i.image, '') 
+		FROM public.obtain o
+		JOIN public.items i ON o.item_id = i.id
+		WHERE o.notification_id = $1
+	`, notifID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ดึงข้อมูลของรางวัลล้มเหลว"})
+		return
+	}
+
+	// ดึงข้อมูลมาเก็บใน Struct ชั่วคราวก่อน เพื่อหลีกเลี่ยงการเปิด rows ค้างไว้แล้วไปทำ Query ซ้อน
+	type rewardItem struct {
+		ItemID int64
+		Qty    int
+		Name   string
+		Image  string
+	}
+	var pendingRewards []rewardItem
+
+	for rows.Next() {
+		var itemID int64
+		var qty int
+		var name, image string
+		if err := rows.Scan(&itemID, &qty, &name, &image); err == nil {
+			pendingRewards = append(pendingRewards, rewardItem{ItemID: itemID, Qty: qty, Name: name, Image: image})
+		}
+	}
+	rows.Close() // ปิด connection เพื่อความปลอดภัย
+
+	var rewards []map[string]interface{}
+
+	// 🌟 3. ยัดของเข้าตัว (แก้ปัญหา Database Constraints)
+	for _, item := range pendingRewards {
+		if item.ItemID == 22 || item.Name == "EXP" {
+			// อัปเดต EXP
+			_, errExp := tx.Exec(ctx, `UPDATE public.characters SET experience = experience + $1 WHERE user_id = $2`, item.Qty, userID)
+			if errExp != nil {
+				fmt.Println("❌ [Claim Reward] Update EXP Error:", errExp)
+			}
+		} else {
+			// 🌟 ใช้ SELECT ตรวจสอบก่อนว่ามีของชิ้นนี้อยู่แล้วหรือยัง ปลอดภัยกว่าการใช้ ON CONFLICT
+			var exists int
+			errCheck := tx.QueryRow(ctx, "SELECT 1 FROM public.collect WHERE user_id = $1 AND item_id = $2", userID, item.ItemID).Scan(&exists)
+			
+			if errCheck != nil {
+				// หาไม่เจอ แปลว่ายังไม่เคยมีของชิ้นนี้ ให้ INSERT
+				_, errCol := tx.Exec(ctx, `
+					INSERT INTO public.collect (user_id, item_id, quantity, acquired_date)
+					VALUES ($1, $2, $3, NOW())
+				`, userID, item.ItemID, item.Qty)
+				if errCol != nil {
+					fmt.Println("❌ [Claim Reward] Insert Collect Error:", errCol)
+				}
+			} else {
+				// ถ้ามีแล้ว ให้อัปเดตบวกเพิ่ม
+				_, errCol := tx.Exec(ctx, `
+					UPDATE public.collect 
+					SET quantity = quantity + $1, acquired_date = NOW() 
+					WHERE user_id = $2 AND item_id = $3
+				`, item.Qty, userID, item.ItemID)
+				if errCol != nil {
+					fmt.Println("❌ [Claim Reward] Update Collect Error:", errCol)
+				}
+			}
+		}
+
+		rewards = append(rewards, map[string]interface{}{
+			"item_id": item.ItemID,
+			"name":    item.Name,
+			"amount":  item.Qty, // ชื่อฟิลด์ส่งกลับแอปต้องเป็น amount ตามที่ Flutter รอรับ
+			"image":   item.Image,
+		})
+	}
+
+	// 4. อัปเดตสถานะว่ารับแล้ว ทั้งใน obtain และ get_notifications
+	tx.Exec(ctx, `UPDATE public.obtain SET reward_claimed = true, completed_date = NOW() WHERE notification_id = $1`, notifID)
+	tx.Exec(ctx, `UPDATE public.get_notifications SET reward_claimed = true, status = 'read', read_date = NOW() WHERE user_id = $1 AND notification_id = $2`, userID, notifID)
+
+	// 🌟 5. ยืนยันการเปลี่ยนแปลง (ถ้าพัง ให้โยน Error 500 โชว์ Flutter ทันที)
+	if err := tx.Commit(ctx); err != nil {
+		fmt.Println("❌ [Claim Reward] Transaction Commit Error:", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "เกิดข้อผิดพลาดในการบันทึกข้อมูลลงฐานข้อมูล"})
+		return
+	}
+
+	// 🌟 6. ยืนยันเซฟลง DB เสร็จแล้ว ค่อยเรียกเช็ค Achievement (เพื่อป้องกันการคิวรี่ขัดจังหวะ Transaction)
+	go func(u uuid.UUID) {
+		CheckCoinAchievement(context.Background(), u)
+	}(userID)
+	CheckLevelAchievement(context.Background(), userID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "รับรางวัลสำเร็จ!",
+		"rewards": rewards,
+	})
+}
+
+// GET /notifications/:id/rewards — ดึงข้อมูลของรางวัลและสถานะการรับของจดหมาย
+func GetNotificationRewards(c *gin.Context) {
+	userIdVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	userIDStr := fmt.Sprintf("%v", userIdVal)
+	userID, _ := uuid.Parse(userIDStr)
+
+	notifIDStr := c.Param("id")
+	notifID, err := strconv.ParseInt(notifIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid notification ID"})
+		return
+	}
+
+	ctx := context.Background()
+
+	// 1. เช็คสถานะ reward_claimed
+	var isClaimed bool
+	err = configs.DB.QueryRow(ctx, `SELECT COALESCE(reward_claimed, false) FROM public.get_notifications WHERE user_id = $1 AND notification_id = $2`, userID, notifID).Scan(&isClaimed)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบการแจ้งเตือน"})
+		return
+	}
+
+	// 2. ดึงลิสต์ของรางวัลจาก obtain
+	rows, err := configs.DB.Query(ctx, `
+		SELECT o.item_id, COALESCE(o.quantity, 1), COALESCE(i.name, 'Item'), COALESCE(i.image, '') 
+		FROM public.obtain o
+		JOIN public.items i ON o.item_id = i.id
+		WHERE o.notification_id = $1
+	`, notifID)
+	
+	var rewards []map[string]interface{}
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var itemID int64
+			var qty int
+			var name, image string
+			rows.Scan(&itemID, &qty, &name, &image)
+			rewards = append(rewards, map[string]interface{}{
+				"item_id": itemID,
+				"name":    name,
+				"amount":  qty,
+				"image":   image,
+			})
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":    true,
+		"is_claimed": isClaimed,
+		"rewards":    rewards,
+	})
+}

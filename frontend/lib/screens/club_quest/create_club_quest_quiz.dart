@@ -76,22 +76,40 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
       _nameController.text = widget.initialData!['name'] ?? '';
       _detailController.text = widget.initialData!['detail'] ?? '';
       _selectedDate = widget.initialData!['date'];
-      _minScore = widget.initialData!['minScore'] ?? 1;
-
+      
+      // ดึงคะแนนขั้นต่ำ (ถ้าไม่มีตั้งต้นเป็น 1)
+      _minScore = widget.initialData!['passing_score'] ?? widget.initialData!['minScore'] ?? 1;
       _selectedImage = widget.initialData!['imageFile'];
 
-      if (widget.initialData!['questions'] != null) {
+      // 🌟 นำคำถามจาก DB มายัดใส่ Form
+      if (widget.initialData!['questions'] != null && (widget.initialData!['questions'] as List).isNotEmpty) {
         final List<dynamic> questionsData = widget.initialData!['questions'];
         _questions = questionsData.map((qData) {
           final q = QuizQuestion();
-          q.textController.text = qData['question'] ?? '';
-          if (qData['options'] != null) {
-            final List<dynamic> options = qData['options'];
-            for (int i = 0; i < options.length && i < 4; i++) {
-              q.optionControllers[i].text = options[i] ?? '';
-            }
+          
+          // ดึงโจทย์คำถาม
+          q.textController.text = qData['question_text'] ?? qData['question'] ?? '';
+          
+          // ดึงช้อยส์ A B C D
+          q.optionControllers[0].text = qData['choice_a'] ?? '';
+          q.optionControllers[1].text = qData['choice_b'] ?? '';
+          q.optionControllers[2].text = qData['choice_c'] ?? '';
+          q.optionControllers[3].text = qData['choice_d'] ?? '';
+
+          // แปลงเฉลยจากตัวอักษรกลับมาเป็น Index
+          String correctAns = qData['correct_answer'] ?? '';
+          if (correctAns == 'A') {
+            q.correctOptionIndex = 0;
+          } else if (correctAns == 'B') {
+            q.correctOptionIndex = 1;
+          } else if (correctAns == 'C') {
+            q.correctOptionIndex = 2;
+          } else if (correctAns == 'D') {
+            q.correctOptionIndex = 3;
+          } else {
+            q.correctOptionIndex = qData['correctOptionIndex'] ?? 0;
           }
-          q.correctOptionIndex = qData['correctOptionIndex'] ?? 0;
+
           return q;
         }).toList();
       }
@@ -135,13 +153,15 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
   }
 
   void _submit() async {
+    // 1. ดักเช็คชื่อภารกิจ (ถึงหน้า UI นี้จะไม่มีให้กรอก แต่เช็คเผื่อข้อมูลหลุด)
     if (_nameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณากรอกชื่อภารกิจ'), backgroundColor: Colors.red),
+        const SnackBar(content: Text('เกิดข้อผิดพลาด: ไม่พบชื่อภารกิจ'), backgroundColor: Colors.red),
       );
       return;
     }
 
+    // 2. ดักเช็คความครบถ้วนของคำถามและตัวเลือก
     for (int i = 0; i < _questions.length; i++) {
       if (_questions[i].textController.text.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('กรุณากรอกคำถามที่ ${i + 1}'), backgroundColor: Colors.red));
@@ -155,6 +175,7 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
       }
     }
 
+    // 3. ปั้นข้อมูลคำถามส่ง API
     List<Map<String, dynamic>> apiQuestions = [];
     const optionLetters = ['A', 'B', 'C', 'D'];
 
@@ -169,34 +190,65 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
       });
     }
 
+    // 🌟 4. ดึงวันที่จากหน้าแรกมาแปลงเป็นเวลาสากล (UTC)
+    DateTime? rawDate = widget.initialData?['date'];
+    String dueDateStr = rawDate?.toUtc().toIso8601String() ?? DateTime.now().add(const Duration(days: 1)).toUtc().toIso8601String();
+
+    // 🌟 5. เตรียมข้อมูลก้อนหลัก
     Map<String, dynamic> requestData = {
       "name": _nameController.text.trim(),
       "detail": _detailController.text.trim(),
+      "due_date": dueDateStr, // 🌟 ส่งวันหมดเขตไปด้วย!
       "passing_score": _minScore,
       "questions": apiQuestions,
     };
 
+    // โชว์ Loading
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => const Center(child: CircularProgressIndicator()),
     );
 
-    final result = await ApiService.createClubQuest(
-      requestData,
-      imageFile: _selectedImage, 
-    );
+    Map<String, dynamic>? result;
 
+    // 🌟 6. แยกว่าเป็นการ "แก้ไข" หรือ "สร้างใหม่"
+    if (widget.isEditing) {
+      requestData['id'] = widget.initialData?['id'];
+      
+      bool shouldDeleteImage = false;
+      if (_selectedImage == null && widget.initialData?['imageUrl'] != null && widget.initialData?['imageFile'] == null) {
+        shouldDeleteImage = true;
+      }
+
+      result = await ApiService.updateClubQuest(
+        requestData,
+        imageFile: _selectedImage,
+        deleteImage: shouldDeleteImage,
+      );
+    } else {
+      result = await ApiService.createClubQuest(
+        requestData,
+        imageFile: _selectedImage, 
+      );
+    }
+
+    // ปิด Loading
     if (mounted) Navigator.pop(context); 
 
+    // 7. แจ้งเตือนผลลัพธ์
     if (mounted) {
       if (result != null && result['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('สร้างภารกิจและอัปโหลดรูปสำเร็จ!'), backgroundColor: Color(0xFF2374B5)),
+          SnackBar(
+            content: Text(widget.isEditing ? 'อัปเดตภารกิจสำเร็จ!' : 'สร้างภารกิจสำเร็จ!'), 
+            backgroundColor: const Color(0xFF2374B5)
+          ),
         );
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const ClubRoomHeadScreen()),
+          (route) => route.isFirst,
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(

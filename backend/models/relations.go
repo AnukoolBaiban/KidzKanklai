@@ -40,6 +40,7 @@ type Wear struct {
 type Obtain struct {
 	NotificationID int64      `json:"notification_id"`
 	ItemID         int64      `json:"item_id"`
+	Quantity     *int       `json:"quantity"`
 	Status         *string    `json:"status"`
 	CompletedDate  *time.Time `json:"completed_date"`
 	RewardClaimed  *bool      `json:"reward_claimed"`

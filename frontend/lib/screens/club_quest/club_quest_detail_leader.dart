@@ -3,14 +3,13 @@ import '../../widgets/custom_top_bar.dart';
 import '../../api_service.dart';
 import 'club_quest_quiz_answer.dart';
 import 'create_club_quest.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // 🌟 เพิ่มบรรทัดนี้
 
 class ClubQuestDetailLeaderScreen extends StatefulWidget {
-  final User? user;
   final Map<String, dynamic> questData; // 🌟 รับข้อมูลเควส
 
   const ClubQuestDetailLeaderScreen({
     Key? key, 
-    this.user, 
     required this.questData, // 🌟 บังคับใส่ข้อมูล
   }) : super(key: key);
 
@@ -56,6 +55,56 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
       _imagePath = img;
     } else {
       _imagePath = null;
+    }
+  }
+
+  // 🌟 ฟังก์ชันดึงข้อมูลคำถามและส่งไปหน้าแก้ไข
+  Future<void> _navigateToEditQuest() async {
+    // 1. โชว์วงกลมโหลดก่อน
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      // 2. ดึงคำถามจาก Supabase
+      final supabase = Supabase.instance.client;
+      final questionsRes = await supabase
+          .from('quest_questions')
+          .select('*')
+          .eq('quest_id', widget.questData['id']);
+
+      if (!mounted) return;
+      Navigator.pop(context); // ปิดโหลด
+
+      // 3. เตรียมข้อมูล
+      Map<String, dynamic> editData = Map<String, dynamic>.from(widget.questData);
+      editData['questions'] = questionsRes; // ยัดคำถามที่ดึงมาใส่เข้าไป
+      editData['imageUrl'] = widget.questData['image']; // URL รูปภาพ
+      
+      // แปลงวันที่ให้เป็น DateTime เพื่อส่งให้ปฏิทินในหน้าฟอร์ม
+      if (widget.questData['due_date'] != null) {
+        editData['date'] = DateTime.parse(widget.questData['due_date']).toLocal();
+      }
+
+      // 4. เปิดหน้าฟอร์ม
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CreateClubQuestScreen(
+            isEditing: true, // 🌟 เปิดโหมดแก้ไข
+            initialData: editData, // 🌟 ส่งข้อมูลเก่าที่เตรียมไว้เข้าไปให้ครบ
+            onSubmit: (data) {}, 
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // ปิดโหลดกรณี Error
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ไม่สามารถดึงข้อมูลคำถามได้'), backgroundColor: Colors.red),
+      );
     }
   }
 
@@ -382,28 +431,7 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
               text: 'แก้ไข',
               color: Color(0xFF4A8FE7),
               useGradient: true,
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder:
-                        (_) => CreateClubQuestScreen(
-                          user: widget.user,
-                          isEditing: true,
-                          initialData: {
-                            'id': widget.questData['id'],
-                            'name': _title,
-                            'detail': _description,
-                            'minScore': widget.questData['passing_score'] ?? 2,
-                          },
-                          onSubmit: (data) {
-                            debugPrint('Updated Data: $data');
-                            Navigator.pop(context);
-                          },
-                        ),
-                  ),
-                );
-              },
+              onPressed: _navigateToEditQuest, // 🌟 เปลี่ยนมาเรียกฟังก์ชันที่เราสร้างไว้
             ),
           ),
         ],

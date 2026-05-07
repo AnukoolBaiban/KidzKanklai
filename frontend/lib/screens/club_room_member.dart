@@ -16,50 +16,20 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
   int _selectedIndex = 3;
   bool _isDetailPressed = false;
 
-  // 🌟 1. เพิ่มตัวแปรเก็บข้อมูล
   String _clubName = "กำลังโหลด...";
   bool _isLoading = true;
-  List<dynamic> _quests = []; // 🌟 เก็บ List ภารกิจ
-  Set<int> _completedQuestIds = {}; // 🌟 เก็บ ID ของเควสที่ทำสำเร็จแล้ว
+  List<dynamic> _quests = []; // เก็บ List ภารกิจ
+  Set<int> _completedQuestIds = {}; // เก็บ ID ของเควสที่ทำสำเร็จแล้ว
 
   @override
   void initState() {
     super.initState();
-    _fetchClubData(); // 🌟 2. สั่งโหลดข้อมูลตอนเปิดหน้า
+    _fetchClubData(); // สั่งโหลดข้อมูลตอนเปิดหน้า
     // โหลดข้อมูลของหน้ารายละเอียดล่วงหน้าแบบ Background
     Future.microtask(() => ClubDetailMemberPreloader.preload());
   }
 
-  // 🌟 ฟังก์ชันคำนวณเวลาสัปดาห์นี้ (จันทร์ 00:00 - จันทร์หน้า 00:00 UTC+7)
-  Map<String, String> _getThisWeekTimeRangeUTC() {
-    DateTime now = DateTime.now().toUtc();
-    DateTime nowUtc7 = now.add(const Duration(hours: 7));
-    
-    int daysSinceMonday = nowUtc7.weekday - DateTime.monday;
-    
-    // จันทร์นี้ 00:00:00 (อิงตามเวลาไทย)
-    DateTime startOfWeekUtc7 = DateTime(nowUtc7.year, nowUtc7.month, nowUtc7.day)
-        .subtract(Duration(days: daysSinceMonday));
-        
-    // จันทร์หน้า 00:00:00 (อิงตามเวลาไทย)
-    DateTime endOfWeekUtc7 = startOfWeekUtc7.add(const Duration(days: 7));
-
-    // 🌟 แก้ไข: แปลงเป็น String รูปแบบเวลาท้องถิ่นเป๊ะๆ (ไม่มีอักษร Z และไม่หักลบ 7 ชม.)
-    // เพื่อให้ Database เปรียบเทียบตัวเลข วัน-เวลา ตรงๆ ป้องกันบั๊ก Timezone
-    String formatNaiveLocal(DateTime dt) {
-      String y = dt.year.toString().padLeft(4, '0');
-      String m = dt.month.toString().padLeft(2, '0');
-      String d = dt.day.toString().padLeft(2, '0');
-      return '$y-$m-${d}T00:00:00'; 
-    }
-
-    return {
-      'start': formatNaiveLocal(startOfWeekUtc7), // ผลลัพธ์: '2024-05-27T00:00:00'
-      'end': formatNaiveLocal(endOfWeekUtc7),     // ผลลัพธ์: '2024-06-03T00:00:00'
-    };
-  }
-
-  // 🌟 3. ฟังก์ชันดึงข้อมูลชมรมและเควส
+  // 🌟 1. ฟังก์ชันดึงข้อมูลชมรมและเควส
   Future<void> _fetchClubData() async {
     try {
       final supabase = Supabase.instance.client;
@@ -74,10 +44,7 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
         // นำ club_id ไปหาชื่อชมรม
         final club = await supabase.from('clubs').select('name').eq('id', clubId).single();
         
-        // ดึงช่วงเวลา
-        final timeRange = _getThisWeekTimeRangeUTC();
-
-        // ดึงเควส พร้อม Join ตาราง Receive และ Items
+        // 🌟 ดึงเควสทั้งหมดที่ยังไม่หมดเวลา (อิงตาม API ใหม่)
         final questsResponse = await supabase
             .from('quests')
             .select('''
@@ -91,11 +58,10 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
               )
             ''')
             .eq('club_id', clubId)
-            .gte('start_date', timeRange['start']!)
-            .lt('start_date', timeRange['end']!)
-            .order('start_date', ascending: true);
+            .gt('due_date', DateTime.now().toUtc().toIso8601String()) // กรองเฉพาะอันที่ยังไม่หมดเขต
+            .order('due_date', ascending: true);
 
-        // 🌟 เพิ่มโค้ดส่วนนี้: ดึงข้อมูลว่า user ปัจจุบันทำเควสไหนเสร็จแล้วบ้าง
+        // ดึงข้อมูลว่า user ปัจจุบันทำเควสไหนเสร็จแล้วบ้าง
         final List<int> questIds = (questsResponse as List<dynamic>).map((q) => q['id'] as int).toList();
         final Set<int> completedIds = {};
 
@@ -105,7 +71,7 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
               .select('quest_id')
               .eq('user_id', userId)
               .inFilter('quest_id', questIds)
-              .eq('status', 'completed'); // ตรวจสอบสถานะให้ตรงกับใน DB ของคุณ (เช่น 'completed' หรือ 'success')
+              .eq('status', 'completed');
 
           for (var dq in doQuestsResponse) {
             completedIds.add(dq['quest_id'] as int);
@@ -116,7 +82,7 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
           setState(() {
             _clubName = club['name'];
             _quests = questsResponse;
-            _completedQuestIds = completedIds; // 🌟 เซ็ตค่าใส่ State
+            _completedQuestIds = completedIds; // เซ็ตค่าใส่ State
             _isLoading = false;
           });
         }
@@ -197,7 +163,6 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
     );
   }
 
-  // ปุ่ม 1 ปุ่ม: รายละเอียดชมรมสำหรับสมาชิก
   Widget _buildActionButtonsRow() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
@@ -222,9 +187,7 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
       child: Container(
         width: 50,
         height: 50,
-        padding: const EdgeInsets.all(
-          2,
-        ), // ความหนาของเส้นขอบปกติต้องน้อยกว่านี้หน่อย ลอง 2px
+        padding: const EdgeInsets.all(2), 
         decoration: const BoxDecoration(
           shape: BoxShape.circle,
           color: Color(0xFF015496),
@@ -262,7 +225,7 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
     );
   }
 
-  // กล่องภารกิจชมรม (ดึงจากข้อมูล)
+  // 🌟 2. กล่องภารกิจชมรม (เอาโควตาออก)
   Widget _buildMissionBox() {
     if (_isLoading) {
       return Container(
@@ -275,9 +238,6 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
       );
     }
 
-    // นับจำนวนภารกิจที่ user ทำสำเร็จแล้ว
-    int completedCount = _completedQuestIds.length;
-
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -289,28 +249,12 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header: โชว์จำนวนภารกิจที่ทำได้
-          Align(
-            alignment: Alignment.centerRight,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 6, bottom: 8),
-              child: Text(
-                "ภารกิจที่ทำได้ $completedCount/3",
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
-          ),
-
           // Mission List แบบ scroll ได้
           Expanded(
             child: _quests.isEmpty
                 ? const Center(
                     child: Text(
-                      "ไม่มีภารกิจในสัปดาห์นี้",
+                      "ยังไม่มีภารกิจในขณะนี้",
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -336,16 +280,12 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
     );
   }
 
-  // รับข้อมูลแบบ Map เพื่อแสดงผล
   Widget _buildMissionCard(Map<String, dynamic> quest) {
-    // 1. ดึงข้อมูลพื้นฐาน
     final String title = quest['name'] ?? 'ไม่มีชื่อภารกิจ';
     final int questId = quest['id'] ?? 0;
 
-    // 🌟 2. เช็คว่าเควสนี้อยู่ใน Set ที่ทำเสร็จแล้วหรือไม่
     final bool isCompleted = _completedQuestIds.contains(questId);
 
-    // 3. คำนวณเวลาที่เหลือ หรือ เปลี่ยนข้อความถ้าเสร็จแล้ว
     String timeLeftText = "ไม่มีกำหนด";
     Color timeTextColor = Colors.red;
 
@@ -367,38 +307,60 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
       }
     }
 
-    // 4. จัดการของรางวัล (Reward Badges)
+    // 🌟 3. จัดการของรางวัล (กรณีไม่มีของรางวัล)
     final receives = quest['receive'] as List<dynamic>? ?? [];
-    List<Widget> badges = receives.map((r) {
-      final item = r['items'] ?? {};
-      final itemName = item['name'] ?? "Item";
-      final quantity = r['quantity'] ?? 1;
-      
-      final String imagePath = item['image'] ?? 'assets/images/item/Gasha.png';
-      final bool isExp = itemName.toString().toUpperCase().contains("EXP");
-      
-      Color badgeColor = isExp ? const Color(0xFFC8E6C9) : const Color(0xFFFFE0B2);
-      if (isCompleted) {
-        badgeColor = Colors.grey.shade300; 
-      }
-      
-      final String valueText = isExp ? "+$quantity" : "x$quantity";
-
-      return RewardBadge(
-        label: itemName,
-        value: valueText,
-        color: badgeColor,
-        iconPath: imagePath,
-        isClaimed: isCompleted,
+    List<Widget> badges = [];
+    
+    if (receives.isEmpty) {
+      badges.add(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade300,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Text(
+            "ไม่มีรางวัล",
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.black54,
+            ),
+          ),
+        ),
       );
-    }).toList();
+    } else {
+      badges = receives.map((r) {
+        final item = r['items'] ?? {};
+        final itemName = item['name'] ?? "Item";
+        final quantity = r['quantity'] ?? 1;
+        
+        final String imagePath = item['image'] ?? 'assets/images/item/Gasha.png';
+        final bool isExp = itemName.toString().toUpperCase().contains("EXP");
+        
+        Color badgeColor = isExp ? const Color(0xFFC8E6C9) : const Color(0xFFFFE0B2);
+        if (isCompleted) {
+          badgeColor = Colors.grey.shade300; 
+        }
+        
+        final String valueText = isExp ? "+$quantity" : "x$quantity";
+
+        return RewardBadge(
+          label: itemName,
+          value: valueText,
+          color: badgeColor,
+          iconPath: imagePath,
+          isClaimed: isCompleted,
+        );
+      }).toList();
+    }
 
     return Container(
       decoration: BoxDecoration(
         color: isCompleted
             ? Colors.grey.shade300.withOpacity(0.85)
             : Colors.white,
-        borderRadius: BorderRadius.circular(15), // เปลี่ยนเป็น 15 ให้เหมือน all_quest
+        borderRadius: BorderRadius.circular(15), 
         border: Border.all(
           color: isCompleted ? Colors.grey : const Color(0xFF9DD0E7),
           width: 2,
@@ -448,10 +410,10 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
                         Expanded(
                           child: Text(
                             title,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: Colors.black87, // ให้เป็นสีดำเหมือน all_quest
+                              color: Colors.black87, 
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -463,7 +425,7 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
                     Wrap(
                       spacing: 8,
                       runSpacing: 4,
-                      children: badges.isNotEmpty ? badges : [const SizedBox.shrink()],
+                      children: badges,
                     ),
                   ],
                 ),
@@ -493,7 +455,7 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
                                 isCompleted: isCompleted,
                               ),
                             ),
-                          );
+                          ).then((_) => _fetchClubData()); // 🌟 รีเฟรชข้อมูลเมื่อกลับมาเผื่อเพิ่งทำเควสเสร็จ
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF536DFE),
@@ -546,4 +508,3 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
     );
   }
 }
-

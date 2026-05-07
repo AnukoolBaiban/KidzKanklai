@@ -5,7 +5,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_application_1/screens/all_quest.dart';
 import 'package:flutter_application_1/screens/club_quest/club_quest_detail_leader.dart';
 
-
 class ClubRoomHeadScreen extends StatefulWidget {
   const ClubRoomHeadScreen({super.key});
 
@@ -18,56 +17,44 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
   bool _isDetailPressed = false;
   bool _isCreatePressed = false;
 
-  // 🌟 1. เพิ่มตัวแปรเก็บข้อมูล
   String _clubName = "กำลังโหลด...";
   bool _isLoading = true;
-  List<dynamic> _quests = []; // 🌟 เก็บ List ภารกิจ
+  List<dynamic> _quests = []; // เก็บ List ภารกิจ
+  int _ticketCount = 0; // 🌟 1. เพิ่มตัวแปรเก็บจำนวนตั๋ว
 
   @override
   void initState() {
     super.initState();
-    _fetchClubData(); // 🌟 2. สั่งโหลดข้อมูลตอนเปิดหน้า
+    _fetchClubData(); // สั่งโหลดข้อมูลตอนเปิดหน้า
     // โหลดข้อมูลของหน้ารายละเอียดล่วงหน้าแบบ Background
     Future.microtask(() => ClubDetailHeadPreloader.preload());
   }
 
-  // 🌟 ฟังก์ชันคำนวณเวลาสัปดาห์นี้ (จันทร์ 00:00 - จันทร์หน้า 00:00)
-  Map<String, String> _getThisWeekTimeRangeUTC() {
-    DateTime now = DateTime.now().toUtc();
-    DateTime nowUtc7 = now.add(const Duration(hours: 7));
-    
-    int daysSinceMonday = nowUtc7.weekday - DateTime.monday;
-    DateTime startOfWeekUtc7 = DateTime(nowUtc7.year, nowUtc7.month, nowUtc7.day)
-        .subtract(Duration(days: daysSinceMonday));
-    DateTime endOfWeekUtc7 = startOfWeekUtc7.add(const Duration(days: 7));
-
-    String formatNaiveLocal(DateTime dt) {
-      String y = dt.year.toString().padLeft(4, '0');
-      String m = dt.month.toString().padLeft(2, '0');
-      String d = dt.day.toString().padLeft(2, '0');
-      return '$y-$m-${d}T00:00:00'; 
-    }
-
-    return {
-      'start': formatNaiveLocal(startOfWeekUtc7),
-      'end': formatNaiveLocal(endOfWeekUtc7),
-    };
-  }
-
-  // 🌟 3. ฟังก์ชันดึงข้อมูลชมรมและเควส (เหมือนฝั่ง Member)
+  // 🌟 ฟังก์ชันดึงข้อมูลชมรมและเควส
   Future<void> _fetchClubData() async {
     try {
       final supabase = Supabase.instance.client;
       final userId = supabase.auth.currentUser!.id;
+
+      // 🌟 2. ดึงข้อมูลจำนวนตั๋ว (Item ID = 19) ในกระเป๋าของผู้ใช้
+      final ticketData = await supabase
+          .from('collect')
+          .select('quantity')
+          .eq('user_id', userId)
+          .eq('item_id', 19)
+          .maybeSingle(); // ใช้ maybeSingle เผื่อว่าไม่มีตั๋วเลย
+
+      int tickets = 0;
+      if (ticketData != null) {
+        tickets = ticketData['quantity'] ?? 0;
+      }
 
       final profile = await supabase.from('user_profiles').select('club_id').eq('id', userId).single();
       
       if (profile['club_id'] != null) {
         final clubId = profile['club_id'];
         final club = await supabase.from('clubs').select('name').eq('id', clubId).single();
-        final timeRange = _getThisWeekTimeRangeUTC();
 
-        // ดึงเควส พร้อม Join ตาราง Receive และ Items
         final questsResponse = await supabase
             .from('quests')
             .select('''
@@ -81,12 +68,12 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
               )
             ''')
             .eq('club_id', clubId)
-            .gte('start_date', timeRange['start']!)
-            .lt('start_date', timeRange['end']!)
-            .order('start_date', ascending: true);
+            .gt('due_date', DateTime.now().toUtc().toIso8601String())
+            .order('due_date', ascending: true);
 
         if (mounted) {
           setState(() {
+            _ticketCount = tickets; // 🌟 เก็บจำนวนตั๋วลง State
             _clubName = club['name'];
             _quests = questsResponse;
             _isLoading = false;
@@ -139,8 +126,8 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
                   children: [_buildMissionTitle(), _buildActionButtonsRow()],
                 ),
                 const SizedBox(height: 10),
-                Expanded(flex: 5, child: _buildMissionBox()), // 🌟 กล่องภารกิจคงที่
-                const Spacer(flex: 3), // พื้นที่ว่างด้านล่าง (โมเดลอยู่ด้านหลัง)
+                Expanded(flex: 5, child: _buildMissionBox()), // กล่องภารกิจ
+                const Spacer(flex: 3), // พื้นที่ว่างด้านล่าง
               ],
             ),
           ),
@@ -171,8 +158,6 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
 
   // ปุ่ม 2 ปุ่ม: รายละเอียดชมรม และสร้างภารกิจ
   Widget _buildActionButtonsRow() {
-    bool isQuotaFull = _quests.length >= 3;
-
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
@@ -181,18 +166,8 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
         _buildCircularIconButton(
           imagePath: "assets/images/button/bt-create.png",
           isPressed: _isCreatePressed,
-          isDisabled: isQuotaFull,
+          isDisabled: false, // 🌟 ไม่มีการจำกัดสิทธิ์การกดสร้างแล้ว
           onTap: () {
-            // 🌟 เช็คโควตาก่อนกดสร้าง
-            if (isQuotaFull) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('คุณสร้างภารกิจครบ 3 ครั้งในสัปดาห์นี้แล้ว'),
-                  backgroundColor: Colors.orange,
-                ),
-              );
-              return;
-            }
             Navigator.pushNamed(context, '/createclubquest');
           },
           onPressedChanged: (val) => setState(() => _isCreatePressed = val),
@@ -309,7 +284,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
     );
   }
 
-  // 🌟 กล่องภารกิจชมรม (คำนวณโควตา และแสดงข้อมูลจริง)
+  // 🌟 กล่องภารกิจชมรม
   Widget _buildMissionBox() {
     if (_isLoading) {
       return Container(
@@ -322,10 +297,6 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
       );
     }
 
-    // คำนวณสิทธิ์คงเหลือ
-    int questsLeft = 3 - _quests.length;
-    if (questsLeft < 0) questsLeft = 0;
-
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -337,13 +308,13 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 🌟 Header: โชว์จำนวนโควตาที่สร้างได้
+          // 🌟 เพิ่มข้อความบอกจำนวนตั๋วที่มุมขวาบน
           Align(
             alignment: Alignment.centerRight,
             child: Padding(
               padding: const EdgeInsets.only(right: 6, bottom: 8),
               child: Text(
-                "จำนวนภารกิจที่สร้างได้ $questsLeft/3",
+                "จำนวนตั๋วสร้างภารกิจชมรมที่มี $_ticketCount",
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -358,7 +329,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
             child: _quests.isEmpty
                 ? const Center(
                     child: Text(
-                      "ยังไม่มีภารกิจในสัปดาห์นี้",
+                      "ยังไม่มีภารกิจในขณะนี้",
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -407,23 +378,46 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
     }
 
     final receives = quest['receive'] as List<dynamic>? ?? [];
-    List<Widget> badges = receives.map((r) {
-      final item = r['items'] ?? {};
-      final itemName = item['name'] ?? "Item";
-      final quantity = r['quantity'] ?? 1;
-
-      final String imagePath = item['image'] ?? 'assets/images/item/Gasha.png';
-      final bool isExp = itemName.toString().toUpperCase().contains("EXP");
-      final Color color = isExp ? const Color(0xFFC8E6C9) : const Color(0xFFFFE0B2);
-      final String valueText = isExp ? "+$quantity" : "x$quantity";
-
-      return RewardBadge(
-        label: itemName,
-        value: valueText,
-        color: color,
-        iconPath: imagePath,
+    
+    // 🌟 ดักเช็คว่าถ้าไม่มีรางวัล ให้ขึ้นกล่องบอกว่า "ไม่มีรางวัล"
+    List<Widget> badges = [];
+    if (receives.isEmpty) {
+      badges.add(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade300, // สีพื้นหลังเทาๆ
+            borderRadius: BorderRadius.circular(12), // ขอบมนคล้ายป้าย Badge
+          ),
+          child: const Text(
+            "ไม่มีรางวัล",
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.black54, // สีข้อความเทาเข้ม
+            ),
+          ),
+        ),
       );
-    }).toList();
+    } else {
+      badges = receives.map((r) {
+        final item = r['items'] ?? {};
+        final itemName = item['name'] ?? "Item";
+        final quantity = r['quantity'] ?? 1;
+
+        final String imagePath = item['image'] ?? 'assets/images/item/Gasha.png';
+        final bool isExp = itemName.toString().toUpperCase().contains("EXP");
+        final Color color = isExp ? const Color(0xFFC8E6C9) : const Color(0xFFFFE0B2);
+        final String valueText = isExp ? "+$quantity" : "x$quantity";
+
+        return RewardBadge(
+          label: itemName,
+          value: valueText,
+          color: color,
+          iconPath: imagePath,
+        );
+      }).toList();
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -487,7 +481,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
                     Wrap(
                       spacing: 8,
                       runSpacing: 4,
-                      children: badges.isNotEmpty ? badges : [const SizedBox.shrink()],
+                      children: badges,
                     ),
                   ],
                 ),
@@ -513,7 +507,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
                                 questData: quest,
                               ),
                             ),
-                          );
+                          ).then((_) => _fetchClubData()); // 🌟 รีเฟรชหน้าหลังกลับมาจากแก้ไข/ดูรายละเอียด
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF536DFE),
