@@ -167,6 +167,7 @@ class MusicRouteObserver extends NavigatorObserver {
       case '/load':
       case '/auth':
       case '/me':
+      case '/video':
         return _kSilent;
 
       // หน้า Menu/Login group (ใช้เพลงเดียวกัน รอใส่ไฟล์เพลงภายหลัง) ──────────
@@ -231,6 +232,7 @@ class MusicRouteObserver extends NavigatorObserver {
       if (s.contains('Login')) return '/login';
       if (s.contains('Register')) return '/register';
       if (s.contains('Loading')) return '/load';
+      if (s.contains('VideoTransition')) return '/video';
       if (s.contains('StartGame')) return '/startgame';
     }
     return null;

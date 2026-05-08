@@ -12,6 +12,7 @@ import 'package:flutter_application_1/screens/result_stat.dart';
 import 'package:flutter_application_1/screens/result_exam.dart';
 import 'package:flutter_application_1/widgets/ticket_box.dart';
 import 'package:flutter_application_1/widgets/energy_bar.dart'; // 🌟 นำเข้า EnergyBar Widget
+import 'package:flutter_application_1/screens/video_transition_screen.dart';
 
 // 🌟 เปลี่ยนจาก level เป็น energy
 enum StatType { energy, intelligence, strength, creativity }
@@ -827,6 +828,21 @@ class _ExamScreenState extends State<ExamScreen> {
               if (mounted) Navigator.pop(context);
 
               if (result != null) {
+                // 🌟 เล่นวิดีโอคั่นกลาง
+                String videoPath = '';
+                if (examName.contains('วิทยาศาสตร์')) videoPath = 'assets/video/exam-science.mp4';
+                else if (examName.contains('อังกฤษ')) videoPath = 'assets/video/exam_eng.mp4';
+                else if (examName.contains('คณิตศาสตร์')) videoPath = 'assets/video/exam_math.mp4';
+
+                if (videoPath.isNotEmpty && mounted) {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => VideoTransitionScreen(videoPath: videoPath),
+                    ),
+                  );
+                }
+
                 if (result['success'] == true) {
                   bool resultPassed = result['is_passed'] ?? false;
                   

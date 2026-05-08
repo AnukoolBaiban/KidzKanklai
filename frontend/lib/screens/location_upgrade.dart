@@ -13,6 +13,7 @@ import 'package:flutter_application_1/widgets/chance_display.dart';
 import 'package:flutter_application_1/widgets/ticket_box.dart';
 import 'package:flutter_application_1/screens/result_stat.dart';
 import 'package:flutter_application_1/screens/exam.dart';
+import 'package:flutter_application_1/screens/video_transition_screen.dart';
 
 class LocationUpgradeScreen extends StatefulWidget {
   final api.User? user;
@@ -595,16 +596,16 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
       child: Column(
         children: [
           // 🌟 ใช้ CostDisplayWidget แบบเดิม แต่ซ่อนตั๋วเพื่อให้มันโชว์แค่ พลังงาน และพื้นหลังสีขาว
-          Center(
-            child: CostDisplayWidget(
-              energyCostText: '10-20', 
-              showTicket: false, // 🌟 ไม่โชว์ตั๋ว เพราะเราย้ายตั๋วไปติดกับปุ่มแล้ว
-              showEnergy: !isPark,
-              customText: isPark ? 'ไม่ต้องใช้พลังงาน' : null,
+          if (!isPark) ...[
+            Center(
+              child: CostDisplayWidget(
+                energyCostText: '10-20', 
+                showTicket: false, // 🌟 ไม่โชว์ตั๋ว เพราะเราย้ายตั๋วไปติดกับปุ่มแล้ว
+                showEnergy: true,
+              ),
             ),
-          ),
-
-          SizedBox(height: 8),
+            SizedBox(height: 8),
+          ],
 
           // ✅ ปุ่ม Start (แก้ตรงนี้)
           Stack(
@@ -663,6 +664,22 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                   if (mounted) Navigator.pop(context);
 
                   if (result != null) {
+                    // 🌟 เล่นวิดีโอคั่นกลาง
+                    String videoPath = '';
+                    if (widget.locationName == 'หอสมุด') videoPath = 'assets/video/add-int.mp4';
+                    else if (widget.locationName == 'โรงยิม') videoPath = 'assets/video/add-str.mp4';
+                    else if (widget.locationName == 'สวนสนุก') videoPath = 'assets/video/add-cre.mp4';
+                    else if (widget.locationName == 'สวนสาธารณะ') videoPath = 'assets/video/add-energy.mp4';
+
+                    if (videoPath.isNotEmpty && mounted) {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => VideoTransitionScreen(videoPath: videoPath),
+                        ),
+                      );
+                    }
+
                     // เก็บค่าเก่าก่อนอัปเดต เพื่อส่งให้ ResultStatScreen ทำอนิเมชัน
                     Map<String, int> oldStatsData = {
                       'ความฉลาด': int.tryParse(_intStat) ?? 0,
