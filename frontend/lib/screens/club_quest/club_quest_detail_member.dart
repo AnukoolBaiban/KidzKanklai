@@ -30,6 +30,9 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
   late String _endDate;
   String? _imagePath;
 
+  int _totalMembers = 0;
+  int _completedMembers = 0;
+
   @override
   void initState() {
     super.initState();
@@ -56,6 +59,47 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
       _imagePath = img;
     } else {
       _imagePath = null;
+    }
+
+    _fetchQuestProgress();
+  }
+
+  // 🌟 ฟังก์ชันดึงสถิติคนที่ทำเควสนี้
+  Future<void> _fetchQuestProgress() async {
+    try {
+      final supabase = Supabase.instance.client;
+      
+      final clubId = widget.questData['club_id'];
+      final questId = widget.questData['id'];
+
+      if (clubId == null || questId == null) return;
+
+      // 1. นับจำนวนลูกน้องในคลับ
+      final membersRes = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('club_id', clubId)
+          .neq('club_role', 'owner');
+      
+      final total = (membersRes as List).length;
+
+      // 2. นับคนที่ทำเควสนี้เสร็จ
+      final doQuestsRes = await supabase
+          .from('do_quests')
+          .select('user_id') 
+          .eq('quest_id', questId)
+          .eq('status', 'completed');
+          
+      final completed = (doQuestsRes as List).length;
+
+      if (mounted) {
+        setState(() {
+          _totalMembers = total;
+          _completedMembers = completed;
+        });
+      }
+    } catch (e) {
+      debugPrint("❌ Error fetching progress: $e");
     }
   }
 
@@ -276,13 +320,16 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
                             clipBehavior: Clip.none,
                             children: [
                               // Scrollable Content
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
-                                child: SingleChildScrollView(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
+                              Column(
+                                children: [
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
+                                      child: SingleChildScrollView(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
                                           Expanded(
@@ -400,8 +447,42 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
                                   ),
                                 ),
                               ),
+                            ),
+                            
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                              child: Column(
+                                children: [
+                                  // 🌟 1. ข้อความสรุปจำนวน
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE8F4F8),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: const Color(0xFF9DD0E7)),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        const Text(
+                                          'ความคืบหน้าภารกิจ',
+                                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF002A50)),
+                                        ),
+                                        Text(
+                                          '$_completedMembers / $_totalMembers คน',
+                                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2374B5)),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
 
-                              Positioned(
+                        Positioned(
                                 top: 0,
                                 left: 0,
                                 right: 0,

@@ -205,13 +205,16 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
                             clipBehavior: Clip.none,
                             children: [
                               // Scrollable Content
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
-                                child: SingleChildScrollView(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      // Quest Title and Dates
+                              Column(
+                                children: [
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
+                                      child: SingleChildScrollView(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            // Quest Title and Dates
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
@@ -333,10 +336,17 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
                                           height: 1.5,
                                         ),
                                       ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
 
-                                      const SizedBox(height: 24), // 🌟 เพิ่มระยะห่าง
-
-                                      // 🌟 1. ข้อความสรุปจำนวน
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                              child: Column(
+                                children: [
+                                  // 🌟 1. ข้อความสรุปจำนวน
                                       Container(
                                         width: double.infinity,
                                         padding: const EdgeInsets.all(12),
@@ -394,9 +404,10 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
                                     ],
                                   ),
                                 ),
-                              ),
+                              ],
+                            ),
 
-                              // Header "รายละเอียด"
+                            // Header "รายละเอียด"
                               Positioned(
                                 top: 0,
                                 left: 0,
