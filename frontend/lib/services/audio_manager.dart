@@ -10,7 +10,8 @@ class AudioManager with WidgetsBindingObserver {
 
   // 2. ตัวเล่นเสียง
   final AudioPlayer _musicPlayer = AudioPlayer(); // สำหรับ BGM
-  final AudioPlayer _sfxPlayer = AudioPlayer(); // สำหรับ SFX
+  final AudioPlayer _sfxPlayer = AudioPlayer();   // สำหรับ SFX ทั่วไป
+  final AudioPlayer _buttonPlayer = AudioPlayer(); // สำหรับเสียงปุ่มโดยเฉพาะ (แยกเพื่อไม่ conflict)
 
   // 3. ค่า Config เริ่มต้น
   double _musicVolume = 0.7;
@@ -38,6 +39,10 @@ class AudioManager with WidgetsBindingObserver {
     // ตั้งค่า Mode ให้เล่นทับกันได้ (Low Latency)
     await _musicPlayer.setReleaseMode(ReleaseMode.loop); // BGM วนซ้ำ
     await _sfxPlayer.setReleaseMode(ReleaseMode.stop);
+    await _buttonPlayer.setReleaseMode(ReleaseMode.stop); // เสียงปุ่ม
+
+    // Preload เสียงปุ่มเพื่อลด latency ครั้งแรก
+    await _buttonPlayer.setVolume(_sfxVolume);
 
     // ลงทะเบียน lifecycle observer เพื่อจัดการเพลงตอนกด Home / ออกแอป
     WidgetsBinding.instance.addObserver(this);
@@ -66,6 +71,19 @@ class AudioManager with WidgetsBindingObserver {
     if (_isMuted) return; // ถ้า Mute อยู่ ไม่ต้องเล่น SFX
     // สร้าง Player ใหม่ชั่วคราวสำหรับ SFX ที่อาจเกิดซ้อนกัน หรือใช้ player เดียวก็ได้
     await _sfxPlayer.play(AssetSource('audio/$fileName'), volume: _sfxVolume);
+  }
+
+  // 6.1 ฟังก์ชันเล่นเสียงปุ่ม (Button Sound) — เรียกใช้ได้จากทุกที่ในแอป
+  /// ใช้ _buttonPlayer แยกต่างหาก เพื่อไม่ conflict กับ SFX อื่น
+  /// และ stop ก่อน play เสมอ เพื่อรองรับการกดถี่ๆ อย่างรวดเร็ว
+  Future<void> playButtonSound() async {
+    if (_isMuted) return;
+    // stop ก่อนเสมอ เพื่อให้เสียงเริ่มใหม่ทันทีแม้กดถี่
+    await _buttonPlayer.stop();
+    await _buttonPlayer.play(
+      AssetSource('audio/button_sound.MP3'),
+      volume: _sfxVolume,
+    );
   }
 
   // 7. ฟังก์ชันปรับระดับเสียง Music
@@ -136,6 +154,67 @@ class AudioManager with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _musicPlayer.dispose();
     _sfxPlayer.dispose();
+    _buttonPlayer.dispose();
+  }
+}
+
+// ─── AppSoundLayer ─────────────────────────────────────────────────────────────
+// Widget ดักจับการกดทุกจุดในแอปโดยอัตโนมัติ ไม่ต้องแก้ไขแต่ละหน้า
+//
+// วิธีใช้ — เพิ่มใน MaterialApp.builder ครั้งเดียว:
+//
+//   MaterialApp(
+//     builder: (context, child) => AppSoundLayer(child: child!),
+//     ...
+//   )
+//
+// หลักการทำงาน:
+//   - Listener.onPointerDown  → บันทึกตำแหน่ง pointer ลง
+//   - Listener.onPointerUp    → ถ้า pointer เคลื่อนน้อยกว่า 10px (คือ tap ไม่ใช่ scroll)
+//                               → เล่นเสียงปุ่ม
+//   ดังนั้นการ scroll จะไม่เล่นเสียง แต่การกดปุ่มทุกชนิดจะเล่นเสียง
+
+class AppSoundLayer extends StatefulWidget {
+  final Widget child;
+
+  const AppSoundLayer({super.key, required this.child});
+
+  @override
+  State<AppSoundLayer> createState() => _AppSoundLayerState();
+}
+
+class _AppSoundLayerState extends State<AppSoundLayer> {
+  // เก็บตำแหน่งที่นิ้วแตะหน้าจอครั้งแรก
+  Offset? _pointerDownPosition;
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      // HitTestBehavior.translucent = ให้ทุก widget ด้านล่างยังรับ event ได้ตามปกติ
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (PointerDownEvent event) {
+        _pointerDownPosition = event.position;
+      },
+      onPointerUp: (PointerUpEvent event) {
+        if (_pointerDownPosition == null) return;
+
+        // คำนวณระยะทางที่นิ้วเคลื่อนไป
+        final distance = (event.position - _pointerDownPosition!).distance;
+
+        // ถ้าน้อยกว่า 10px → ถือว่าเป็น "tap" แล้วเล่นเสียงปุ่ม
+        // ถ้ามากกว่า → ถือว่าเป็น scroll/drag ไม่เล่นเสียง
+        if (distance < 10.0) {
+          AudioManager().playButtonSound();
+        }
+
+        _pointerDownPosition = null;
+      },
+      onPointerCancel: (_) {
+        // ยกเลิก gesture (เช่น เลื่อนออกนอกจอ) → reset ไม่เล่นเสียง
+        _pointerDownPosition = null;
+      },
+      child: widget.child,
+    );
   }
 }
 
@@ -311,5 +390,164 @@ class MusicRouteObserver extends NavigatorObserver {
       final inherited = _musicHistory.isNotEmpty ? _musicHistory.last : _kSilent;
       _musicHistory.add(inherited);
     }
+  }
+}
+
+// ─── Button Sound Widgets ─────────────────────────────────────────────────────
+// Widget สำเร็จรูปสำหรับห่อปุ่มต่างๆ ให้เล่นเสียงอัตโนมัติเมื่อกด
+// วิธีใช้:
+//   SoundButton(onPressed: () { /* your logic */ }, child: Text('กด'))
+//   SoundInkWell(onTap: () { /* your logic */ }, child: YourWidget())
+//   SoundGestureDetector(onTap: () { /* your logic */ }, child: YourWidget())
+
+/// ห่อ [ElevatedButton] / [TextButton] / [OutlinedButton] / [FilledButton]
+/// ให้เล่นเสียงปุ่มอัตโนมัติทุกครั้งที่กด
+class SoundButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+  final Widget child;
+  final ButtonStyle? style;
+
+  /// เลือก variant ของปุ่ม (ค่าเริ่มต้นคือ ElevatedButton)
+  final _SoundButtonType type;
+
+  const SoundButton({
+    super.key,
+    required this.onPressed,
+    required this.child,
+    this.style,
+    this.type = _SoundButtonType.elevated,
+  });
+
+  /// ใช้ TextButton
+  const SoundButton.text({
+    super.key,
+    required this.onPressed,
+    required this.child,
+    this.style,
+  }) : type = _SoundButtonType.text;
+
+  /// ใช้ OutlinedButton
+  const SoundButton.outlined({
+    super.key,
+    required this.onPressed,
+    required this.child,
+    this.style,
+  }) : type = _SoundButtonType.outlined;
+
+  /// ใช้ FilledButton
+  const SoundButton.filled({
+    super.key,
+    required this.onPressed,
+    required this.child,
+    this.style,
+  }) : type = _SoundButtonType.filled;
+
+  VoidCallback? get _wrappedOnPressed {
+    if (onPressed == null) return null;
+    return () {
+      AudioManager().playButtonSound();
+      onPressed!();
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    switch (type) {
+      case _SoundButtonType.text:
+        return TextButton(
+          onPressed: _wrappedOnPressed,
+          style: style,
+          child: child,
+        );
+      case _SoundButtonType.outlined:
+        return OutlinedButton(
+          onPressed: _wrappedOnPressed,
+          style: style,
+          child: child,
+        );
+      case _SoundButtonType.filled:
+        return FilledButton(
+          onPressed: _wrappedOnPressed,
+          style: style,
+          child: child,
+        );
+      case _SoundButtonType.elevated:
+        return ElevatedButton(
+          onPressed: _wrappedOnPressed,
+          style: style,
+          child: child,
+        );
+    }
+  }
+}
+
+enum _SoundButtonType { elevated, text, outlined, filled }
+
+/// ห่อ widget ใดก็ได้ (เช่น Container, Image, Icon) ให้กดได้และเล่นเสียงปุ่ม
+/// แทนที่การใช้ [InkWell] แบบธรรมดา
+class SoundInkWell extends StatelessWidget {
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  final Widget child;
+  final BorderRadius? borderRadius;
+  final Color? splashColor;
+  final Color? highlightColor;
+
+  const SoundInkWell({
+    super.key,
+    required this.onTap,
+    this.onLongPress,
+    required this.child,
+    this.borderRadius,
+    this.splashColor,
+    this.highlightColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap == null
+          ? null
+          : () {
+              AudioManager().playButtonSound();
+              onTap!();
+            },
+      onLongPress: onLongPress,
+      borderRadius: borderRadius,
+      splashColor: splashColor,
+      highlightColor: highlightColor,
+      child: child,
+    );
+  }
+}
+
+/// ห่อ widget ใดก็ได้ด้วย [GestureDetector] ให้เล่นเสียงปุ่มอัตโนมัติเมื่อ onTap
+class SoundGestureDetector extends StatelessWidget {
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  final Widget child;
+  final HitTestBehavior? behavior;
+
+  const SoundGestureDetector({
+    super.key,
+    required this.onTap,
+    this.onLongPress,
+    required this.child,
+    this.behavior,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: behavior,
+      onTap: onTap == null
+          ? null
+          : () {
+              AudioManager().playButtonSound();
+              onTap!();
+            },
+      onLongPress: onLongPress,
+      child: child,
+    );
   }
 }
