@@ -1281,7 +1281,7 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: const Color(0xFF9DD0E7), width: 2),
         ),
-        child: Column(
+        child: Stack(
           children: [
             IntrinsicHeight(
               child: Row(
@@ -1404,32 +1404,15 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                child: Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
-                              ),
-                              if (!isLeader) const SizedBox(width: 8),
-                              if (!isLeader) // 🌟 ซ่อนปุ่มเตะถ้าเป็นหัวหน้า
-                                ElevatedButton(
-                                  onPressed: () => _kickMember(memberId, name),
-                                  style: ButtonStyle(
-                                    backgroundColor: MaterialStateProperty.resolveWith<Color>(
-                                      (states) => states.contains(MaterialState.pressed) ? const Color(0xFFC72E2E) : const Color(0xFFEA4444),
-                                    ),
-                                    foregroundColor: MaterialStateProperty.all<Color>(Colors.white),
-                                    padding: MaterialStateProperty.all<EdgeInsetsGeometry>(const EdgeInsets.all(12)),
-                                    minimumSize: MaterialStateProperty.all<Size>(Size.zero),
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    shape: MaterialStateProperty.all<OutlinedBorder>(RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                                  ),
-                                  child: const Text("ไล่ออก", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                ),
-                            ],
+                          Padding(
+                            padding: EdgeInsets.only(right: isLeader ? 0 : 70),
+                            child: Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
                           ),
                           const SizedBox(height: 6),
-                          Text(detail.isEmpty ? 'ไม่มีคำแนะนำตัว' : detail, style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.3), maxLines: 2, overflow: TextOverflow.ellipsis),
+                          Padding(
+                            padding: EdgeInsets.only(right: isLeader ? 0 : 70),
+                            child: Text(detail.isEmpty ? 'ไม่มีคำแนะนำตัว' : detail, style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.3), maxLines: 2, overflow: TextOverflow.ellipsis),
+                          ),
                         ],
                       ),
                     ),
@@ -1437,6 +1420,24 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
                 ],
               ),
             ),
+            if (!isLeader)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: ElevatedButton(
+                  onPressed: () => _kickMember(memberId, name),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEA4444),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    elevation: 0,
+                  ),
+                  child: const Text("ไล่ออก", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                ),
+              ),
           ],
         ),
       ),
