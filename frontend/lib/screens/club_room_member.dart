@@ -78,10 +78,21 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
           }
         }
 
+        // 🌟 2. เรียงลำดับเควสที่ทำสำเร็จแล้วไปไว้ด้านล่างสุด
+        List<dynamic> sortedQuests = List.from(questsResponse);
+        sortedQuests.sort((a, b) {
+          bool aCompleted = completedIds.contains(a['id']);
+          bool bCompleted = completedIds.contains(b['id']);
+          
+          if (aCompleted && !bCompleted) return 1;
+          if (!aCompleted && bCompleted) return -1;
+          return 0; // รักษาลำดับเดิม (เรียงตาม due_date ไว้)
+        });
+
         if (mounted) {
           setState(() {
             _clubName = club['name'];
-            _quests = questsResponse;
+            _quests = sortedQuests;
             _completedQuestIds = completedIds; // เซ็ตค่าใส่ State
             _isLoading = false;
           });
@@ -306,53 +317,31 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
       }
     }
 
-    // 🌟 3. จัดการของรางวัล (กรณีไม่มีของรางวัล)
+    // 🌟 3. จัดการของรางวัล
     final receives = quest['receive'] as List<dynamic>? ?? [];
-    List<Widget> badges = [];
-    
-    if (receives.isEmpty) {
-      badges.add(
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade300,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Text(
-            "ไม่มีรางวัล",
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.black54,
-            ),
-          ),
-        ),
-      );
-    } else {
-      badges = receives.map((r) {
-        final item = r['items'] ?? {};
-        final itemName = item['name'] ?? "Item";
-        final quantity = r['quantity'] ?? 1;
-        
-        final String imagePath = item['image'] ?? 'assets/images/item/Gasha.png';
-        final bool isExp = itemName.toString().toUpperCase().contains("EXP");
-        
-        Color badgeColor = isExp ? const Color(0xFFC8E6C9) : const Color(0xFFFFE0B2);
-        if (isCompleted) {
-          badgeColor = Colors.grey.shade300; 
-        }
-        
-        final String valueText = isExp ? "+$quantity" : "x$quantity";
+    List<Widget> badges = receives.map((r) {
+      final item = r['items'] ?? {};
+      final itemName = item['name'] ?? "Item";
+      final quantity = r['quantity'] ?? 1;
+      
+      final String imagePath = item['image'] ?? 'assets/images/item/Gasha.png';
+      final bool isExp = itemName.toString().toUpperCase().contains("EXP");
+      
+      Color badgeColor = isExp ? const Color(0xFFC8E6C9) : const Color(0xFFFFE0B2);
+      if (isCompleted) {
+        badgeColor = Colors.grey.shade300; 
+      }
+      
+      final String valueText = isExp ? "+$quantity" : "x$quantity";
 
-        return RewardBadge(
-          label: itemName,
-          value: valueText,
-          color: badgeColor,
-          iconPath: imagePath,
-          isClaimed: isCompleted,
-        );
-      }).toList();
-    }
+      return RewardBadge(
+        label: itemName,
+        value: valueText,
+        color: badgeColor,
+        iconPath: imagePath,
+        isClaimed: isCompleted,
+      );
+    }).toList();
 
     return Container(
       decoration: BoxDecoration(
@@ -421,11 +410,25 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: badges,
-                    ),
+                    if (receives.isEmpty)
+                      Container(
+                        height: 60,
+                        alignment: Alignment.center,
+                        child: const Text(
+                          "ไม่มีของรางวัลสำหรับภารกิจนี้",
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      )
+                    else
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: badges,
+                      ),
                   ],
                 ),
               ),

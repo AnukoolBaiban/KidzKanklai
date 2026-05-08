@@ -21,6 +21,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
   bool _isLoading = true;
   List<dynamic> _quests = []; // เก็บ List ภารกิจ
   int _ticketCount = 0; // 🌟 1. เพิ่มตัวแปรเก็บจำนวนตั๋ว
+  Set<int> _completedQuestIds = {}; // 🌟 เก็บ ID ของเควสที่สมาชิกทุกคนทำสำเร็จแล้ว
 
   @override
   void initState() {
@@ -71,11 +72,60 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
             .gt('due_date', DateTime.now().toUtc().toIso8601String())
             .order('due_date', ascending: true);
 
+        // 🌟 1. นับจำนวนสมาชิกทั้งหมดในชมรม (ยกเว้นหัวหน้าชมรม)
+        final membersResponse = await supabase
+            .from('user_profiles')
+            .select('id')
+            .eq('club_id', clubId)
+            .neq('club_role', 'owner');
+        final int totalMembers = (membersResponse as List).length;
+
+        // 🌟 2. ดึงข้อมูลการทำภารกิจของสมาชิก
+        final List<int> questIds = (questsResponse as List<dynamic>).map((q) => q['id'] as int).toList();
+        final Set<int> completedQuestIds = {};
+
+        if (questIds.isNotEmpty && totalMembers > 0) {
+          final doQuestsResponse = await supabase
+              .from('do_quests')
+              .select('quest_id, user_id')
+              .inFilter('quest_id', questIds)
+              .eq('status', 'completed');
+
+          // นับจำนวนคนที่ทำเควสสำเร็จ (แบบไม่ซ้ำคน)
+          Map<int, Set<String>> questCompletionMap = {};
+          for (var dq in doQuestsResponse) {
+            final qId = dq['quest_id'] as int;
+            final uId = dq['user_id'] as String;
+            if (!questCompletionMap.containsKey(qId)) {
+              questCompletionMap[qId] = {};
+            }
+            questCompletionMap[qId]!.add(uId);
+          }
+
+          questCompletionMap.forEach((qId, userSet) {
+            if (userSet.length >= totalMembers) {
+              completedQuestIds.add(qId);
+            }
+          });
+        }
+
+        // 🌟 3. เรียงลำดับเควสที่ทำสำเร็จแล้วไปไว้ด้านล่างสุด
+        List<dynamic> sortedQuests = List.from(questsResponse);
+        sortedQuests.sort((a, b) {
+          bool aCompleted = completedQuestIds.contains(a['id']);
+          bool bCompleted = completedQuestIds.contains(b['id']);
+          
+          if (aCompleted && !bCompleted) return 1;
+          if (!aCompleted && bCompleted) return -1;
+          return 0; // รักษาลำดับเดิม (เรียงตาม due_date ไว้)
+        });
+
         if (mounted) {
           setState(() {
             _ticketCount = tickets; // 🌟 เก็บจำนวนตั๋วลง State
             _clubName = club['name'];
-            _quests = questsResponse;
+            _quests = sortedQuests;
+            _completedQuestIds = completedQuestIds;
             _isLoading = false;
           });
         }
@@ -357,6 +407,9 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
   // 🌟 การ์ดแสดงภารกิจแต่ละอัน
   Widget _buildMissionCard(Map<String, dynamic> quest) {
     final String title = quest['name'] ?? 'ไม่มีชื่อภารกิจ';
+    final int questId = quest['id'] ?? 0;
+
+    final bool isCompleted = _completedQuestIds.contains(questId);
 
     String timeLeftText = "ไม่มีกำหนด";
     Color timeTextColor = Colors.red;
@@ -378,51 +431,41 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
 
     final receives = quest['receive'] as List<dynamic>? ?? [];
     
-    // 🌟 ดักเช็คว่าถ้าไม่มีรางวัล ให้ขึ้นกล่องบอกว่า "ไม่มีรางวัล"
-    List<Widget> badges = [];
-    if (receives.isEmpty) {
-      badges.add(
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade300, // สีพื้นหลังเทาๆ
-            borderRadius: BorderRadius.circular(12), // ขอบมนคล้ายป้าย Badge
-          ),
-          child: const Text(
-            "ไม่มีรางวัล",
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.black54, // สีข้อความเทาเข้ม
-            ),
-          ),
-        ),
+    // 🌟 3. จัดการของรางวัล
+    List<Widget> badges = receives.map((r) {
+      final item = r['items'] ?? {};
+      final itemName = item['name'] ?? "Item";
+      final quantity = r['quantity'] ?? 1;
+
+      final String imagePath = item['image'] ?? 'assets/images/item/Gasha.png';
+      final bool isExp = itemName.toString().toUpperCase().contains("EXP");
+      
+      Color badgeColor = isExp ? const Color(0xFFC8E6C9) : const Color(0xFFFFE0B2);
+      if (isCompleted) {
+        badgeColor = Colors.grey.shade300; 
+      }
+      
+      final String valueText = isExp ? "+$quantity" : "x$quantity";
+
+      return RewardBadge(
+        label: itemName,
+        value: valueText,
+        color: badgeColor,
+        iconPath: imagePath,
+        isClaimed: isCompleted,
       );
-    } else {
-      badges = receives.map((r) {
-        final item = r['items'] ?? {};
-        final itemName = item['name'] ?? "Item";
-        final quantity = r['quantity'] ?? 1;
-
-        final String imagePath = item['image'] ?? 'assets/images/item/Gasha.png';
-        final bool isExp = itemName.toString().toUpperCase().contains("EXP");
-        final Color color = isExp ? const Color(0xFFC8E6C9) : const Color(0xFFFFE0B2);
-        final String valueText = isExp ? "+$quantity" : "x$quantity";
-
-        return RewardBadge(
-          label: itemName,
-          value: valueText,
-          color: color,
-          iconPath: imagePath,
-        );
-      }).toList();
-    }
+    }).toList();
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isCompleted
+            ? Colors.grey.shade300.withValues(alpha: 0.85)
+            : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF9DD0E7), width: 2),
+        border: Border.all(
+          color: isCompleted ? Colors.grey : const Color(0xFF9DD0E7),
+          width: 2,
+        ),
       ),
       child: IntrinsicHeight(
         child: Row(
@@ -477,16 +520,33 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: badges,
-                    ),
+                    if (receives.isEmpty)
+                      Container(
+                        height: 60,
+                        alignment: Alignment.center,
+                        child: const Text(
+                          "ไม่มีของรางวัลสำหรับภารกิจนี้",
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      )
+                    else
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: badges,
+                      ),
                   ],
                 ),
               ),
             ),
-            Container(width: 1, color: const Color(0xFF9DD0E7)),
+            Container(
+              width: 1,
+              color: isCompleted ? Colors.grey : const Color(0xFF9DD0E7),
+            ),
             Expanded(
               flex: 2,
               child: Padding(
@@ -529,16 +589,26 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    FittedBox(
-                      child: Text(
-                        timeLeftText,
+                    if (isCompleted)
+                      const Text(
+                        "สำเร็จ",
                         style: TextStyle(
-                          color: timeTextColor,
-                          fontSize: 10,
+                          color: Color(0xFF34C759),
+                          fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
+                      )
+                    else
+                      FittedBox(
+                        child: Text(
+                          timeLeftText,
+                          style: TextStyle(
+                            color: timeTextColor,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
