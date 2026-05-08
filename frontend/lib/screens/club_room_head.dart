@@ -126,8 +126,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
                   children: [_buildMissionTitle(), _buildActionButtonsRow()],
                 ),
                 const SizedBox(height: 10),
-                Expanded(flex: 5, child: _buildMissionBox()), // กล่องภารกิจ
-                const Spacer(flex: 3), // พื้นที่ว่างด้านล่าง
+                Expanded(child: _buildMissionBox()), // กล่องภารกิจ
               ],
             ),
           ),

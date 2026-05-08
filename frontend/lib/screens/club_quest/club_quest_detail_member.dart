@@ -27,6 +27,7 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
 
   late String _title;
   late String _description;
+  late String _startDate;
   late String _endDate;
   String? _imagePath;
 
@@ -39,6 +40,20 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
     final q = widget.questData;
     _title = q['name'] ?? 'ไม่มีชื่อภารกิจ';
     _description = q['detail'] ?? 'ไม่มีรายละเอียด';
+
+    if (q['start_date'] != null) {
+      try {
+        DateTime parsed = DateTime.parse(q['start_date']).toLocal();
+        String dd = parsed.day.toString().padLeft(2, '0');
+        String mm = parsed.month.toString().padLeft(2, '0');
+        String yy = (parsed.year + 543).toString().substring(2);
+        _startDate = "$dd/$mm/$yy";
+      } catch (e) {
+        _startDate = "--/--/--";
+      }
+    } else {
+      _startDate = "--/--/--";
+    }
 
     if (q['due_date'] != null) {
       try {
@@ -62,6 +77,43 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
     }
 
     _fetchQuestProgress();
+  }
+
+  // 🌟 ฟังก์ชันสำหรับแสดง Dialog รูปภาพแบบเต็ม
+  void _showFullScreenImage(BuildContext context, String path) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.9), // พื้นหลังดำเข้มโปร่งแสง
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.zero, // ให้ขยายเต็มหน้าจอ
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // 🌟 สามารถบีบซูมรูปได้
+              InteractiveViewer(
+                panEnabled: true,
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: path.startsWith('http')
+                    ? Image.network(path, fit: BoxFit.contain)
+                    : Image.asset(path, fit: BoxFit.contain),
+              ),
+              // ปุ่มปิดสีขาวมุมขวาบน
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 10,
+                right: 10,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   // 🌟 ฟังก์ชันดึงสถิติคนที่ทำเควสนี้
@@ -347,6 +399,13 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
                                             crossAxisAlignment: CrossAxisAlignment.end,
                                             children: [
                                               Text(
+                                                'สร้าง $_startDate',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                              ),
+                                              Text(
                                                 'วันที่สิ้นสุด $_endDate',
                                                 style: TextStyle(
                                                   fontSize: 12,
@@ -405,23 +464,26 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
                                                       ),
                                                       child: AspectRatio(
                                                         aspectRatio: 1,
-                                                        child: ClipRRect(
-                                                          borderRadius: BorderRadius.circular(12),
-                                                          child: Image.network(
-                                                            _imagePath!,
-                                                            fit: BoxFit.cover,
-                                                            errorBuilder: (context, error, stackTrace) {
-                                                              return Container(
-                                                                color: Color(0xFFE8F4F8),
-                                                                child: Center(
-                                                                  child: Icon(
-                                                                    Icons.broken_image,
-                                                                    size: 60,
-                                                                    color: Colors.grey,
+                                                        child: GestureDetector(
+                                                          onTap: () => _showFullScreenImage(context, _imagePath!),
+                                                          child: ClipRRect(
+                                                            borderRadius: BorderRadius.circular(12),
+                                                            child: Image.network(
+                                                              _imagePath!,
+                                                              fit: BoxFit.cover,
+                                                              errorBuilder: (context, error, stackTrace) {
+                                                                return Container(
+                                                                  color: Color(0xFFE8F4F8),
+                                                                  child: Center(
+                                                                    child: Icon(
+                                                                      Icons.broken_image,
+                                                                      size: 60,
+                                                                      color: Colors.grey,
+                                                                    ),
                                                                   ),
-                                                                ),
-                                                              );
-                                                            },
+                                                                );
+                                                              },
+                                                            ),
                                                           ),
                                                         ),
                                                       ),

@@ -24,6 +24,7 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
   // 🌟 ตัวแปรสำหรับเก็บข้อมูลจริง
   late String _title;
   late String _description;
+  late String _startDate;
   late String _endDate;
   String? _imagePath;
 
@@ -37,6 +38,21 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
     final q = widget.questData;
     _title = q['name'] ?? 'ไม่มีชื่อภารกิจ';
     _description = q['detail'] ?? 'ไม่มีรายละเอียด';
+
+    // จัดการวันที่สร้างและวันที่สิ้นสุด
+    if (q['start_date'] != null) {
+      try {
+        DateTime parsed = DateTime.parse(q['start_date']).toLocal();
+        String dd = parsed.day.toString().padLeft(2, '0');
+        String mm = parsed.month.toString().padLeft(2, '0');
+        String yy = (parsed.year + 543).toString().substring(2);
+        _startDate = "$dd/$mm/$yy";
+      } catch (e) {
+        _startDate = "--/--/--";
+      }
+    } else {
+      _startDate = "--/--/--";
+    }
 
     // จัดการวันที่สิ้นสุดให้อยู่ในรูปแบบ วว/ดด/ปป (พ.ศ.)
     if (q['due_date'] != null) {
@@ -62,6 +78,43 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
     }
 
     _fetchQuestProgress(); // 🌟 เรียกใช้ตอนเปิดหน้า
+  }
+
+  // 🌟 ฟังก์ชันสำหรับแสดง Dialog รูปภาพแบบเต็ม
+  void _showFullScreenImage(BuildContext context, String path) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.9), // พื้นหลังดำเข้มโปร่งแสง
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.zero, // ให้ขยายเต็มหน้าจอ
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // 🌟 สามารถบีบซูมรูปได้
+              InteractiveViewer(
+                panEnabled: true,
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: path.startsWith('http')
+                    ? Image.network(path, fit: BoxFit.contain)
+                    : Image.asset(path, fit: BoxFit.contain),
+              ),
+              // ปุ่มปิดสีขาวมุมขวาบน
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 10,
+                right: 10,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   // 🌟 ฟังก์ชันดึงข้อมูลคำถามและส่งไปหน้าแก้ไข
@@ -233,6 +286,13 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
                                             crossAxisAlignment: CrossAxisAlignment.end,
                                             children: [
                                               Text(
+                                                'สร้าง $_startDate',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                              ),
+                                              Text(
                                                 'วันที่สิ้นสุด $_endDate', // 🌟 แสดงวันที่จริง
                                                 style: TextStyle(
                                                   fontSize: 12,
@@ -295,24 +355,27 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
                                                       ),
                                                       child: AspectRatio(
                                                         aspectRatio: 1, 
-                                                        child: ClipRRect(
-                                                          borderRadius: BorderRadius.circular(12),
-                                                          // 🌟 เปลี่ยน Image.asset เป็น Image.network สำหรับดึงภาพจริง
-                                                          child: Image.network(
-                                                            _imagePath!,
-                                                            fit: BoxFit.cover,
-                                                            errorBuilder: (context, error, stackTrace) {
-                                                              return Container(
-                                                                color: Color(0xFFE8F4F8),
-                                                                child: Center(
-                                                                  child: Icon(
-                                                                    Icons.broken_image,
-                                                                    size: 60,
-                                                                    color: Colors.grey,
+                                                        child: GestureDetector(
+                                                          onTap: () => _showFullScreenImage(context, _imagePath!),
+                                                          child: ClipRRect(
+                                                            borderRadius: BorderRadius.circular(12),
+                                                            // 🌟 เปลี่ยน Image.asset เป็น Image.network สำหรับดึงภาพจริง
+                                                            child: Image.network(
+                                                              _imagePath!,
+                                                              fit: BoxFit.cover,
+                                                              errorBuilder: (context, error, stackTrace) {
+                                                                return Container(
+                                                                  color: Color(0xFFE8F4F8),
+                                                                  child: Center(
+                                                                    child: Icon(
+                                                                      Icons.broken_image,
+                                                                      size: 60,
+                                                                      color: Colors.grey,
+                                                                    ),
                                                                   ),
-                                                                ),
-                                                              );
-                                                            },
+                                                                );
+                                                              },
+                                                            ),
                                                           ),
                                                         ),
                                                       ),

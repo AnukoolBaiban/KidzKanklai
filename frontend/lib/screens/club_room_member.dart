@@ -133,8 +133,7 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
                   children: [_buildMissionTitle(), _buildActionButtonsRow()],
                 ),
                 const SizedBox(height: 10),
-                Expanded(flex: 5, child: _buildMissionBox()),
-                const Spacer(flex: 3), // พื้นที่ว่างด้านล่าง (โมเดลอยู่ด้านหลัง)
+                Expanded(child: _buildMissionBox()),
               ],
             ),
           ),
