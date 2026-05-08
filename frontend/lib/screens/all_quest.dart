@@ -892,11 +892,12 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
           )
           .toList();
     } else if (_selectedTabIndex == 3) {
-      // 🌟 "ประวัติ" = ทำสำเร็จแล้ว หรือ หมดเวลา (และต้องไม่ใช่หมวดระบบ) ไม่เกิน 3 เดือน
+      // 🌟 "ประวัติ" = ทำสำเร็จแล้ว หรือ หมดเวลา (และต้องไม่ใช่หมวดระบบ และไม่ใช่ชมรม) ไม่เกิน 3 เดือน
       filteredQuests = _allQuests.where((q) {
         bool isDoneOrFailed =
             (q['status'] == 'completed' || q['status'] == 'failed') &&
-            q['category'] != 'ระบบ';
+            q['category'] != 'ระบบ' &&
+            q['type'] != 'ชมรม'; // 🌟 ไม่แสดงภารกิจชมรม
 
         if (!isDoneOrFailed) return false;
 
