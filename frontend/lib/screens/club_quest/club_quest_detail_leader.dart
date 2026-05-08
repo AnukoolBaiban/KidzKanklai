@@ -30,6 +30,7 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
 
   int _totalMembers = 0;
   int _completedMembers = 0;
+  bool _hasQuestions = false;
 
   @override
   void initState() {
@@ -172,7 +173,6 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
     try {
       final supabase = Supabase.instance.client;
       
-      // ดึงค่า ID มาเช็คก่อนว่าไม่เป็น null
       final clubId = widget.questData['club_id'];
       final questId = widget.questData['id'];
 
@@ -181,7 +181,7 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
         return;
       }
 
-      // 1. นับจำนวนลูกน้องในคลับ (user_profiles มีคอลัมน์ id)
+      // 1. นับจำนวนลูกน้องในคลับ
       final membersRes = await supabase
           .from('user_profiles')
           .select('id')
@@ -190,7 +190,7 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
       
       final total = (membersRes as List).length;
 
-      // 2. นับคนที่ทำเควสนี้เสร็จ (🌟 เปลี่ยนจาก 'id' เป็น 'user_id' ป้องกัน Error คอลัมน์ไม่มี)
+      // 2. นับคนที่ทำเควสนี้เสร็จ
       final doQuestsRes = await supabase
           .from('do_quests')
           .select('user_id') 
@@ -199,14 +199,22 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
           
       final completed = (doQuestsRes as List).length;
 
+      // 3. เช็คว่าภารกิจนี้มีคำถามหรือไม่
+      final questionsRes = await supabase
+          .from('quest_questions')
+          .select('id')
+          .eq('quest_id', questId);
+
+      final hasQ = (questionsRes as List).isNotEmpty;
+
       if (mounted) {
         setState(() {
           _totalMembers = total;
           _completedMembers = completed;
+          _hasQuestions = hasQ;
         });
       }
     } catch (e) {
-      // 🌟 พิมพ์ Error ออกมาดูว่าติดปัญหาอะไร
       debugPrint("❌ Error fetching progress: $e");
     }
   }
@@ -410,32 +418,50 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
                               child: Column(
                                 children: [
                                   // 🌟 1. ข้อความสรุปจำนวน
-                                      Container(
-                                        width: double.infinity,
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFE8F4F8),
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: const Color(0xFF9DD0E7)),
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            const Text(
-                                              'ความคืบหน้าภารกิจ',
-                                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF002A50)),
+                                      Builder(builder: (context) {
+                                        final bool isCompleted = _totalMembers > 0 && _completedMembers >= _totalMembers;
+                                        return Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: isCompleted ? const Color(0xFFE6F9EE) : const Color(0xFFE8F4F8),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: isCompleted ? const Color(0xFF34C759) : const Color(0xFF9DD0E7),
                                             ),
-                                            Text(
-                                              '$_completedMembers / $_totalMembers คน',
-                                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2374B5)),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
+                                          ),
+                                          child: isCompleted
+                                              ? const Row(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    Icon(Icons.check_circle, color: Color(0xFF34C759), size: 18),
+                                                    SizedBox(width: 8),
+                                                    Text(
+                                                      'สมาชิกทุกคนทำภารกิจนี้สำเร็จแล้ว',
+                                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF34C759)),
+                                                    ),
+                                                  ],
+                                                )
+                                              : Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    const Text(
+                                                      'ความคืบหน้าภารกิจ',
+                                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF002A50)),
+                                                    ),
+                                                    Text(
+                                                      '$_completedMembers / $_totalMembers คน',
+                                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2374B5)),
+                                                    ),
+                                                  ],
+                                                ),
+                                        );
+                                      }),
 
                                       const SizedBox(height: 12),
 
-                                      // 🌟 2. ปุ่มดูรายชื่อคนที่ยังไม่เสร็จ
+                                      // 🌟 2. ปุ่มดูรายชื่อคนที่ยังไม่เสร็จ (ซ่อนเมื่อทุกคนทำเสร็จแล้ว)
+                                      if (_totalMembers == 0 || _completedMembers < _totalMembers)
                                       SizedBox(
                                         width: double.infinity,
                                         child: ElevatedButton.icon(
@@ -585,38 +611,145 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
   }
 
   Widget _buildBottomButtons(double bottomPadding) {
-    return Positioned(
-      bottom: bottomPadding + 20,
-      left: MediaQuery.of(context).size.width * 0.1,
-      right: MediaQuery.of(context).size.width * 0.1,
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildButton(
-              text: 'ดูคำถาม',
-              color: Color(0xFF34C759),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ClubQuestQuizAnswerScreen(
-                      questId: widget.questData['id'],
+    final bool isCompleted = _totalMembers > 0 && _completedMembers >= _totalMembers;
+
+    // ภารกิจสำเร็จแล้ว
+    if (isCompleted) {
+      if (_hasQuestions) {
+        // มีคำถาม → แสดงปุ่มดูคำถาม
+        return Positioned(
+          bottom: bottomPadding + 20,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Container(
+              width: 150,
+              decoration: BoxDecoration(
+                color: const Color(0xFF34C759),
+                borderRadius: BorderRadius.circular(25),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF34C759).withOpacity(0.4),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ClubQuestQuizAnswerScreen(
+                        questId: widget.questData['id'],
+                      ),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                ),
+                child: const Text(
+                  'ดูคำถาม',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      } else {
+        // ไม่มีคำถาม → แสดงป้าย ภารกิจสำเร็จ
+        return Positioned(
+          bottom: bottomPadding + 20,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF34C759),
+                borderRadius: BorderRadius.circular(25),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF34C759).withOpacity(0.4),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'ภารกิจสำเร็จ',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
-                );
-              },
+                ],
+              ),
             ),
           ),
-          SizedBox(width: 20),
-          Expanded(
-            child: _buildButton(
-              text: 'แก้ไข',
-              color: Color(0xFF4A8FE7),
-              useGradient: true,
-              onPressed: _navigateToEditQuest, // 🌟 เปลี่ยนมาเรียกฟังก์ชันที่เราสร้างไว้
+        );
+      }
+    }
+
+    // ภารกิจยังไม่เสร็จ → ปุ่มแก้ไข
+    return Positioned(
+      bottom: bottomPadding + 20,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: Container(
+          width: 150,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF556AEB), Color(0xFF59ABEC)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            borderRadius: BorderRadius.circular(25),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF4A8FE7).withOpacity(0.4),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ElevatedButton(
+            onPressed: _navigateToEditQuest,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(25),
+              ),
+            ),
+            child: const Text(
+              'แก้ไข',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
