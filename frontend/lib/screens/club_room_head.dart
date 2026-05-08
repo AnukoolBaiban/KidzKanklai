@@ -22,6 +22,8 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
   List<dynamic> _quests = []; // เก็บ List ภารกิจ
   int _ticketCount = 0; // 🌟 1. เพิ่มตัวแปรเก็บจำนวนตั๋ว
   Set<int> _completedQuestIds = {}; // 🌟 เก็บ ID ของเควสที่สมาชิกทุกคนทำสำเร็จแล้ว
+  Map<int, int> _questProgressMap = {}; // 🌟 เก็บความคืบหน้าของแต่ละเควส
+  int _totalMembersCount = 1; // 🌟 เก็บจำนวนสมาชิกทั้งหมดเพื่อเอาไปใช้กับหลอด
 
   @override
   void initState() {
@@ -83,6 +85,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
         // 🌟 2. ดึงข้อมูลการทำภารกิจของสมาชิก
         final List<int> questIds = (questsResponse as List<dynamic>).map((q) => q['id'] as int).toList();
         final Set<int> completedQuestIds = {};
+        Map<int, int> progressMap = {}; // 🌟 เก็บความคืบหน้าแบบ local ก่อน
 
         if (questIds.isNotEmpty && totalMembers > 0) {
           final doQuestsResponse = await supabase
@@ -103,6 +106,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
           }
 
           questCompletionMap.forEach((qId, userSet) {
+            progressMap[qId] = userSet.length;
             if (userSet.length >= totalMembers) {
               completedQuestIds.add(qId);
             }
@@ -126,6 +130,8 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
             _clubName = club['name'];
             _quests = sortedQuests;
             _completedQuestIds = completedQuestIds;
+            _questProgressMap = progressMap;
+            _totalMembersCount = totalMembers;
             _isLoading = false;
           });
         }
@@ -570,23 +576,27 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF536DFE),
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          padding: EdgeInsets.zero,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
                           elevation: 0,
                         ),
-                        child: const FittedBox(
-                          child: Text(
-                            'รายละเอียด',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
+                        child: const Text(
+                          'รายละเอียด',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildProgressBar(
+                      isCompleted,
+                      _questProgressMap[questId] ?? 0,
+                      _totalMembersCount,
                     ),
                     const SizedBox(height: 4),
                     if (isCompleted)
@@ -599,14 +609,13 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
                         ),
                       )
                     else
-                      FittedBox(
-                        child: Text(
-                          timeLeftText,
-                          style: TextStyle(
-                            color: timeTextColor,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      Text(
+                        timeLeftText,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: timeTextColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                   ],
@@ -615,6 +624,47 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildProgressBar(bool isDone, int progress, int totalReq) {
+    double percent = totalReq > 0 ? (progress / totalReq).clamp(0.0, 1.0) : 0.0;
+    if (isDone) percent = 1.0;
+
+    return Container(
+      height: 14,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade300,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Stack(
+        children: [
+          FractionallySizedBox(
+            alignment: Alignment.centerLeft,
+            widthFactor: percent,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF59ABEC), Color(0xFF85D755)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+          Center(
+            child: Text(
+              isDone ? "$totalReq/$totalReq" : "$progress/$totalReq",
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: percent > 0.5 ? Colors.white : Colors.black87,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

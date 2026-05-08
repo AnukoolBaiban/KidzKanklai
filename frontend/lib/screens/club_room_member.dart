@@ -259,6 +259,22 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // 🌟 เพิ่มข้อความบอกจำนวนภารกิจที่มุมขวาบน
+          Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 6, bottom: 8),
+              child: Text(
+                "จำนวนภารกิจที่ทำได้ ${_quests.length - _completedQuestIds.length}/${_quests.length}",
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+          ),
+
           // Mission List แบบ scroll ได้
           Expanded(
             child: _quests.isEmpty
