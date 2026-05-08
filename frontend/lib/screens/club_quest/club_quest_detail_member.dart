@@ -516,28 +516,45 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
                               child: Column(
                                 children: [
                                   // 🌟 1. ข้อความสรุปจำนวน
-                                  Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFE8F4F8),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: const Color(0xFF9DD0E7)),
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text(
-                                          'ความคืบหน้าภารกิจ',
-                                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF002A50)),
+                                  Builder(builder: (context) {
+                                    final bool allDone = _totalMembers > 0 && _completedMembers >= _totalMembers;
+                                    return Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: allDone ? const Color(0xFFE6F9EE) : const Color(0xFFE8F4F8),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: allDone ? const Color(0xFF34C759) : const Color(0xFF9DD0E7),
                                         ),
-                                        Text(
-                                          '$_completedMembers / $_totalMembers คน',
-                                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2374B5)),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                                      ),
+                                      child: allDone
+                                          ? const Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(Icons.check_circle, color: Color(0xFF34C759), size: 18),
+                                                SizedBox(width: 8),
+                                                Text(
+                                                  'สมาชิกทุกคนทำภารกิจนี้สำเร็จแล้ว',
+                                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF34C759)),
+                                                ),
+                                              ],
+                                            )
+                                          : Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                const Text(
+                                                  'ความคืบหน้าภารกิจ',
+                                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF002A50)),
+                                                ),
+                                                Text(
+                                                  '$_completedMembers / $_totalMembers คน',
+                                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2374B5)),
+                                                ),
+                                              ],
+                                            ),
+                                    );
+                                  }),
                                 ],
                               ),
                             ),
@@ -675,7 +692,6 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
                 ? Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.check_circle, color: Colors.green, size: 28),
                       SizedBox(width: 8),
                       Text(
                         'ภารกิจสำเร็จ',

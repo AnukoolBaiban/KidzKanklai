@@ -616,7 +616,7 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
     // ภารกิจสำเร็จแล้ว
     if (isCompleted) {
       if (_hasQuestions) {
-        // มีคำถาม → แสดงปุ่มดูคำถาม
+        // มีคำถาม → ปุ่มเขียว "ดูคำถาม" แทน
         return Positioned(
           bottom: bottomPadding + 20,
           left: 0,
@@ -667,39 +667,18 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
           ),
         );
       } else {
-        // ไม่มีคำถาม → แสดงป้าย ภารกิจสำเร็จ
+        // ไม่มีคำถาม → ข้อความ "ภารกิจสำเร็จ" แบบเดิม
         return Positioned(
-          bottom: bottomPadding + 20,
+          bottom: bottomPadding + 30,
           left: 0,
           right: 0,
-          child: Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF34C759),
-                borderRadius: BorderRadius.circular(25),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF34C759).withOpacity(0.4),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.check_circle, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'ภารกิจสำเร็จ',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
+          child: const Center(
+            child: Text(
+              'ภารกิจสำเร็จ',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF6CC732),
               ),
             ),
           ),
