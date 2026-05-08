@@ -23,6 +23,9 @@ class ResultStatScreen extends StatefulWidget {
 }
 
 class _ResultStatScreenState extends State<ResultStatScreen> {
+  SMINumber? _screenModeInput;
+  SMITrigger? _missionWinInput;
+  SMITrigger? _missionLoseInput;
   SMINumber? _poseInput;
   SMINumber? _hairInput;
   SMINumber? _faceInput;
@@ -48,6 +51,9 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
       _controller = controller;
 
       for (var input in controller.inputs) {
+        if (input.name == 'ScreenMode') _screenModeInput = input as SMINumber;
+        if (input.name == 'MissionWin') _missionWinInput = input as SMITrigger;
+        if (input.name == 'MissionLose') _missionLoseInput = input as SMITrigger;
         if (input.name == 'Pose') _poseInput = input as SMINumber;
         if (input.name == 'HairID') _hairInput = input as SMINumber;
         if (input.name == 'FaceID') _faceInput = input as SMINumber;
@@ -57,10 +63,13 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
         }
       }
 
+      _screenModeInput?.value = 1.0;
       _syncRiveToEquipped();
 
-      if (_poseInput != null) {
-        _poseInput!.value = widget.isSuccess ? 2.0 : 1.0; // 2=ดีใจ, 1=เศร้า
+      if (widget.isSuccess) {
+        _missionWinInput?.fire();
+      } else {
+        _missionLoseInput?.fire();
       }
     }
     if (mounted) setState(() => _isRiveLoaded = true);
@@ -102,9 +111,6 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
       if (_skinInput != null) _skinInput!.value = _parseId(widget.user!.equippedSkin);
       if (_clothInput != null) {
         _clothInput!.value = _parseId(widget.user!.equippedOutfit);
-      }
-      if (_poseInput != null) {
-        _poseInput!.value = widget.isSuccess ? 2.0 : 1.0;
       }
     } catch (e) {
       print("Error syncing Rive Profile: $e");
