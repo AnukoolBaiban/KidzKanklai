@@ -9,7 +9,11 @@ import 'package:flutter_application_1/widgets/club_confirm_save_popup.dart';
 import '../../widgets/exit_edit_club_quest_popup.dart';
 import 'dart:io'; 
 import 'package:flutter_application_1/widgets/ticket_box.dart';
-import 'package:google_fonts/google_fonts.dart';class QuizQuestion {
+import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide User;
+import 'package:flutter_application_1/widgets/confirm_zero_ticket_popup.dart';
+
+class QuizQuestion {
   TextEditingController textController = TextEditingController();
   List<TextEditingController> optionControllers = [
     TextEditingController(),
@@ -870,7 +874,7 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
               ],
             ),
             child: ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 if (!isReady) {
                   if (!hasName) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -897,13 +901,46 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
                     },
                   );
                 } else {
-                  ClubConfirmSavePopup.show(
-                    context,
-                    onConfirm: () {
-                      Navigator.pop(context);
-                      _submit();
-                    },
-                  );
+                  // ดึงข้อมูลตั๋วชมรม (item_id = 19)
+                  final supabase = Supabase.instance.client;
+                  final user = supabase.auth.currentUser;
+                  int ticketCount = 0;
+
+                  if (user != null) {
+                    try {
+                      final res = await supabase
+                          .from('collect')
+                          .select('quantity')
+                          .eq('user_id', user.id)
+                          .eq('item_id', 19)
+                          .maybeSingle();
+                      if (res != null) {
+                        ticketCount = res['quantity'] as int? ?? 0;
+                      }
+                    } catch (e) {
+                      debugPrint('Error fetch ticket: $e');
+                    }
+                  }
+
+                  if (!mounted) return;
+
+                  if (ticketCount <= 0) {
+                    ConfirmZeroTicketPopup.show(
+                      context,
+                      onConfirm: () {
+                        Navigator.pop(context);
+                        _submit();
+                      },
+                    );
+                  } else {
+                    ClubConfirmSavePopup.show(
+                      context,
+                      onConfirm: () {
+                        Navigator.pop(context);
+                        _submit();
+                      },
+                    );
+                  }
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -924,39 +961,40 @@ class _CreateClubQuestQuizScreenState extends State<CreateClubQuestQuizScreen> {
               ),
             ),
           ),
-          Positioned(
-            top: -10,
-            right: -10,
-            child: TicketBox(
-              slant: 12,
-              borderRadius: 4,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 15,
-                  vertical: 4,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Image.asset(
-                      'assets/images/item/Ticket_quest_img.png',
-                      width: 20,
-                      height: 14,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      "-1",
-                      style: GoogleFonts.kanit(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black87,
+          if (!widget.isEditing)
+            Positioned(
+              top: -10,
+              right: -10,
+              child: TicketBox(
+                slant: 12,
+                borderRadius: 4,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 15,
+                    vertical: 4,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.asset(
+                        'assets/images/item/Ticket_quest_img.png',
+                        width: 20,
+                        height: 14,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      Text(
+                        "-1",
+                        style: GoogleFonts.kanit(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
