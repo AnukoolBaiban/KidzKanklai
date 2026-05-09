@@ -981,12 +981,31 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
       );
     }
 
-    return ListView.builder(
-      padding: EdgeInsets.zero,
-      itemCount: filteredQuests.length,
-      itemBuilder: (context, index) {
-        return QuestCard(
-          quest: filteredQuests[index],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 🌟 แสดงจำนวนภารกิจเฉพาะ tab ประวัติ
+        if (_selectedTabIndex == 3)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              "ภารกิจทั้งหมด ${filteredQuests.length} ภารกิจ",
+              textAlign: TextAlign.center,
+              style: GoogleFonts.kanit(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.black54,
+              ),
+            ),
+          ),
+
+        Expanded(
+          child: ListView.builder(
+            padding: EdgeInsets.zero,
+            itemCount: filteredQuests.length,
+            itemBuilder: (context, index) {
+              return QuestCard(
+                quest: filteredQuests[index],
           onClaim: () async {
             // 🌟 ดึง Profile ก่อนเรียก API เพื่อบันทึก Level เดิม
             final profileBefore = await ApiService.getProfile(0);
@@ -1091,6 +1110,9 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
           },
         );
       },
+    ),
+        ),
+      ],
     );
   }
 }
