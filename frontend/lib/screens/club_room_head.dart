@@ -22,6 +22,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
 
   String _clubName = "กำลังโหลด...";
   bool _isLoading = true;
+  bool _isCollapsed = false; // 🌟 ตัวแปร toggle ย่อ/ขยายกล่องภารกิจ
   List<dynamic> _quests = []; // เก็บ List ภารกิจ
   int _ticketCount = 0; // 🌟 1. เพิ่มตัวแปรเก็บจำนวนตั๋ว
   Set<int> _completedQuestIds = {}; // 🌟 เก็บ ID ของเควสที่สมาชิกทุกคนทำสำเร็จแล้ว
@@ -205,7 +206,19 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
                   children: [_buildMissionTitle(), _buildActionButtonsRow()],
                 ),
                 const SizedBox(height: 10),
-                Expanded(child: _buildMissionBox()), // กล่องภารกิจ
+                // 🌟 ปรับตาม state: ถ้า collapsed ไม่ใช้ Expanded เพื่อให้กล่องย่อเล็กลง
+                if (_isCollapsed)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: _buildMissionBox(),
+                  )
+                else
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: _buildMissionBox(),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -390,74 +403,176 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
     );
   }
 
-  // 🌟 กล่องภารกิจชมรม
+  // 🌟 กล่องภารกิจชมรม พร้อมปุ่ม toggle ย่อ/ขยาย
   Widget _buildMissionBox() {
+    final BoxDecoration boxDecoration = BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.85),
+      borderRadius: BorderRadius.circular(15),
+      border: Border.all(color: const Color(0xFF9DD0E7), width: 2),
+    );
+
     if (_isLoading) {
-      return Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.85),
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: const Color(0xFF9DD0E7), width: 2),
-        ),
-        child: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: const Color(0xFF9DD0E7), width: 2),
-      ),
-      padding: const EdgeInsets.all(10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      return Stack(
+        clipBehavior: Clip.none,
         children: [
-          // 🌟 แสดงจำนวนภารกิจทั้งหมด
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Text(
-              "มีจำนวนภารกิจชมรมทั้งหมด ${_quests.length} ภารกิจ",
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.black54,
-              ),
-            ),
-          ),
-
-          // 🌟 Mission List แบบ scroll ได้
-          Expanded(
-            child: _quests.isEmpty
-                ? const Center(
-                    child: Text(
-                      "ยังไม่มีภารกิจในขณะนี้",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
+          // 🌟 ปุ่ม Toggle อยู่ด้านหลัง
+          _buildToggleButton(),
+          Container(
+            margin: const EdgeInsets.only(bottom: 22), // 🌟 สร้างขอบเขตให้ Stack ครอบคลุมปุ่ม
+            width: double.infinity,
+            decoration: boxDecoration,
+            padding: const EdgeInsets.all(10),
+            child: _isCollapsed
+                ? const SizedBox(
+                    height: 36,
+                    child: Center(
+                      child: Text(
+                        "กำลังโหลดข้อมูล...",
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black54,
+                        ),
                       ),
                     ),
                   )
-                : ListView.builder(
-                    padding: EdgeInsets.zero,
-                    itemCount: _quests.length,
-                    itemBuilder: (context, index) {
-                      final quest = _quests[index];
-                      final isLast = index == _quests.length - 1;
-                      return Padding(
-                        padding: EdgeInsets.only(bottom: isLast ? 0 : 8),
-                        child: _buildMissionCard(quest),
-                      );
-                    },
+                : const Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.only(bottom: 10),
+                        child: Text(
+                          "กำลังโหลดข้อมูล...",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                    ],
                   ),
           ),
         ],
+      );
+    }
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // 🌟 ปุ่ม Toggle มุมขวาล่าง (อยู่ด้านหลัง)
+        _buildToggleButton(),
+
+        // 🌟 ตัวกล่องภารกิจ
+        Container(
+          margin: const EdgeInsets.only(bottom: 22), // 🌟 สร้างขอบเขตให้ Stack ครอบคลุมปุ่ม
+          width: double.infinity,
+          decoration: boxDecoration,
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+          child: _isCollapsed
+              // — โหมดย่อ: แสดงแค่จำนวนภารกิจ —
+              ? SizedBox(
+                  height: 36,
+                  child: Center(
+                    child: Text(
+                      "ภารกิจชมรมทั้งหมด ${_quests.length} ภารกิจ",
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ),
+                )
+              // — โหมดขยาย: แสดงรายการเต็ม —
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // จำนวนภารกิจ
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Text(
+                        "มีจำนวนภารกิจชมรมทั้งหมด ${_quests.length} ภารกิจ",
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    ),
+                    // 🌟 Mission List แบบ scroll ได้
+                    Expanded(
+                      child: _quests.isEmpty
+                          ? const Center(
+                              child: Text(
+                                "ยังไม่มีภารกิจในขณะนี้",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: EdgeInsets.zero,
+                              itemCount: _quests.length,
+                              itemBuilder: (context, index) {
+                                final quest = _quests[index];
+                                final isLast = index == _quests.length - 1;
+                                return Padding(
+                                  padding: EdgeInsets.only(bottom: isLast ? 0 : 8),
+                                  child: _buildMissionCard(quest),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+
+  // 🌟 ปุ่มสี่เหลี่ยมเล็ก toggle ย่อ/ขยาย
+  Widget _buildToggleButton() {
+    return Positioned(
+      bottom: -10, // 🌟 ให้อยู่ในขอบเขต Stack
+      right: 20,
+      child: GestureDetector(
+        onTap: () => setState(() => _isCollapsed = !_isCollapsed),
+        child: Container(
+          width: 36,
+          height: 36, // เพิ่มความสูงให้ซ่อนอยู่ข้างหลังกล่องได้พอดี
+          decoration: BoxDecoration(
+            color: const Color(0xFF2374B5),
+            // โค้งเฉพาะมุมล่างซ้ายและขวา ให้เหมือนที่คั่นหนังสือ
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
+            border: Border.all(color: const Color(0xFF9DD0E7), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          alignment: Alignment.bottomCenter,
+          padding: const EdgeInsets.only(bottom: 2), // ดันไอคอนลงมานิดนึง
+          child: Icon(
+            _isCollapsed ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_up_rounded,
+            color: Colors.white,
+            size: 22,
+          ),
+        ),
       ),
     );
   }
+
 
   // 🌟 การ์ดแสดงภารกิจแต่ละอัน
   Widget _buildMissionCard(Map<String, dynamic> quest) {
