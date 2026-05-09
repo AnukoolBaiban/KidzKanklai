@@ -258,7 +258,14 @@ class _RewardPopupState extends State<RewardPopup> with SingleTickerProviderStat
 
   // 🌟 ฟังก์ชันวาดกล่องไอเทมแต่ละชิ้น
   Widget _buildRewardIcon(RewardData reward) {
-    String imageToShow = reward.itemImage ?? "assets/images/item/EXP.png";
+    String imageToShow;
+    if (reward.type == 'COIN') {
+      imageToShow = 'assets/images/item/coin.png';
+    } else if (reward.type == 'EXP') {
+      imageToShow = 'assets/images/item/EXP.png';
+    } else {
+      imageToShow = reward.itemImage ?? "assets/images/item/Gasha.png";
+    }
 
     return Container(
       width: 70, // ปรับขนาดกล่องให้เล็กลงนิดนึงเพื่อเรียงได้หลายอัน

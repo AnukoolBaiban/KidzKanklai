@@ -4,6 +4,7 @@ import 'package:flutter_application_1/widgets/custom_top_bar.dart';
 import 'package:rive/rive.dart' hide LinearGradient, Image;
 import 'package:flutter_application_1/config/rive_cache.dart';
 import 'package:flutter_application_1/screens/result_stat.dart' show AnimatedUpwardArrow;
+import 'package:flutter_application_1/widgets/reward_popup.dart';
 
 class ResultExamScreen extends StatefulWidget {
   final User? user;
@@ -388,13 +389,38 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
                         ],
                       ),
                       child: ElevatedButton(
-                        onPressed: () {
-                          // 🌟 3. กลับไปหน้าห้องชมรมหลัก เพื่อให้มันโหลด API สถานะเควสใหม่
-                          Navigator.pushNamedAndRemoveUntil(
-                            context,
-                            '/club', // ชื่อ Route หน้า Lobby/คลับ ของคุณ
-                            (route) => route.isFirst,
-                          );
+                        onPressed: () async {
+                          // 🌟 1. ถ้าผ่านภารกิจและมีของรางวัล ให้แสดง RewardPopup ก่อน
+                          if (widget.isPassed && widget.rewardsList != null && widget.rewardsList!.isNotEmpty) {
+                            List<RewardData> popupRewards = [];
+                            for (var reward in widget.rewardsList!) {
+                              final String name = reward['name'] ?? '';
+                              final int amount = reward['amount'] ?? 1;
+                              
+                              if (name.toUpperCase().contains('EXP')) {
+                                popupRewards.add(RewardData.exp(amount));
+                              } else if (name.toUpperCase().contains('COIN') || name.contains('เหรียญ')) {
+                                popupRewards.add(RewardData.coin(amount));
+                              } else {
+                                popupRewards.add(RewardData.item(name: name, amount: amount, image: reward['image']));
+                              }
+                            }
+
+                            // โชว์ popup รอจนกดปิด
+                            await RewardPopup.show(
+                              context,
+                              rewards: popupRewards,
+                            );
+                          }
+
+                          // 🌟 2. กลับไปหน้าห้องชมรมหลัก เพื่อให้มันโหลด API สถานะเควสใหม่
+                          if (context.mounted) {
+                            Navigator.pushNamedAndRemoveUntil(
+                              context,
+                              '/club', // ชื่อ Route หน้า Lobby/คลับ ของคุณ
+                              (route) => route.isFirst,
+                            );
+                          }
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
@@ -440,7 +466,7 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
 
       // จัดการรูปภาพและสีแบบฉุกเฉิน (เหมือนที่คุณทำในหน้าคลับ)
       bool isExp = name.toUpperCase().contains('EXP');
-      bool isCoin = name.toUpperCase().contains('COIN');
+      bool isCoin = name.toUpperCase().contains('COIN') || name.contains('เหรียญ');
       
       String imagePath = 'assets/images/item/Gasha.png';
       IconData icon = Icons.card_giftcard;

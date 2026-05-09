@@ -245,11 +245,19 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
             if (apiRewards.isNotEmpty) {
               // แปลงข้อมูลจาก API เป็น RewardData
               List<RewardData> popupRewards = apiRewards.map<RewardData>((rw) {
+                final String rwName = (rw['name'] ?? '').toUpperCase();
+                String rwType = 'ITEM';
+                if (rwName.contains('EXP')) {
+                  rwType = 'EXP';
+                } else if (rwName.contains('COIN') || rwName.contains('เหรียญ')) {
+                  rwType = 'COIN';
+                }
+
                 return RewardData(
-                  type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM',
-                  amount: rw['amount'] ?? 0, // API ชมรมส่งกลับมาเป็นคีย์ 'amount'
+                  type: rwType,
+                  amount: rw['amount'] ?? 0,
                   itemName: rw['name'],
-                  itemImage: rw['image'], // โชว์รูปภาพไอเทมถ้า API มีส่งมา
+                  itemImage: rw['image'],
                 );
               }).toList();
 
