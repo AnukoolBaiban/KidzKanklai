@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/screens/club_detail_head.dart';
 import 'package:flutter_application_1/widgets/club/club_room_components.dart';
+import 'package:flutter_application_1/widgets/reward_popup.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_application_1/screens/all_quest.dart';
 import 'package:flutter_application_1/screens/club_quest/club_quest_detail_leader.dart';
 
 class ClubRoomHeadScreen extends StatefulWidget {
-  const ClubRoomHeadScreen({super.key});
+  final bool isNewClub; // 🌟 true = เพิ่งสร้างชมรมใหม่ → แสดง popup ตั๋ว
+
+  const ClubRoomHeadScreen({super.key, this.isNewClub = false});
 
   @override
   State<ClubRoomHeadScreen> createState() => _ClubRoomHeadScreenState();
@@ -28,9 +31,29 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchClubData(); // สั่งโหลดข้อมูลตอนเปิดหน้า
+    _fetchClubData().then((_) {
+      // 🌟 ถ้าเพิ่งสร้างชมรมใหม่ ให้แสดง popup ตั๋วสร้างภารกิจชมรมทันที
+      if (widget.isNewClub && mounted) {
+        _showNewClubTicketPopup();
+      }
+    });
     // โหลดข้อมูลของหน้ารายละเอียดล่วงหน้าแบบ Background
     Future.microtask(() => ClubDetailHeadPreloader.preload());
+  }
+
+  // 🌟 แสดง RewardPopup ตั๋วสร้างภารกิจชมรม 3 ใบ เมื่อสร้างชมรมสำเร็จ
+  Future<void> _showNewClubTicketPopup() async {
+    if (!mounted) return;
+    await RewardPopup.show(
+      context,
+      rewards: [
+        RewardData.item(
+          name: 'ตั๋วสร้างภารกิจชมรม',
+          amount: 3,
+          image: 'assets/images/item/Ticket_clubquest_img.png',
+        ),
+      ],
+    );
   }
 
   // 🌟 ฟังก์ชันดึงข้อมูลชมรมและเควส
@@ -198,15 +221,43 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
   }
 
   Widget _buildMissionTitle() {
-    return const Padding(
-      padding: EdgeInsets.only(bottom: 4),
-      child: Text(
-        "ภารกิจของชมรม",
-        style: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-          color: Colors.black,
-        ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "ภารกิจของชมรม",
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'assets/images/item/Ticket_clubquest_img.png',
+                width: 22,
+                height: 22,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) =>
+                    const Icon(Icons.confirmation_num, size: 18, color: Colors.blueAccent),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                '$_ticketCount/3',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -363,18 +414,16 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 🌟 เพิ่มข้อความบอกจำนวนตั๋วที่มุมขวาบน
-          Align(
-            alignment: Alignment.centerRight,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 6, bottom: 8),
-              child: Text(
-                "จำนวนตั๋วสร้างภารกิจชมรมที่มี $_ticketCount",
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
+          // 🌟 แสดงจำนวนภารกิจทั้งหมด
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(
+              "มีจำนวนภารกิจชมรมทั้งหมด ${_quests.length} ภารกิจ",
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.black54,
               ),
             ),
           ),

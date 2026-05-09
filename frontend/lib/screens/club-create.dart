@@ -79,7 +79,7 @@ class _ClubCreateScreenState extends State<ClubCreateScreen> {
         // TODO: (ถ้ามีหน้า ClubRoomHead) ส่ง club_id หรือข้อมูลไปให้หน้านั้นด้วย
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const ClubRoomHeadScreen()),
+          MaterialPageRoute(builder: (context) => const ClubRoomHeadScreen(isNewClub: true)),
         );
       } else {
         // ❌ สร้างไม่สำเร็จ (เช่น มีชมรมอยู่แล้ว)

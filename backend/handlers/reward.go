@@ -90,6 +90,17 @@ func ClaimLoginTickets(c *gin.Context) {
 		}
 	}
 	itemRows.Close()
+
+	// 🌟 Override รูปภาพ Club Ticket (item_id 19) ให้ใช้รูปที่กำหนดไว้เสมอ
+	if info, ok := itemsMap[19]; ok {
+		info.Image = "assets/images/item/Ticket_clubquest_img.png"
+		itemsMap[19] = info
+	}
+
+	// 🌟 ตรวจสอบว่าผู้เล่นเป็นหัวหน้าชมรม (owner) หรือไม่
+	var clubRolePtr *string
+	configs.DB.QueryRow(ctx, `SELECT club_role FROM public.user_profiles WHERE id = $1`, userId).Scan(&clubRolePtr)
+	isClubOwner := clubRolePtr != nil && *clubRolePtr == "owner"
 	// -------------------------------------------------------------
 
 	var rewards []RewardResponse
@@ -171,9 +182,11 @@ func ClaimLoginTickets(c *gin.Context) {
 	}
 
 	// 🌟 ตอนเรียกใช้ ไม่ต้องพิมพ์ชื่อตั๋วเองแล้ว ใส่แค่ (ID, MaxCap, จำนวนที่แจก, เป็นรายวันใช่ไหม?)
-	upsertTicket(17, 7, 1, true)  // QUEST_TICKET
-	upsertTicket(18, 3, 3, false) // EXAM_TICKET
-	upsertTicket(19, 3, 3, false) // CLUB_TICKET
+	upsertTicket(17, 7, 1, true)  // QUEST_TICKET (รายวัน)
+	upsertTicket(18, 3, 3, false) // EXAM_TICKET (รายสัปดาห์)
+	if isClubOwner {
+		upsertTicket(19, 3, 3, false) // CLUB_TICKET (รายสัปดาห์, เฉพาะหัวหน้าชมรมเท่านั้น)
+	}
 
 	// Commit
 	if err := tx.Commit(ctx); err != nil {
