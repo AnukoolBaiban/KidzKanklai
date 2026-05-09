@@ -544,7 +544,7 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
                                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                               children: [
                                                 const Text(
-                                                  'ความคืบหน้าภารกิจ',
+                                                  'ความคืบหน้าภารกิจของสมาชิก',
                                                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF002A50)),
                                                 ),
                                                 Text(

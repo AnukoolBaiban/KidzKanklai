@@ -207,6 +207,41 @@ class _ClubConfirmSavePopupState extends State<ClubConfirmSavePopup>
                                       ),
                                     ),
                                   ),
+
+                                  // Badge (บอกว่าเสียตั๋ว)
+                                  Positioned(
+                                    top: -15,
+                                    right: -6,
+                                    child: TicketBox(
+                                      slant: 12,
+                                      borderRadius: 4,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 15,
+                                          vertical: 4,
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Image.asset(
+                                              'assets/images/item/Ticket_clubquest_img.png',
+                                              width: 20,
+                                              height: 14,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              "-1",
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),

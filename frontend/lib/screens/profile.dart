@@ -102,7 +102,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
   
   // --- ตัวแปรใหม่สำหรับ Achievement ---
-  int _totalAchievements = 18; // ค่าเริ่มต้น สมมติมี 18 อัน (คุณปรับได้ตามจริง)
+  int _totalAchievements = 8; // ค่าเริ่มต้น สมมติมี 18 อัน (คุณปรับได้ตามจริง)
   int _unlockedAchievements = 0;
   List<String> _achievementImages = [];
 

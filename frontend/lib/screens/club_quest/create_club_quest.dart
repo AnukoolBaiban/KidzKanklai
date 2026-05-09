@@ -1183,7 +1183,7 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Image.asset(
-                        'assets/images/item/Ticket_quest_img.png',
+                        'assets/images/item/Ticket_clubquest_img.png',
                         width: 20,
                         height: 14,
                       ),

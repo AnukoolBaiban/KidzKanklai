@@ -4,7 +4,7 @@ import '../../api_service.dart';
 import 'club_quest_quiz_answer.dart';
 import 'create_club_quest.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; // 🌟 เพิ่มบรรทัดนี้
-import 'incomplete_member.dart'; // 🌟 Import ไฟล์ใหม่
+import '../../widgets/club/incomplete_member_popup.dart'; // 🌟 Import ไฟล์ใหม่
 
 class ClubQuestDetailLeaderScreen extends StatefulWidget {
   final Map<String, dynamic> questData; // 🌟 รับข้อมูลเควส
@@ -446,7 +446,7 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
                                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                   children: [
                                                     const Text(
-                                                      'ความคืบหน้าภารกิจ',
+                                                      'ความคืบหน้าภารกิจของสมาชิก',
                                                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF002A50)),
                                                     ),
                                                     Text(
@@ -466,19 +466,15 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
                                         width: double.infinity,
                                         child: ElevatedButton.icon(
                                           onPressed: () {
-                                            Navigator.push(
+                                            IncompleteMemberPopup.show(
                                               context,
-                                              MaterialPageRoute(
-                                                builder: (_) => IncompleteMembersScreen(
-                                                  questId: widget.questData['id'],
-                                                  clubId: widget.questData['club_id'],
-                                                ),
-                                              ),
+                                              questId: widget.questData['id'],
+                                              clubId: widget.questData['club_id'],
                                             );
                                           },
                                           icon: const Icon(Icons.people_alt, color: Colors.white),
                                           label: const Text(
-                                            'สมาชิกที่ยังไม่เสร็จภารกิจ',
+                                            'รายชื่อสมาชิกที่ยังทำภารกิจไม่สำเร็จ',
                                             style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
                                           ),
                                           style: ElevatedButton.styleFrom(
