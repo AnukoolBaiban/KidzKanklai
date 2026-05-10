@@ -38,7 +38,7 @@ class _CharacterWidgetState extends State<CharacterWidget>
   SMINumber? _clothInput;
   SMINumber? _armInput;
   bool _isRiveLoaded = false;
-
+  String _currentRiveAsset = '';
   // --- Speech Bubble State ---
   String? _greetingText;
   bool _showBubble = false;
@@ -420,6 +420,8 @@ class CountdownCharacterWidgetState extends State<CountdownCharacterWidget> {
   // ── Rive ────────────────────────────────────────────────────
   StateMachineController? _controller;
   bool _isRiveLoaded = false;
+  int _riveResetKey = 0;
+  String? _pendingAction;
 
   // ── Fashion inputs (เหมือน CharacterWidget ทุกประการ) ──────
   SMINumber? _screenModeInput;
@@ -556,11 +558,13 @@ class CountdownCharacterWidgetState extends State<CountdownCharacterWidget> {
     _screenModeInput?.value = 1;
     _updateFashionInputs();
 
-    // เล่นท่าใน popup ถ้าระบุไว้
-    if (widget.initialAction == 'Win') {
+    // เล่นท่าใน popup ถ้าระบุไว้ หรือมาจาก _pendingAction
+    if (widget.initialAction == 'Win' || _pendingAction == 'Win') {
       _missionWinInput?.fire();
-    } else if (widget.initialAction == 'Lose') {
+      _pendingAction = null;
+    } else if (widget.initialAction == 'Lose' || _pendingAction == 'Lose') {
       _missionLoseInput?.fire();
+      _pendingAction = null;
     }
 
     setState(() {
@@ -594,14 +598,32 @@ class CountdownCharacterWidgetState extends State<CountdownCharacterWidget> {
 
   /// เล่นท่า Win เมื่อเควสสำเร็จ
   void triggerWin() {
-    _missionWinInput?.fire();
     _sleepyTimer?.cancel();
+    if (_isSleepyPlaying) {
+      // 🌟 บังคับโหลด Rive ใหม่ทั้งหมดเพื่อล้าง State การหาวที่ค้างอยู่ (แก้ปัญหาหน้าหาย 100%)
+      setState(() {
+        _pendingAction = 'Win';
+        _riveResetKey++;
+        _isSleepyPlaying = false;
+      });
+    } else {
+      _missionWinInput?.fire();
+    }
   }
 
   /// เล่นท่า Lose เมื่อเควสล้มเหลว / ยอมแพ้
   void triggerLose() {
-    _missionLoseInput?.fire();
     _sleepyTimer?.cancel();
+    if (_isSleepyPlaying) {
+      // 🌟 บังคับโหลด Rive ใหม่ทั้งหมดเพื่อล้าง State การหาวที่ค้างอยู่ (แก้ปัญหาหน้าหาย 100%)
+      setState(() {
+        _pendingAction = 'Lose';
+        _riveResetKey++;
+        _isSleepyPlaying = false;
+      });
+    } else {
+      _missionLoseInput?.fire();
+    }
   }
 
   // ── Kick Fashion Inputs ───────────────────────────────────────
@@ -680,6 +702,7 @@ class CountdownCharacterWidgetState extends State<CountdownCharacterWidget> {
           if (RiveCache().getFile(asset) != null)
             RiveAnimation.direct(
               RiveCache().getFile(asset)!,
+              key: ValueKey('$asset-$_riveResetKey'),
               fit: BoxFit.contain,
               antialiasing: false,
               onInit: _onRiveInit,
@@ -688,6 +711,7 @@ class CountdownCharacterWidgetState extends State<CountdownCharacterWidget> {
           else
             RiveAnimation.asset(
               asset,
+              key: ValueKey('$asset-$_riveResetKey'),
               fit: BoxFit.contain,
               antialiasing: false,
               onInit: _onRiveInit,

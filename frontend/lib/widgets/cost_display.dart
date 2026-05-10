@@ -10,6 +10,7 @@ class CostDisplayWidget extends StatelessWidget {
   final Color borderColor;
   final double borderWidth;
   final bool showEnergy;
+  final String? customText;
 
   const CostDisplayWidget({
     Key? key,
@@ -21,6 +22,7 @@ class CostDisplayWidget extends StatelessWidget {
     this.backgroundColor = Colors.white,
     this.borderColor = Colors.black,
     this.borderWidth = 1.0,
+    this.customText,
   }) : super(key: key);
 
   @override
@@ -36,45 +38,56 @@ class CostDisplayWidget extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 🌟 เพิ่มคำว่า "ใช้ " ไว้ข้างหน้า
-            Text(
-              'ใช้ ',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            // Energy Box
-            if (showEnergy)
-              _buildCostItem(
-                icon: 'assets/images/item/energy.png',
-                // 🌟 ลบเครื่องหมายลบออก
-                value: energyCostText != null ? energyCostText! : '$energyCost',
-                fallbackIcon: Icons.flash_on,
-                fallbackColor: Colors.yellow,
-              ),
-
-            if (showTicket) ...[
-              if (showEnergy) ...[
-                SizedBox(width: 8),
-                Text(
-                  'และ',
-                  style: TextStyle(
-                    fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-                  ),
+            if (customText != null)
+              Text(
+                customText!,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
                 ),
-                SizedBox(width: 8),
-              ],
-
-              _buildCostItem(
-                icon: 'assets/images/item/Ticket_energy_img.png',
-                value: ' $ticketCost',
-                fallbackIcon: Icons.confirmation_number,
-                fallbackColor: Colors.green,
+              )
+            else ...[
+              // 🌟 เพิ่มคำว่า "ใช้ " ไว้ข้างหน้า
+              Text(
+                'ใช้ ',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
+              // Energy Box
+              if (showEnergy)
+                _buildCostItem(
+                  icon: 'assets/images/item/energy.png',
+                  // 🌟 ลบเครื่องหมายลบออก
+                  value: energyCostText != null ? energyCostText! : '$energyCost',
+                  fallbackIcon: Icons.flash_on,
+                  fallbackColor: Colors.yellow,
+                ),
+
+              if (showTicket) ...[
+                if (showEnergy) ...[
+                  SizedBox(width: 8),
+                  Text(
+                    'และ',
+                    style: TextStyle(
+                      fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                ],
+
+                _buildCostItem(
+                  icon: 'assets/images/item/Ticket_energy_img.png',
+                  value: ' $ticketCost',
+                  fallbackIcon: Icons.confirmation_number,
+                  fallbackColor: Colors.green,
+                ),
+              ],
             ],
           ],
         ),

@@ -23,6 +23,9 @@ class ResultStatScreen extends StatefulWidget {
 }
 
 class _ResultStatScreenState extends State<ResultStatScreen> {
+  SMINumber? _screenModeInput;
+  SMITrigger? _missionWinInput;
+  SMITrigger? _missionLoseInput;
   SMINumber? _poseInput;
   SMINumber? _hairInput;
   SMINumber? _faceInput;
@@ -30,6 +33,34 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
   SMINumber? _clothInput;
   StateMachineController? _controller;
   bool _isRiveLoaded = false;
+
+  String? _encouragementMessage;
+  bool _showEncouragement = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pickRandomMessage();
+    // ตั้งให้แสดงผลทันทีหลังบิลด์ครั้งแรกเสร็จ
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _showEncouragement = true;
+        });
+      }
+    });
+  }
+
+  void _pickRandomMessage() {
+    List<String> messages;
+    if (widget.isSuccess) {
+      messages = ["เก่งมากเลย!", "ยอดเยี่ยมไปเลย!", "ทำได้ดีมาก!", "พัฒนาขึ้นอีกแล้ว!"];
+    } else {
+      messages = ["ไม่เป็นไรนะ!", "สู้ๆ เริ่มใหม่ได้!", "พยายามอีกนิด!", "อย่าเพิ่งท้อนะ!"];
+    }
+    messages.shuffle();
+    _encouragementMessage = messages.first;
+  }
 
   void _onRiveInit(Artboard artboard) {
     var controller = StateMachineController.fromArtboard(
@@ -48,6 +79,9 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
       _controller = controller;
 
       for (var input in controller.inputs) {
+        if (input.name == 'ScreenMode') _screenModeInput = input as SMINumber;
+        if (input.name == 'MissionWin') _missionWinInput = input as SMITrigger;
+        if (input.name == 'MissionLose') _missionLoseInput = input as SMITrigger;
         if (input.name == 'Pose') _poseInput = input as SMINumber;
         if (input.name == 'HairID') _hairInput = input as SMINumber;
         if (input.name == 'FaceID') _faceInput = input as SMINumber;
@@ -57,10 +91,13 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
         }
       }
 
+      _screenModeInput?.value = 1.0;
       _syncRiveToEquipped();
 
-      if (_poseInput != null) {
-        _poseInput!.value = widget.isSuccess ? 2.0 : 1.0; // 2=ดีใจ, 1=เศร้า
+      if (widget.isSuccess) {
+        _missionWinInput?.fire();
+      } else {
+        _missionLoseInput?.fire();
       }
     }
     if (mounted) setState(() => _isRiveLoaded = true);
@@ -102,9 +139,6 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
       if (_skinInput != null) _skinInput!.value = _parseId(widget.user!.equippedSkin);
       if (_clothInput != null) {
         _clothInput!.value = _parseId(widget.user!.equippedOutfit);
-      }
-      if (_poseInput != null) {
-        _poseInput!.value = widget.isSuccess ? 2.0 : 1.0;
       }
     } catch (e) {
       print("Error syncing Rive Profile: $e");
@@ -229,6 +263,7 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
                             height: 200,
                             width: 200,
                             child: Stack(
+                              clipBehavior: Clip.none,
                               alignment: Alignment.center,
                               children: [
                                 // ตัวละคร Rive
@@ -270,6 +305,14 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
                                   Positioned(
                                     left: 20,
                                     child: const AnimatedUpwardArrow(delayMs: 600), // โผล่หลังทางขวาแปปนึง
+                                  ),
+
+                                // Bubble ข้อความให้กำลังใจ (ด้านซ้ายของตัวละคร)
+                                if (_showEncouragement && _encouragementMessage != null)
+                                  Positioned(
+                                    left: -80, // เลยขอบซ้ายออกไปเยอะๆ จะได้ไม่โดนทับ
+                                    top: 60, // ระดับแก้มตัวละคร
+                                    child: _buildEncouragementBubble(),
                                   ),
                               ],
                             ),
@@ -349,6 +392,29 @@ class _ResultStatScreenState extends State<ResultStatScreen> {
           // Blue Header
           _buildBlueHeader(topBarHeight),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEncouragementBubble() {
+    return AnimatedOpacity(
+      opacity: _showEncouragement ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 300),
+      child: CustomPaint(
+        painter: _SideBubblePainter(),
+        child: Container(
+          constraints: BoxConstraints(maxWidth: 140), // กว้างสุดแค่นี้พอ เพราะอยู่ในกล่อง
+          padding: const EdgeInsets.fromLTRB(14, 10, 24, 10), // เว้นขวาให้หาง
+          child: Text(
+            _encouragementMessage ?? '',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF333333),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
       ),
     );
   }
@@ -642,4 +708,37 @@ class _AnimatedUpwardArrowState extends State<AnimatedUpwardArrow>
       ),
     );
   }
+}
+
+// ==========================================
+// Custom Painter สำหรับวาดกล่องข้อความที่มีหางชี้ไปหาตัวละคร
+// ==========================================
+class _SideBubblePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.white;
+    final shadowPaint = Paint()
+      ..color = Colors.black.withOpacity(0.15)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+
+    final bubbleWidth = size.width - 12; // เว้นพื้นที่ 12px ทางขวาให้หาง
+    const radius = Radius.circular(16);
+    final rect = RRect.fromLTRBR(0, 0, bubbleWidth, size.height, radius);
+
+    final path = Path()..addRRect(rect);
+    
+    // เติมหางชี้ไปทางขวา (ระดับกลางค่อนไปล่างนิดนึง)
+    path.moveTo(bubbleWidth - 1, size.height / 2 - 8);
+    path.lineTo(size.width, size.height / 2 + 2); // จุดปลายแหลม
+    path.lineTo(bubbleWidth - 1, size.height / 2 + 12);
+    path.close();
+
+    // วาดเงาทีเดียวรวมกันทั้งกล่องและหาง
+    canvas.drawPath(path.shift(const Offset(0, 4)), shadowPaint);
+    // วาดกล่องข้อความทับ
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -9,8 +9,11 @@ import 'package:rive/rive.dart' hide LinearGradient, Image;
 import 'package:flutter_application_1/config/rive_cache.dart';
 import 'package:flutter_application_1/widgets/energy_bar.dart';
 import 'package:flutter_application_1/widgets/cost_display.dart';
+import 'package:flutter_application_1/widgets/chance_display.dart';
+import 'package:flutter_application_1/widgets/ticket_box.dart';
 import 'package:flutter_application_1/screens/result_stat.dart';
 import 'package:flutter_application_1/screens/exam.dart';
+import 'package:flutter_application_1/screens/video_transition_screen.dart';
 
 class LocationUpgradeScreen extends StatefulWidget {
   final api.User? user;
@@ -592,44 +595,42 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
       padding: EdgeInsets.fromLTRB(20,20,20,20),
       child: Column(
         children: [
-          // Cost Display
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Center(
-                child: CostDisplayWidget(
-                  energyCostText: '10-20', // 🌟 ส่งข้อความไปโชว์แทน
-                  ticketCost: 1,
-                  showTicket: true,
-                  showEnergy: !isPark,
-                ),
+          // 🌟 ใช้ CostDisplayWidget แบบเดิม แต่ซ่อนตั๋วเพื่อให้มันโชว์แค่ พลังงาน และพื้นหลังสีขาว
+          if (!isPark) ...[
+            Center(
+              child: CostDisplayWidget(
+                energyCostText: '10-20', 
+                showTicket: false, // 🌟 ไม่โชว์ตั๋ว เพราะเราย้ายตั๋วไปติดกับปุ่มแล้ว
+                showEnergy: true,
               ),
-            ],
-          ),
-
-          SizedBox(height: 8),
+            ),
+            SizedBox(height: 8),
+          ],
 
           // ✅ ปุ่ม Start (แก้ตรงนี้)
-          Container(
-            width: 180,
-          height: 48,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF556AEB), Color(0xFF59ABEC)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: [
-                BoxShadow(
-                  color: Color(0xFF4A8FE7).withOpacity(0.4),
-                  blurRadius: 8,
-                  offset: Offset(0, 4),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 180,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF556AEB), Color(0xFF59ABEC)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                  borderRadius: BorderRadius.circular(25),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color(0xFF4A8FE7).withOpacity(0.4),
+                      blurRadius: 8,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: ElevatedButton(
-                onPressed: () async {
+                child: ElevatedButton(
+                  onPressed: () async {
                   // 🌟 1. แปลงชื่อสถานที่เป็นภาษาอังกฤษเพื่อส่งให้ API
                   String apiLocation = '';
                   switch (widget.locationName) {
@@ -663,6 +664,22 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                   if (mounted) Navigator.pop(context);
 
                   if (result != null) {
+                    // 🌟 เล่นวิดีโอคั่นกลาง
+                    String videoPath = '';
+                    if (widget.locationName == 'หอสมุด') videoPath = 'assets/video/add-int.mp4';
+                    else if (widget.locationName == 'โรงยิม') videoPath = 'assets/video/add-str.mp4';
+                    else if (widget.locationName == 'สวนสนุก') videoPath = 'assets/video/add-cre.mp4';
+                    else if (widget.locationName == 'สวนสาธารณะ') videoPath = 'assets/video/add-energy.mp4';
+
+                    if (videoPath.isNotEmpty && mounted) {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => VideoTransitionScreen(videoPath: videoPath),
+                        ),
+                      );
+                    }
+
                     // เก็บค่าเก่าก่อนอัปเดต เพื่อส่งให้ ResultStatScreen ทำอนิเมชัน
                     Map<String, int> oldStatsData = {
                       'ความฉลาด': int.tryParse(_intStat) ?? 0,
@@ -773,6 +790,40 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                   ),
                 ),
               ),
+              ),
+
+              // 🌟 2. เพิ่มป้ายตั๋วติดที่มุมปุ่ม
+              Positioned(
+                top: -12,
+                right: -10,
+                child: TicketBox(
+                  slant: 12,
+                  borderRadius: 4,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Image.asset(
+                          'assets/images/item/Ticket_energy_img.png',
+                          width: 20,
+                          height: 10,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          "-1",
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

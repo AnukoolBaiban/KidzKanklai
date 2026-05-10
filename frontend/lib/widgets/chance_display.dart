@@ -10,6 +10,7 @@ class ChanceDisplay extends StatelessWidget {
   final double borderWidth;
   final bool showEnergy;
   final int chancePercent;
+  final String? customText;
 
   const ChanceDisplay({
     Key? key,
@@ -21,6 +22,7 @@ class ChanceDisplay extends StatelessWidget {
     this.borderColor = Colors.black,
     this.borderWidth = 1.0,
     this.chancePercent = 50, // 🔥 default
+    this.customText,
   }) : super(key: key);
 
   @override
@@ -37,7 +39,7 @@ class ChanceDisplay extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'โอกาสผ่าน $chancePercent%',
+              customText ?? 'โอกาสผ่าน $chancePercent%',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,

@@ -47,6 +47,13 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
   int _selectedSeconds = 0; // ใน UI คือ "นาที"
   int _selectedActualSeconds = 0; // วินาที
   int _elapsedTotalSeconds = 0;
+  int _totalDurationSeconds = 0; // 🌟 เก็บเวลาทั้งหมดสำหรับเช็ค %
+
+  // 🌟 State สำหรับ Bubble ให้กำลังใจ
+  String? _encouragementMessage;
+  bool _showEncouragement = false;
+  Timer? _encouragementTimer;
+  Set<int> _triggeredThresholds = {};
 
   int? _currentQuestId; // 🌟 เพิ่ม: เก็บ ID ของเควสที่เพิ่งสร้าง
   DateTime? _targetEndTime; // 🌟 เพิ่ม: เก็บเวลาสิ้นสุดที่ Server ตอบกลับมา
@@ -127,6 +134,9 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
         seconds: _selectedActualSeconds, // วินาที
       ));
 
+      _totalDurationSeconds = durationInMinutes * 60 + _selectedActualSeconds;
+      _triggeredThresholds.clear();
+
       setState(() {
         _isRunning = true;
         _isLoadingAPI = false;
@@ -172,8 +182,55 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
           _selectedSeconds = remaining.inMinutes % 60; // นาที
           _selectedActualSeconds = remaining.inSeconds % 60; // วินาที
         });
+
+        // 🌟 ตรวจสอบและแสดงข้อความให้กำลังใจตาม % ความคืบหน้า
+        if (_totalDurationSeconds > 0) {
+          int elapsed = _totalDurationSeconds - remaining.inSeconds;
+          double progress = elapsed / _totalDurationSeconds;
+          int progressPercent = (progress * 100).toInt();
+
+          List<int> thresholds = [10, 25, 50, 75, 90];
+          for (int t in thresholds) {
+            if (progressPercent >= t && !_triggeredThresholds.contains(t)) {
+              _triggeredThresholds.add(t);
+              _showEncouragementBubble(t);
+              break;
+            }
+          }
+        }
       }
     });
+  }
+
+  // 🌟 ฟังก์ชันสุ่มและแสดงข้อความให้กำลังใจ
+  void _showEncouragementBubble(int percentage) {
+    List<String> messages = [];
+    switch (percentage) {
+      case 10: messages = ["เริ่มต้นได้ดีเลย!", "พยายามเข้านะ!", "ฮึบๆ ลุยเลย!"]; break;
+      case 25: messages = ["เก่งมาก!", "สู้ๆ นะ!", "ทำได้ดีมาก!"]; break;
+      case 50: messages = ["ครึ่งทางแล้ว!", "ยอดเยี่ยม!", "ไปกันต่อเลย!"]; break;
+      case 75: messages = ["ใกล้สำเร็จแล้ว!", "ฮึบๆ อีกนิด!", "อย่ายอมแพ้นะ!"]; break;
+      case 90: messages = ["อีกนิดเดียว!", "โค้งสุดท้ายแล้ว!", "เตรียมฉลองเลย!"]; break;
+      default: messages = ["สู้ๆ นะ!"];
+    }
+    
+    messages.shuffle();
+    
+    if (mounted) {
+      setState(() {
+        _encouragementMessage = messages.first;
+        _showEncouragement = true;
+      });
+      
+      _encouragementTimer?.cancel();
+      _encouragementTimer = Timer(const Duration(seconds: 5), () {
+        if (mounted) {
+          setState(() {
+            _showEncouragement = false;
+          });
+        }
+      });
+    }
   }
 
   // 🌟 3. ฟังก์ชันจบเควส (ยิง API Complete)
@@ -265,6 +322,10 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
         _selectedSeconds = 0;
         _selectedActualSeconds = 0;
         _elapsedTotalSeconds = 0;
+        _totalDurationSeconds = 0;
+        _triggeredThresholds.clear();
+        _showEncouragement = false;
+        _encouragementTimer?.cancel();
       }
     });
   }
@@ -408,6 +469,14 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
               child: Center(child: _buildStartButton(size, isSmallScreen)),
             ),
 
+            // ── Bubble ข้อความให้กำลังใจ (ด้านซ้ายของตัวละคร) ──
+            if (_showEncouragement && _encouragementMessage != null)
+              Positioned(
+                bottom: bottomPadding + 360.0, // ยกให้สูงขึ้นระดับแก้มของตัวละคร
+                left: size.width * 0.04, // ชิดซ้าย
+                child: _buildEncouragementBubble(size, isSmallScreen),
+              ),
+
             // ── Overlay โซนกดตัวละครเพื่อให้เล่นท่า Cheerup (ดัก Tap ไว้หน้าสุด) ──
             Positioned(
               bottom: bottomPadding + 140, // อยู่เหนือโต๊ะและปุ่ม
@@ -431,6 +500,29 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
   // UI Component Builders
   // แยกฟังก์ชันสำหรับสร้าง Widget แต่ละส่วน (พื้นหลัง, แถบด้านบน, แถบชื่อภารกิจ, กล่องเวลา, และปุ่มเริ่ม)
   // ==========================================
+
+  Widget _buildEncouragementBubble(Size size, bool isSmallScreen) {
+    return AnimatedOpacity(
+      opacity: _showEncouragement ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 300),
+      child: CustomPaint(
+        painter: _SideBubblePainter(),
+        child: Container(
+          constraints: BoxConstraints(maxWidth: size.width * 0.45),
+          padding: const EdgeInsets.fromLTRB(16, 12, 28, 12), // เว้น padding ขวาให้หางข้อความ
+          child: Text(
+            _encouragementMessage ?? '',
+            style: GoogleFonts.kanit(
+              fontSize: isSmallScreen ? 14 : 16,
+              fontWeight: FontWeight.w500,
+              color: const Color(0xFF333333),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    );
+  }
 
   // สร้างพื้นหลังของจอ (ท้องฟ้า)
   Widget _buildBackground() {
@@ -1161,4 +1253,37 @@ class _TimePickerPopupWidgetState extends State<_TimePickerPopupWidget> {
       ),
     );
   }
+}
+
+// ==========================================
+// Custom Painter สำหรับวาดกล่องข้อความที่มีหางชี้ไปหาตัวละคร
+// ==========================================
+class _SideBubblePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.white;
+    final shadowPaint = Paint()
+      ..color = Colors.black.withOpacity(0.15)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+
+    final bubbleWidth = size.width - 12; // เว้นพื้นที่ 12px ทางขวาให้หาง
+    const radius = Radius.circular(16);
+    final rect = RRect.fromLTRBR(0, 0, bubbleWidth, size.height, radius);
+
+    final path = Path()..addRRect(rect);
+    
+    // เติมหางชี้ไปทางขวา (ระดับกลางค่อนไปล่างนิดนึง)
+    path.moveTo(bubbleWidth - 1, size.height / 2 - 8);
+    path.lineTo(size.width, size.height / 2 + 2); // จุดปลายแหลม
+    path.lineTo(bubbleWidth - 1, size.height / 2 + 12);
+    path.close();
+
+    // วาดเงาทีเดียวรวมกันทั้งกล่องและหาง
+    canvas.drawPath(path.shift(const Offset(0, 4)), shadowPaint);
+    // วาดกล่องข้อความทับ
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
