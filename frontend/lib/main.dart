@@ -92,6 +92,9 @@ class KidzKanklaiApp extends StatelessWidget {
       // ลงทะเบียน Observer ของเรา
       navigatorObservers: [musicObserver],
 
+      // ห่อทั้งแอปด้วย AppSoundLayer เพื่อให้ทุกการกดปุ่มเล่นเสียงอัตโนมัติ
+      builder: (context, child) => AppSoundLayer(child: child!),
+
       home: const LoadingScreen(),
 
       routes: {
