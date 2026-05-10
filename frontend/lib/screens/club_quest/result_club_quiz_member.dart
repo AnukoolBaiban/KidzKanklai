@@ -366,80 +366,104 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
 
                     SizedBox(height: 20),
 
-                    // ✅ ปุ่มรับรางวัล 
-                    Container(
-                      width: 180,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: widget.isPassed
-                              ? [Color(0xFF85D755), Color(0xFF34C759)]
-                              : [Color(0xFFE94444), Color(0xFFC62828)],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                        border: Border.all(color: Colors.white, width: 3),
-                        borderRadius: BorderRadius.circular(100),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 8,
-                            offset: Offset(0, 4),
+                    // ✅ ปุ่มรับรางวัล / ถัดไป / ย้อนกลับ
+                    Builder(builder: (context) {
+                      final bool hasRewards = widget.isPassed &&
+                          widget.rewardsList != null &&
+                          widget.rewardsList!.isNotEmpty;
+
+                      // กำหนดสีปุ่ม: เขียว=ผ่าน+มีรางวัล, ฟ้า=ผ่าน+ไม่มีรางวัล, แดง=ไม่ผ่าน
+                      final List<Color> gradientColors = hasRewards
+                          ? [Color(0xFF85D755), Color(0xFF34C759)]
+                          : widget.isPassed
+                              ? [Color(0xFF556AEB), Color(0xFF59ABEC)]
+                              : [Color(0xFFE94444), Color(0xFFC62828)];
+
+                      // กำหนดข้อความปุ่ม
+                      final String buttonLabel = hasRewards
+                          ? 'รับรางวัล'
+                          : widget.isPassed
+                              ? 'ถัดไป'
+                              : 'ย้อนกลับ';
+
+                      return Container(
+                        width: 180,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: gradientColors,
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
                           ),
-                        ],
-                      ),
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          // 🌟 1. ถ้าผ่านภารกิจและมีของรางวัล ให้แสดง RewardPopup ก่อน
-                          if (widget.isPassed && widget.rewardsList != null && widget.rewardsList!.isNotEmpty) {
-                            List<RewardData> popupRewards = [];
-                            for (var reward in widget.rewardsList!) {
-                              final String name = reward['name'] ?? '';
-                              final int amount = reward['amount'] ?? 1;
-                              
-                              // 🌟 ตรวจสอบ item_id ก่อน (20=Coin, 22=EXP) แล้ว fallback ไปเช็คจาก name
-                              final int itemId = reward['item_id'] ?? 0;
-                              final String itemType = (reward['item_type'] ?? '').toUpperCase();
-                              if (itemId == 22 || itemType == 'EXP' || name.toUpperCase().contains('EXP')) {
-                                popupRewards.add(RewardData.exp(amount));
-                              } else if (itemId == 20 || itemType == 'COIN' || itemType == 'CURRENCY' ||
-                                  name.toUpperCase().contains('COIN') || name.contains('เหรียญ')) {
-                                popupRewards.add(RewardData.coin(amount));
-                              } else {
-                                popupRewards.add(RewardData.item(name: name, amount: amount, image: reward['image']));
+                          border: Border.all(color: Colors.white, width: 3),
+                          borderRadius: BorderRadius.circular(100),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 8,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            // 🌟 1. ถ้าผ่านภารกิจและมีของรางวัล ให้แสดง RewardPopup ก่อน
+                            if (hasRewards) {
+                              List<RewardData> popupRewards = [];
+                              for (var reward in widget.rewardsList!) {
+                                final String name = reward['name'] ?? '';
+                                final int amount = reward['amount'] ?? 1;
+
+                                // 🌟 ตรวจสอบ item_id ก่อน (20=Coin, 22=EXP) แล้ว fallback ไปเช็คจาก name
+                                final int itemId = reward['item_id'] ?? 0;
+                                final String itemType = (reward['item_type'] ?? '').toUpperCase();
+                                if (itemId == 22 || itemType == 'EXP' || name.toUpperCase().contains('EXP')) {
+                                  popupRewards.add(RewardData.exp(amount));
+                                } else if (itemId == 20 || itemType == 'COIN' || itemType == 'CURRENCY' ||
+                                    name.toUpperCase().contains('COIN') || name.contains('เหรียญ')) {
+                                  popupRewards.add(RewardData.coin(amount));
+                                } else {
+                                  popupRewards.add(RewardData.item(name: name, amount: amount, image: reward['image']));
+                                }
                               }
+
+                              // โชว์ popup รอจนกดปิด
+                              await RewardPopup.show(
+                                context,
+                                rewards: popupRewards,
+                              );
                             }
 
-                            // โชว์ popup รอจนกดปิด
-                            await RewardPopup.show(
-                              context,
-                              rewards: popupRewards,
-                            );
-                          }
-
-                          // 🌟 2. กลับไปหน้าห้องชมรมหลัก เพื่อให้มันโหลด API สถานะเควสใหม่
-                          if (context.mounted) {
-                            Navigator.pushNamedAndRemoveUntil(
-                              context,
-                              '/club', // ชื่อ Route หน้า Lobby/คลับ ของคุณ
-                              (route) => route.isFirst,
-                            );
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                        ),
-                        child: Text(
-                          widget.isPassed ? 'รับรางวัล' : 'ย้อนกลับ',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            // 🌟 2. นำทางตามผลลัพธ์
+                            if (context.mounted) {
+                              if (widget.isPassed) {
+                                // ✅ ผ่าน → ไปหน้าห้องชมรมหลัก
+                                Navigator.pushNamedAndRemoveUntil(
+                                  context,
+                                  '/club',
+                                  (route) => route.isFirst,
+                                );
+                              } else {
+                                // ❌ ไม่ผ่าน → ย้อนกลับไปหน้ารายละเอียดภารกิจ
+                                Navigator.pop(context);
+                              }
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                          ),
+                          child: Text(
+                            buttonLabel,
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
-                      ),
-                    ),
+                      );
+                    }),
                   ],
                 ),
               ),

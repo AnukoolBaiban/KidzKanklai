@@ -692,37 +692,66 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
     // 🌟 2. กำหนดข้อความปุ่มตามเงื่อนไข
     final String buttonText = passingScore > 0 ? 'ตอบคำถาม' : 'สำเร็จภารกิจ';
 
+    if (widget.isCompleted) {
+      return Positioned(
+        bottom: bottomPadding + 30,
+        left: 0,
+        right: 0,
+        child: const Center(
+          child: Text(
+            'ภารกิจสำเร็จ',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF6CC732),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Positioned(
       bottom: bottomPadding + 20,
-      left: MediaQuery.of(context).size.width * 0.1,
-      right: MediaQuery.of(context).size.width * 0.1,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Expanded(
-            child: widget.isCompleted
-                ? Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(width: 8),
-                      Text(
-                        'ภารกิจสำเร็จ',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green, 
-                        ),
-                      ),
-                    ],
-                  )
-                : _buildButton(
-                    text: buttonText, // 🌟 3. นำข้อความปุ่มที่เช็คแล้วมาใส่ตรงนี้
-                    color: Color(0xFF4A8FE7),
-                    useGradient: true,
-                    onPressed: _checkCooldownAndProceed, 
-                  ),
+      left: 0,
+      right: 0,
+      child: Center(
+        child: Container(
+          width: 150,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF556AEB), Color(0xFF59ABEC)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            borderRadius: BorderRadius.circular(25),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF4A8FE7).withOpacity(0.35),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
+          child: ElevatedButton(
+            onPressed: _checkCooldownAndProceed,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(25),
+              ),
+            ),
+            child: Text(
+              buttonText,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
