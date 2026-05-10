@@ -145,19 +145,19 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
                   children: [_buildMissionTitle(), _buildActionButtonsRow()],
                 ),
                 const SizedBox(height: 10),
-                // 🌟 ปรับตาม state: ถ้า collapsed ไม่ใช้ Expanded
-                if (_isCollapsed)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 20),
-                    child: _buildMissionBox(),
-                  )
-                else
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 20),
-                      child: _buildMissionBox(),
-                    ),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          child: _buildMissionBox(constraints.maxHeight - 20),
+                        ),
+                      );
+                    },
                   ),
+                ),
               ],
             ),
           ),
@@ -248,8 +248,8 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
     );
   }
 
-  // 🌟 กล่องภารกิจชมรม พร้อมปุ่ม toggle
-  Widget _buildMissionBox() {
+  // 🌟 กล่องภารกิจชมรม พร้อมปุ่ม toggle และ Animation
+  Widget _buildMissionBox(double maxHeight) {
     final BoxDecoration boxDecoration = BoxDecoration(
       color: Colors.white.withValues(alpha: 0.85),
       borderRadius: BorderRadius.circular(15),
@@ -312,44 +312,39 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
         // 🌟 ปุ่ม Toggle มุมขวาล่าง (อยู่ด้านหลัง)
         _buildToggleButton(),
         
-        Container(
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeInOut,
           margin: const EdgeInsets.only(bottom: 22), // 🌟 สร้างขอบเขตให้ Stack ครอบคลุมปุ่ม
           width: double.infinity,
+          height: _isCollapsed ? 72 : maxHeight, // ความสูงตอนย่อ=72 (มองเห็น 50px), ตอนขยาย=เต็มที่
           decoration: boxDecoration,
-          padding: const EdgeInsets.all(10),
-          child: _isCollapsed
-              // — โหมดย่อ —
-              ? SizedBox(
-                  height: 36,
-                  child: Center(
-                    child: Text(
-                      "ภารกิจที่ยังไม่สำเร็จ ${_quests.length - _completedQuestIds.length}/${_quests.length}",
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black54,
-                      ),
-                    ),
-                  ),
-                )
-              // — โหมดขยาย —
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // 🌟 เพิ่มข้อความบอกจำนวนภารกิจที่อยู่ตรงกลาง
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          clipBehavior: Clip.hardEdge, // ซ่อนเนื้อหาที่ล้นตอนกำลังพับ
+          child: SingleChildScrollView(
+            physics: const NeverScrollableScrollPhysics(),
+            child: SizedBox(
+              // คำนวณความสูงเนื้อหาให้พอดีกับ AnimatedContainer (ลบ margin 22, padding 16, border 4 = 42)
+              height: _isCollapsed ? 30 : maxHeight - 42,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 🌟 เพิ่มข้อความบอกจำนวนภารกิจที่อยู่ตรงกลาง
+                  SizedBox(
+                    height: 30,
+                    child: Center(
                       child: Text(
-                        "จำนวนภารกิจชมรมที่ยังไม่สำเร็จ ${_quests.length - _completedQuestIds.length}/${_quests.length}",
-                        textAlign: TextAlign.center,
+                        "ภารกิจที่ยังไม่สำเร็จ ${_quests.length - _completedQuestIds.length}/${_quests.length}",
                         style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black54,
                         ),
                       ),
                     ),
-                    // Mission List แบบ scroll ได้
+                  ),
+                  // Mission List แบบ scroll ได้ (แสดงเฉพาะตอนขยาย)
+                  if (!_isCollapsed)
                     Expanded(
                       child: _quests.isEmpty
                           ? const Center(
@@ -375,8 +370,10 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
                               },
                             ),
                     ),
-                  ],
-                ),
+                ],
+              ),
+            ),
+          ),
         ),
       ],
     );
