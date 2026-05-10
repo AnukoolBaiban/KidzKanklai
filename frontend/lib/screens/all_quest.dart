@@ -892,11 +892,12 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
           )
           .toList();
     } else if (_selectedTabIndex == 3) {
-      // 🌟 "ประวัติ" = ทำสำเร็จแล้ว หรือ หมดเวลา (และต้องไม่ใช่หมวดระบบ) ไม่เกิน 3 เดือน
+      // 🌟 "ประวัติ" = ทำสำเร็จแล้ว หรือ หมดเวลา (และต้องไม่ใช่หมวดระบบ และไม่ใช่ชมรม) ไม่เกิน 3 เดือน
       filteredQuests = _allQuests.where((q) {
         bool isDoneOrFailed =
             (q['status'] == 'completed' || q['status'] == 'failed') &&
-            q['category'] != 'ระบบ';
+            q['category'] != 'ระบบ' &&
+            q['type'] != 'ชมรม'; // 🌟 ไม่แสดงภารกิจชมรม
 
         if (!isDoneOrFailed) return false;
 
@@ -980,12 +981,31 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
       );
     }
 
-    return ListView.builder(
-      padding: EdgeInsets.zero,
-      itemCount: filteredQuests.length,
-      itemBuilder: (context, index) {
-        return QuestCard(
-          quest: filteredQuests[index],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 🌟 แสดงจำนวนภารกิจเฉพาะ tab ประวัติ
+        if (_selectedTabIndex == 3)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              "ภารกิจทั้งหมด ${filteredQuests.length} ภารกิจ",
+              textAlign: TextAlign.center,
+              style: GoogleFonts.kanit(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.black54,
+              ),
+            ),
+          ),
+
+        Expanded(
+          child: ListView.builder(
+            padding: EdgeInsets.zero,
+            itemCount: filteredQuests.length,
+            itemBuilder: (context, index) {
+              return QuestCard(
+                quest: filteredQuests[index],
           onClaim: () async {
             // 🌟 ดึง Profile ก่อนเรียก API เพื่อบันทึก Level เดิม
             final profileBefore = await ApiService.getProfile(0);
@@ -1090,6 +1110,9 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
           },
         );
       },
+    ),
+        ),
+      ],
     );
   }
 }

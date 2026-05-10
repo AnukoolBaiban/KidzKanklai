@@ -11,24 +11,10 @@ import 'package:flutter_application_1/widgets/annotation_normal.dart';
 import 'create_club_quest_quiz.dart';
 import 'dart:io'; // 🌟 1. นำเข้า dart:io
 import 'package:image_picker/image_picker.dart'; // 🌟 2. นำเข้า image_picker
-
-class QuizQuestion {
-  TextEditingController textController = TextEditingController();
-  List<TextEditingController> optionControllers = [
-    TextEditingController(),
-    TextEditingController(),
-    TextEditingController(),
-    TextEditingController(),
-  ];
-  int correctOptionIndex = 0;
-
-  void dispose() {
-    textController.dispose();
-    for (var controller in optionControllers) {
-      controller.dispose();
-    }
-  }
-}
+import 'package:flutter_application_1/widgets/ticket_box.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide User;
+import 'package:flutter_application_1/widgets/confirm_zero_ticket_popup.dart';
 
 class CreateClubQuestScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
@@ -57,11 +43,12 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
   DateTime? _selectedDate;
   bool _hasImage = false;
 
-  List<QuizQuestion> _questions = [QuizQuestion()];
-  int _minScore = 1;
+  List<Map<String, dynamic>>? _savedQuestionsData;
+  int? _savedMinScore;
 
   // 🌟 เพิ่มตัวแปรเก็บไฟล์รูปภาพ
   File? _selectedImage;
+  bool _hasQuiz = false;
 
   // 🌟 แก้ไขฟังก์ชันเลือกรูปภาพ
   Future<void> _handleImagePick() async {
@@ -99,6 +86,10 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
       if (widget.initialData!['imageUrl'] != null || widget.initialData!['image'] != null) {
         _hasImage = true;
       }
+
+      if (widget.initialData!['questions'] != null && (widget.initialData!['questions'] as List).isNotEmpty) {
+        _hasQuiz = true;
+      }
     }
   }
 
@@ -106,9 +97,6 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
   void dispose() {
     _nameController.dispose();
     _detailController.dispose();
-    for (var q in _questions) {
-      q.dispose();
-    }
     super.dispose();
   }
 
@@ -233,9 +221,7 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
     bool detailChanged = _detailController.text.trim().isNotEmpty;
     bool dateChanged = _selectedDate != null;
     bool imageChanged = _hasImage || _selectedImage != null;
-    bool questionsChanged = _questions.length > 1 || 
-        _questions[0].textController.text.trim().isNotEmpty || 
-        _questions[0].optionControllers.any((c) => c.text.trim().isNotEmpty);
+    bool questionsChanged = _savedQuestionsData != null && _savedQuestionsData!.isNotEmpty;
 
     if (widget.initialData != null) {
       nameChanged = _nameController.text != (widget.initialData!['name'] ?? '');
@@ -273,6 +259,7 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
         } else {
           ConfirmExitPopup.show(
             context,
+            title: 'ยืนยันที่จะออกจากการสร้างภารกิจชมรมหรือไม่',
             onConfirm: () {
               Navigator.pop(context); // ปิด popup
               Navigator.pop(context); // ออกจากหน้า
@@ -332,10 +319,15 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
                                 _buildDetailTextField(),
                                 SizedBox(height: 16),
 
+                                if (!widget.isEditing)
+                                  _buildQuizSelection(),
+                                if (!widget.isEditing)
+                                  SizedBox(height: 24),
+
                                 _buildCameraButton(),
                                 SizedBox(height: 24),
 
-                                _buildActionButtons(),
+                                _buildSingleSubmitButton(),
                                 SizedBox(height: 20),
                               ],
                             ),
@@ -425,6 +417,7 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
         } else {
           ConfirmExitPopup.show(
             context,
+            title: 'ยืนยันที่จะออกจากการสร้างภารกิจชมรมหรือไม่',
             onConfirm: () {
               Navigator.pop(context); // ปิด popup
               Navigator.pop(context); // 🌟 แก้เป็น .pop() เพื่อย้อนกลับไปหน้าเดิม (Room Head)
@@ -824,138 +817,393 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
     );
   }
 
-  Widget _buildActionButtons() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Expanded(child: _buildSubmitButtonNew()),
-        Expanded(child: _buildSubmitWithoutQuizButton()),
-      ],
-    );
-  }
-
-  Widget _buildSubmitButtonNew() {
+  Widget _buildQuizSelection() {
     return Container(
+      height: 45,
+      padding: const EdgeInsets.only(left: 16, right: 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF556AEB), Color(0xFF59ABEC)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-        borderRadius: BorderRadius.circular(25),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF9DD0E7), width: 2),
         boxShadow: [
           BoxShadow(
-            color: Color(0xFF4A8FE7).withOpacity(0.4),
-            blurRadius: 8,
-            offset: Offset(0, 4),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: ElevatedButton(
-        onPressed: () {
-          // 🌟 1. ดักเช็คชื่อภารกิจ
-          if (_nameController.text.trim().isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('กรุณากรอกชื่อภารกิจ'),
-                backgroundColor: Colors.red,
-              ),
-            );
-            return;
-          }
-
-          // 🌟 2. ดักเช็ควันหมดเขต (สำคัญมาก เพราะ API ใหม่บังคับ)
-          if (_selectedDate == null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('กรุณาเลือกวันที่สิ้นสุดภารกิจ'),
-                backgroundColor: Colors.red,
-              ),
-            );
-            return;
-          }
-
-          // 🌟 3. ผ่านเงื่อนไข ให้เปลี่ยนไปหน้าตั้งคำถาม
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => CreateClubQuestQuizScreen(
-                user: widget.user,
-                isEditing: widget.isEditing,
-                initialData: {
-                  'id': widget.initialData?['id'], 
-                  'imageUrl': widget.initialData?['imageUrl'], 
-                  
-                  'name': _nameController.text.trim(),
-                  'detail': _detailController.text.trim(),
-                  'date': _selectedDate, // ส่งวันที่ไปหน้า Quiz
-                  'imageFile': _selectedImage, 
-                  
-                  'questions': widget.initialData?['questions'],
-                  'minScore': widget.initialData?['minScore'],
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            _hasQuiz ? "มีคำถามสำหรับภารกิจนี้" : "ไม่มีคำถามสำหรับภารกิจนี้",
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF002A50),
+            ),
+          ),
+          SizedBox(
+            height: 28,
+            child: FittedBox(
+              fit: BoxFit.contain,
+              child: Switch(
+                value: _hasQuiz,
+                activeColor: const Color(0xFF2374B5), // สีน้ำเงิน
+                inactiveThumbColor: Colors.white,
+                inactiveTrackColor: Colors.grey.shade400,
+                onChanged: (bool value) {
+                  setState(() => _hasQuiz = value);
                 },
-                onSubmit: widget.onSubmit,
               ),
             ),
-          );
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          padding: EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(25),
           ),
-        ),
-        child: const Text(
-          'เพิ่มคำถาม',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
+        ],
       ),
     );
   }
 
-  // 🌟 UI ปุ่มสร้างภารกิจแบบไม่มีคำถาม
-  Widget _buildSubmitWithoutQuizButton() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF8CD853), Color(0xFF4CB050)], // โทนสีเขียวให้ดูแตกต่าง
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF4CB050).withOpacity(0.4),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+  Widget _buildSingleSubmitButton() {
+    bool isReady = _nameController.text.trim().isNotEmpty && _selectedDate != null;
+
+    // --- โหมดแก้ไข ---
+    if (widget.isEditing) {
+      if (_hasQuiz) {
+        // มีคำถาม -> ปุ่ม "ถัดไป"
+        return Center(
+          child: Container(
+            width: 150,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF556AEB), Color(0xFF59ABEC)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              borderRadius: BorderRadius.circular(25),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF4A8FE7).withOpacity(0.4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ElevatedButton(
+              onPressed: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CreateClubQuestQuizScreen(
+                      user: widget.user,
+                      isEditing: true,
+                      initialData: {
+                        'id': widget.initialData?['id'],
+                        'imageUrl': widget.initialData?['imageUrl'],
+                        'name': _nameController.text.trim(),
+                        'detail': _detailController.text.trim(),
+                        'date': _selectedDate,
+                        'imageFile': _selectedImage,
+                        'questions': _savedQuestionsData ?? widget.initialData?['questions'],
+                        'minScore': _savedMinScore ?? widget.initialData?['minScore'],
+                        'passing_score': widget.initialData?['passing_score'],
+                      },
+                      onSubmit: widget.onSubmit,
+                    ),
+                  ),
+                );
+                if (result != null && result is Map<String, dynamic>) {
+                  setState(() {
+                    _savedQuestionsData = result['questions'];
+                    _savedMinScore = result['minScore'];
+                  });
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(25),
+                ),
+              ),
+              child: const Text(
+                'ถัดไป',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
           ),
-        ],
-      ),
-      child: ElevatedButton(
-        onPressed: _submitWithoutQuestions, // เรียกฟังก์ชันที่เราเพิ่งสร้าง
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
+        );
+      } else {
+        // ไม่มีคำถาม -> ปุ่ม "บันทึก" (ไม่มีตั๋ว)
+        return Center(
+          child: Container(
+            width: 150,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isReady
+                    ? const [Color(0xFF556AEB), Color(0xFF59ABEC)]
+                    : const [Color(0xFFD9D9D9), Color(0xFF8A8A8A)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              borderRadius: BorderRadius.circular(25),
+              boxShadow: [
+                BoxShadow(
+                  color: isReady
+                      ? const Color(0xFF4A8FE7).withOpacity(0.4)
+                      : Colors.black.withOpacity(0.18),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ElevatedButton(
+              onPressed: () {
+                if (!isReady) {
+                  if (_nameController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('กรุณากรอกชื่อภารกิจ'), backgroundColor: Colors.red),
+                    );
+                  } else if (_selectedDate == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('กรุณาเลือกวันที่สิ้นสุดภารกิจ'), backgroundColor: Colors.red),
+                    );
+                  }
+                  return;
+                }
+                _submitWithoutQuestions();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(25),
+                ),
+              ),
+              child: const Text(
+                'บันทึก',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    // --- โหมดสร้างใหม่ ---
+    if (_hasQuiz) {
+      return Center(
+        child: Container(
+          width: 150,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF556AEB), Color(0xFF59ABEC)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
             borderRadius: BorderRadius.circular(25),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF4A8FE7).withOpacity(0.4),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ElevatedButton(
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CreateClubQuestQuizScreen(
+                    user: widget.user,
+                    isEditing: widget.isEditing,
+                    initialData: {
+                      'id': widget.initialData?['id'],
+                      'imageUrl': widget.initialData?['imageUrl'],
+                      'name': _nameController.text.trim(),
+                      'detail': _detailController.text.trim(),
+                      'date': _selectedDate,
+                      'imageFile': _selectedImage,
+                      'questions': _savedQuestionsData ?? widget.initialData?['questions'],
+                      'minScore': _savedMinScore ?? widget.initialData?['minScore'],
+                    },
+                    onSubmit: widget.onSubmit,
+                  ),
+                ),
+              );
+              if (result != null && result is Map<String, dynamic>) {
+                setState(() {
+                  _savedQuestionsData = result['questions'];
+                  _savedMinScore = result['minScore'];
+                });
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(25),
+              ),
+            ),
+            child: const Text(
+              'สร้างคำถาม',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
           ),
         ),
-        child: Text(
-          widget.isEditing ? 'บันทึก' : 'สร้างภารกิจชมรม', // 🌟 ถ้าเป็นโหมดแก้ไขให้ขึ้นว่า "บันทึก"
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+      );
+    } else {
+      return Center(
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 150,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: isReady
+                      ? const [Color(0xFF556AEB), Color(0xFF59ABEC)]
+                      : const [Color(0xFFD9D9D9), Color(0xFF8A8A8A)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.circular(25),
+                boxShadow: [
+                  BoxShadow(
+                    color: isReady
+                        ? const Color(0xFF4A8FE7).withOpacity(0.4)
+                        : Colors.black.withOpacity(0.18),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ElevatedButton(
+                onPressed: () async {
+                  if (!isReady) {
+                    if (_nameController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('กรุณากรอกชื่อภารกิจ'), backgroundColor: Colors.red),
+                      );
+                    } else if (_selectedDate == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('กรุณาเลือกวันที่สิ้นสุดภารกิจ'), backgroundColor: Colors.red),
+                      );
+                    }
+                    return;
+                  }
+
+                  // ดึงข้อมูลตั๋วชมรม (item_id = 19)
+                  final supabase = Supabase.instance.client;
+                  final user = supabase.auth.currentUser;
+                  int ticketCount = 0;
+
+                  if (user != null) {
+                    try {
+                      final res = await supabase
+                          .from('collect')
+                          .select('quantity')
+                          .eq('user_id', user.id)
+                          .eq('item_id', 19)
+                          .maybeSingle();
+                      if (res != null) {
+                        ticketCount = res['quantity'] as int? ?? 0;
+                      }
+                    } catch (e) {
+                      debugPrint('Error fetch ticket: $e');
+                    }
+                  }
+
+                  if (!mounted) return;
+
+                  if (ticketCount <= 0) {
+                    ConfirmZeroTicketPopup.show(
+                      context,
+                      onConfirm: () {
+                        Navigator.pop(context); // ปิด popup ก่อน
+                        _submitWithoutQuestions(); // บันทึกจริง
+                      },
+                    );
+                  } else {
+                    ClubConfirmSavePopup.show(
+                      context,
+                      onConfirm: () {
+                        Navigator.pop(context); // ปิด popup ก่อน
+                        _submitWithoutQuestions(); // บันทึกจริง
+                      },
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                ),
+                child: const Text(
+                  'บันทึก',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: -10,
+              right: -10,
+              child: TicketBox(
+                slant: 12,
+                borderRadius: 4,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 15,
+                    vertical: 4,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.asset(
+                        'assets/images/item/Ticket_clubquest_img.png',
+                        width: 20,
+                        height: 14,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        "-1",
+                        style: GoogleFonts.kanit(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-      ),
-    );
+      );
+    }
   }
 }

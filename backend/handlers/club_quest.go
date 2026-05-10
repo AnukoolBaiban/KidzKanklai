@@ -333,7 +333,8 @@ func SubmitClubQuest(c *gin.Context) {
 	// 2. ดึงข้อมูลเควส
 	var passingScore int
 	var questClubID int64
-	err = tx.QueryRow(ctx, `SELECT club_id, passing_score FROM public.quests WHERE id = $1 AND due_date > NOW()`, input.QuestID).Scan(&questClubID, &passingScore)
+	var questName string
+	err = tx.QueryRow(ctx, `SELECT club_id, passing_score, name FROM public.quests WHERE id = $1 AND due_date > NOW()`, input.QuestID).Scan(&questClubID, &passingScore, &questName)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ไม่พบภารกิจนี้ หรือภารกิจหมดเวลาไปแล้ว"})
 		return
@@ -481,8 +482,8 @@ func SubmitClubQuest(c *gin.Context) {
 
 						// 8.2 สร้างกล่องจดหมาย (เพิ่ม Image และ DueDate)
 						var notiID int64
-						title := "🎉 ภารกิจชมรมสำเร็จทะลุเป้า 50%!"
-						detail := fmt.Sprintf("สมาชิกช่วยกันทำภารกิจเกินครึ่งแล้ว! คุณได้รับรางวัลประจำภารกิจและโบนัสพิเศษ %d เหรียญตามจำนวนสมาชิก", 10*totalMembers)
+						title := "ของรางวัลสำหรับหัวหน้าชมรม🎉"
+						detail := fmt.Sprintf("ภารกิจชมรม \"%s\" สำเร็จทะลุเป้า 50%% แล้ว! คุณได้รับรางวัลประจำภารกิจและโบนัสพิเศษ %d เหรียญตามจำนวนสมาชิก", questName, 10*totalMembers)
 						notiType := "reward"
 						imgUrl := "assets/images/icon/icon-gift.png" // ใส่รูปกล่องของขวัญได้เลย
 						dueDate := time.Now().AddDate(0, 0, 7) // ให้เวลาเก็บ 7 วัน

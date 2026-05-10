@@ -546,19 +546,19 @@ class _NotificationScreenState extends State<NotificationScreen> {
                       ? Image.network(
                           item.iconPath,
                           fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const Icon(
-                            Icons.notifications,
+                          errorBuilder: (_, __, ___) => Icon(
+                            item.type == 'achievement' ? Icons.emoji_events : item.type == 'reward' ? Icons.card_giftcard : Icons.notifications,
                             size: 28,
-                            color: Color(0xFF2374B5),
+                            color: item.type == 'achievement' ? const Color(0xFFFFA000) : item.type == 'reward' ? Colors.green : const Color(0xFF2374B5),
                           ),
                         )
                       : Image.asset(
                           item.iconPath,
                           fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const Icon(
-                            Icons.notifications,
+                          errorBuilder: (_, __, ___) => Icon(
+                            item.type == 'achievement' ? Icons.emoji_events : item.type == 'reward' ? Icons.card_giftcard : Icons.notifications,
                             size: 28,
-                            color: Color(0xFF2374B5),
+                            color: item.type == 'achievement' ? const Color(0xFFFFA000) : item.type == 'reward' ? Colors.green : const Color(0xFF2374B5),
                           ),
                         ),
                 ),

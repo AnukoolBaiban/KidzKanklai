@@ -3,16 +3,19 @@ import 'package:flutter/material.dart';
 class ConfirmExitPopup extends StatefulWidget {
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
+  final String title;
 
   const ConfirmExitPopup({
     Key? key,
     required this.onConfirm,
     required this.onCancel,
+    this.title = 'ยืนยันที่จะออกจากการสร้างภารกิจหรือไม่?',
   }) : super(key: key);
 
   static Future<void> show(
     BuildContext context, {
     required VoidCallback onConfirm,
+    String title = 'ยืนยันที่จะออกจากการสร้างภารกิจหรือไม่?',
   }) {
     return showDialog(
       context: context,
@@ -21,6 +24,7 @@ class ConfirmExitPopup extends StatefulWidget {
       builder: (context) => ConfirmExitPopup(
         onConfirm: onConfirm,
         onCancel: () => Navigator.pop(context),
+        title: title,
       ),
     );
   }
@@ -130,7 +134,7 @@ class _ConfirmExitPopupState extends State<ConfirmExitPopup>
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 4),
                         child: Text(
-                          'ยืนยันที่จะออกจากการสร้างภารกิจหรือไม่?',
+                          widget.title,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white,

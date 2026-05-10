@@ -277,6 +277,47 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
                                                 alignment: WrapAlignment.center,
                                                 children: _rewardsList.map((r) => _buildRewardBadge(r)).toList(),
                                               ),
+                                      const SizedBox(height: 24),
+                                      // 🌟 ปุ่มรับรางวัล
+                                      Container(
+                                        width: 160,
+                                        height: 48,
+                                        decoration: BoxDecoration(
+                                          gradient: _isClaimed
+                                              ? null
+                                              : const LinearGradient(
+                                                  colors: [Color(0xFF85D755), Color(0xFF34C759)],
+                                                  begin: Alignment.topCenter,
+                                                  end: Alignment.bottomCenter,
+                                                ),
+                                          color: _isClaimed ? Colors.grey : null,
+                                          border: Border.all(color: Colors.white, width: 2),
+                                          borderRadius: BorderRadius.circular(100),
+                                          boxShadow: const [
+                                            BoxShadow(
+                                              color: Colors.black26,
+                                              blurRadius: 6,
+                                              offset: Offset(0, 3),
+                                            ),
+                                          ],
+                                        ),
+                                        child: ElevatedButton(
+                                          // ปิดปุ่มถ้ารับไปแล้ว หรือกำลังโหลด
+                                          onPressed: (_isClaimed || _isClaiming) ? null : _claimReward,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.transparent,
+                                            shadowColor: Colors.transparent,
+                                            padding: EdgeInsets.zero,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                                          ),
+                                          child: _isClaiming
+                                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                              : Text(
+                                                  _isClaimed ? 'รับรางวัลแล้ว' : 'รับรางวัล',
+                                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                                                ),
+                                        ),
+                                      ),
                                     ],
 
                                     const SizedBox(height: 12),
@@ -317,8 +358,8 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
 
                       const SizedBox(height: 16),
 
-                      // 🌟 ส่วนปุ่มด้านล่าง (เปลี่ยนฟังก์ชันไปใช้ _buildActionButtons)
-                      _buildActionButtons(isReward),
+                      // 🌟 ส่วนปุ่มด้านล่าง
+                      _buildDeleteButton(),
                     ],
                   ),
                 ),
@@ -327,66 +368,6 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  // 🌟 ฟังก์ชันรวมปุ่มด้านล่าง
-  Widget _buildActionButtons(bool isReward) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // ปุ่มลบ
-        Expanded(
-          flex: 2,
-          child: ElevatedButton(
-            onPressed: _isDeleting
-                ? null
-                : () {
-                    ConfirmDeletePopup.show(
-                      context,
-                      title: 'ยืนยันที่จะลบการแจ้งเตือนนี้หรือไม่?',
-                      onConfirm: () {
-                        Navigator.pop(context);
-                        _deleteAndGoBack(); 
-                      },
-                    );
-                  },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEA4444),
-              disabledBackgroundColor: const Color(0xFFEA4444).withOpacity(0.5),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-            ),
-            child: _isDeleting
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                : const Text('ลบ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-          ),
-        ),
-
-        // 🌟 ถ้าเป็นจดหมายรางวัล ให้โชว์ปุ่มรับของเพิ่มเข้ามา
-        if (isReward) ...[
-          const SizedBox(width: 12),
-          Expanded(
-            flex: 2,
-            child: ElevatedButton(
-              // ปิดปุ่มถ้ารับไปแล้ว หรือกำลังโหลด
-              onPressed: (_isClaimed || _isClaiming) ? null : _claimReward,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _isClaimed ? Colors.grey : const Color(0xFF4CB050),
-                disabledBackgroundColor: Colors.grey.shade400,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-              ),
-              child: _isClaiming
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : Text(
-                      _isClaimed ? 'รับรางวัลแล้ว' : 'รับรางวัล',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
-            ),
-          ),
-        ],
-      ],
     );
   }
 

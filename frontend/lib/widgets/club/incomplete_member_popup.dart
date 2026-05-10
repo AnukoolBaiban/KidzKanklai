@@ -4,26 +4,33 @@ import 'package:flutter_application_1/api_service.dart' as api;
 import 'package:flutter_application_1/screens/player_profile.dart' hide GradientCircularProgressPainter;
 import 'package:flutter_application_1/widgets/character_widget.dart';
 import 'package:flutter_application_1/widgets/bottom_navigation_bar.dart'; // สำหรับ GradientCircularProgressPainter
-import 'package:flutter_application_1/widgets/custom_top_bar.dart';
 
-class IncompleteMembersScreen extends StatefulWidget {
+class IncompleteMemberPopup extends StatefulWidget {
   final int questId;
   final int clubId;
 
-  const IncompleteMembersScreen({
+  const IncompleteMemberPopup({
     Key? key,
     required this.questId,
     required this.clubId,
   }) : super(key: key);
 
+  static Future<void> show(BuildContext context, {required int questId, required int clubId}) {
+    return showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.6),
+      builder: (context) => IncompleteMemberPopup(questId: questId, clubId: clubId),
+    );
+  }
+
   @override
-  State<IncompleteMembersScreen> createState() => _IncompleteMembersScreenState();
+  State<IncompleteMemberPopup> createState() => _IncompleteMemberPopupState();
 }
 
-class _IncompleteMembersScreenState extends State<IncompleteMembersScreen> {
+class _IncompleteMemberPopupState extends State<IncompleteMemberPopup> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _incompleteMembers = [];
-  bool _isPressed = false;
+  int _totalMembers = 0;
 
   @override
   void initState() {
@@ -31,7 +38,7 @@ class _IncompleteMembersScreenState extends State<IncompleteMembersScreen> {
     _fetchIncompleteMembers();
   }
 
-  // ฟังก์ชันช่วยดึงข้อมูลตัวละคร (เหมือนใน ClubDetailHeadPreloader)
+  // --- Functions from incomplete_member.dart ---
   Future<api.User> _fetchUserCharacter(String uId) async {
     final supabase = Supabase.instance.client;
     final charData = await supabase
@@ -84,19 +91,16 @@ class _IncompleteMembersScreenState extends State<IncompleteMembersScreen> {
     );
   }
 
-  // 🌟 ฟังก์ชันดึงรายชื่อคนที่ยังไม่เสร็จ
   Future<void> _fetchIncompleteMembers() async {
     try {
       final supabase = Supabase.instance.client;
 
-      // 1. ดึงสมาชิกทั้งหมดในคลับ (ไม่รวมหัวหน้า)
       final membersResponse = await supabase
           .from('user_profiles')
           .select('id, name, detail, club_role')
           .eq('club_id', widget.clubId)
           .neq('club_role', 'owner');
 
-      // 2. ดึงคนที่ทำเควสนี้เสร็จแล้ว
       final doQuestsResponse = await supabase
           .from('do_quests')
           .select('user_id')
@@ -107,13 +111,11 @@ class _IncompleteMembersScreenState extends State<IncompleteMembersScreen> {
           .map((dq) => dq['user_id'].toString())
           .toSet();
 
-      // 3. กรองเอาเฉพาะคนที่ยังไม่มีชื่อใน completedUserIds
       final List<Map<String, dynamic>> incompleteList = [];
       for (final member in membersResponse as List<dynamic>) {
         final memberId = member['id'].toString();
         
         if (!completedUserIds.contains(memberId)) {
-          // ดึงตัวละครมาแสดงผล
           final userObj = await _fetchUserCharacter(memberId);
           incompleteList.add({
             ...Map<String, dynamic>.from(member),
@@ -125,6 +127,7 @@ class _IncompleteMembersScreenState extends State<IncompleteMembersScreen> {
 
       if (mounted) {
         setState(() {
+          _totalMembers = (membersResponse as List).length;
           _incompleteMembers = incompleteList;
           _isLoading = false;
         });
@@ -135,7 +138,6 @@ class _IncompleteMembersScreenState extends State<IncompleteMembersScreen> {
     }
   }
 
-  // 🌟 ฟังก์ชันคำนวณ EXP
   double _getExpPercent(int dbLevel, int totalExp) {
     int remainingExp = totalExp;
     int requiredExpForNextLevel = 0;
@@ -150,125 +152,184 @@ class _IncompleteMembersScreenState extends State<IncompleteMembersScreen> {
     }
     return (requiredExpForNextLevel > 0) ? (remainingExp / requiredExpForNextLevel).clamp(0.0, 1.0) : 0.0;
   }
+  // --- End of functions from incomplete_member.dart ---
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final topPadding = MediaQuery.of(context).padding.top;
-    final topBarHeight = 75.0 + topPadding;
-    const headerHeight = 80.0;
+    final size = MediaQuery.sizeOf(context);
 
-    return Scaffold(
+    return Dialog(
       backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          // Background
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Container(
-              color: const Color(0xFFE2F5FD),
-              alignment: Alignment.center,
-              child: Image.asset(
-                "assets/images/background/bg-head.png",
-                fit: BoxFit.contain,
-                width: size.width * 0.8,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      elevation: 0,
+      child: Center(
+        child: Container(
+          width: size.width * 0.9,
+          height: 550, // บังคับความสูง
+          constraints: const BoxConstraints(maxWidth: 350, maxHeight: 550),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 10,
+                offset: Offset(0, 5),
               ),
-            ),
-          ),
-
-          // Top Bar & Header
-          Column(
-            children: [
-              Container(
-                padding: EdgeInsets.only(top: topPadding),
-                color: Colors.black.withOpacity(0.4),
-                child: CustomTopBar(
-                  onNotificationTapped: () => Navigator.pushNamed(context, '/notification'),
-                  onSettingsTapped: () => Navigator.pushNamed(context, '/setting'),
-                ),
-              ),
-              _buildBlueHeader(),
             ],
           ),
-
-          // Main Content
-          Padding(
-            padding: EdgeInsets.only(
-              top: topBarHeight + headerHeight + 16,
-              left: size.width * 0.05,
-              right: size.width * 0.05,
-              bottom: 20,
-            ),
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _incompleteMembers.isEmpty
-                    ? const Center(child: Text('สมาชิกทุกคนทำภารกิจนี้เสร็จแล้ว! 🎉', style: TextStyle(fontSize: 18, color: Colors.green, fontWeight: FontWeight.bold)))
-                    : ListView.builder(
-                        padding: EdgeInsets.zero,
-                        itemCount: _incompleteMembers.length,
-                        itemBuilder: (context, index) {
-                          return _buildMemberCard(_incompleteMembers[index]);
-                        },
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            children: [
+              // 1) พื้นหลัง Background Split
+              Positioned.fill(
+                child: Column(
+                  children: [
+                    Container(
+                      height: 120, // ความสูงพื้นที่สีฟ้าเข้ม
+                      color: const Color(0xFF9DD0E7),
+                    ),
+                    Expanded(
+                      child: Container(
+                        color: const Color(0xFFC6F4FF), // สีฟ้าอ่อน
                       ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBlueHeader() {
-    return Container(
-      height: 80,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF015496), Color(0xFF2273B4)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            left: 15,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: GestureDetector(
-                onTapDown: (_) => setState(() => _isPressed = true),
-                onTapCancel: () => setState(() => _isPressed = false),
-                onTap: () {
-                  setState(() => _isPressed = false);
-                  Navigator.pop(context);
-                },
-                child: Image.asset(
-                  _isPressed ? 'assets/images/button/bt-hover-Back.png' : 'assets/images/button/bt-Back.png',
-                  width: 50,
-                  height: 50,
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ),
-          const Positioned.fill(
-            child: Center(
-              child: Text(
-                "สมาชิกที่ยังไม่เสร็จ",
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+
+              // 2) Content
+              Column(
+                mainAxisSize: MainAxisSize.max, // ให้ Content ขยายเต็ม Stack
+                children: [
+                  // Header
+                  SizedBox(
+                    height: 65,
+                    child: Stack(
+                      children: [
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 56.0),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: const Text(
+                                'รายชื่อสมาชิกที่ยังทำภารกิจไม่สำเร็จ',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF002A50),
+                                  shadows: [
+                                    Shadow(color: Colors.white, offset: Offset(1.5, 1.5), blurRadius: 1),
+                                    Shadow(color: Colors.white, offset: Offset(-1.5, -1.5), blurRadius: 1),
+                                    Shadow(color: Colors.white, offset: Offset(1.5, -1.5), blurRadius: 1),
+                                    Shadow(color: Colors.white, offset: Offset(-1.5, 1.5), blurRadius: 1),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        // ปุ่มปิด X
+                        Positioned(
+                          right: 16,
+                          top: 0,
+                          bottom: 0,
+                          child: Center(
+                            child: GestureDetector(
+                              onTap: () => Navigator.pop(context),
+                              child: const Icon(
+                                Icons.close,
+                                color: Color.fromARGB(255, 255, 255, 255),
+                                size: 32,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // กล่องสีขาวด้านใน
+                  Expanded( // ขยายเต็มที่เหลือของ Column
+                    child: Container(
+                      margin: const EdgeInsets.only(
+                        left: 16,
+                        right: 16,
+                        bottom: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 4,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: _isLoading
+                          ? const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(32.0),
+                                child: CircularProgressIndicator(),
+                              ),
+                            )
+                          : _incompleteMembers.isEmpty
+                              ? const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(32.0),
+                                    child: Text(
+                                      'สมาชิกทุกคนทำภารกิจนี้เสร็จแล้ว! 🎉',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(fontSize: 18, color: Colors.green, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                )
+                              : Column(
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 16, bottom: 8),
+                                      child: Text(
+                                        'จำนวน ${_incompleteMembers.length}/$_totalMembers คน',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF447199),
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: ScrollConfiguration(
+                                        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                                        child: ListView.builder(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                                          shrinkWrap: true,
+                                          physics: const BouncingScrollPhysics(),
+                                          itemCount: _incompleteMembers.length,
+                                          itemBuilder: (context, index) {
+                                            return _buildMemberCard(_incompleteMembers[index]);
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                    ),
+                  ),
+                ],
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  // 🌟 การ์ดสมาชิกที่ถูกตัดปุ่มไล่ออกและแถบเควสออก
   Widget _buildMemberCard(Map<String, dynamic> member) {
     final String name = member['name'] ?? 'ไม่มีชื่อ';
     final String detail = member['detail'] ?? '';
     final int level = member['level'] ?? 1;
-    final String memberId = member['id'];
+    final String memberId = member['id'].toString();
 
     return GestureDetector(
       onTap: () {
@@ -295,9 +356,9 @@ class _IncompleteMembersScreenState extends State<IncompleteMembersScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SizedBox(
-                width: 105,
+                width: 90, // ปรับลดขนาดเล็กน้อยเพื่อให้พอดี popup
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -308,7 +369,7 @@ class _IncompleteMembersScreenState extends State<IncompleteMembersScreen> {
                             alignment: Alignment.center,
                             children: [
                               CustomPaint(
-                                size: const Size(80, 80),
+                                size: const Size(60, 60), // ย่อขนาด
                                 painter: GradientCircularProgressPainter(
                                   progress: member['user_obj'] != null ? _getExpPercent(member['user_obj'].level, member['user_obj'].exp) : 0.0,
                                   gradient: const LinearGradient(
@@ -316,12 +377,12 @@ class _IncompleteMembersScreenState extends State<IncompleteMembersScreen> {
                                     begin: Alignment.bottomCenter,
                                     end: Alignment.topCenter,
                                   ),
-                                  strokeWidth: 4,
+                                  strokeWidth: 3,
                                 ),
                               ),
                               Container(
-                                width: 72,
-                                height: 72,
+                                width: 54, // ย่อขนาด
+                                height: 54, // ย่อขนาด
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: Colors.white,
@@ -330,9 +391,9 @@ class _IncompleteMembersScreenState extends State<IncompleteMembersScreen> {
                                 clipBehavior: Clip.hardEdge,
                                 child: IgnorePointer(
                                   child: Transform.translate(
-                                    offset: const Offset(2, 15),
+                                    offset: const Offset(2, 10), // ย่อขนาด
                                     child: Transform.scale(
-                                      scale: 1.6,
+                                      scale: 1.4, // ย่อขนาด
                                       child: RepaintBoundary(
                                         child: CharacterWidget(
                                           user: member['user_obj'],
@@ -349,8 +410,8 @@ class _IncompleteMembersScreenState extends State<IncompleteMembersScreen> {
                             bottom: -4,
                             right: -4,
                             child: Container(
-                              width: 30,
-                              height: 30,
+                              width: 24, // ย่อขนาด
+                              height: 24, // ย่อขนาด
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: Colors.white,
@@ -361,7 +422,7 @@ class _IncompleteMembersScreenState extends State<IncompleteMembersScreen> {
                                 children: [
                                   Text(
                                     '$level',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black, height: 1.1),
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.black, height: 1.1), // ย่อขนาด
                                   ),
                                 ],
                               ),
@@ -369,11 +430,11 @@ class _IncompleteMembersScreenState extends State<IncompleteMembersScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Container(
                         width: double.infinity,
                         margin: const EdgeInsets.symmetric(horizontal: 10),
-                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        padding: const EdgeInsets.symmetric(vertical: 2), // ย่อขนาด
                         decoration: BoxDecoration(
                           color: const Color(0xFFCBE7F5),
                           borderRadius: BorderRadius.circular(16),
@@ -382,7 +443,7 @@ class _IncompleteMembersScreenState extends State<IncompleteMembersScreen> {
                         alignment: Alignment.center,
                         child: const Text(
                           "สมาชิก",
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black), // ย่อขนาด
                         ),
                       ),
                     ],
@@ -397,11 +458,11 @@ class _IncompleteMembersScreenState extends State<IncompleteMembersScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
-                      const SizedBox(height: 6),
+                      Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black)), // ย่อขนาด
+                      const SizedBox(height: 4),
                       Text(
                         detail.isEmpty ? 'ไม่มีคำแนะนำตัว' : detail,
-                        style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.3),
+                        style: const TextStyle(fontSize: 11, color: Colors.black87, height: 1.3), // ย่อขนาด
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),

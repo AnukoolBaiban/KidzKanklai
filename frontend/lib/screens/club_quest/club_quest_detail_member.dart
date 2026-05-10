@@ -27,8 +27,12 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
 
   late String _title;
   late String _description;
+  late String _startDate;
   late String _endDate;
   String? _imagePath;
+
+  int _totalMembers = 0;
+  int _completedMembers = 0;
 
   @override
   void initState() {
@@ -36,6 +40,20 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
     final q = widget.questData;
     _title = q['name'] ?? 'ไม่มีชื่อภารกิจ';
     _description = q['detail'] ?? 'ไม่มีรายละเอียด';
+
+    if (q['start_date'] != null) {
+      try {
+        DateTime parsed = DateTime.parse(q['start_date']).toLocal();
+        String dd = parsed.day.toString().padLeft(2, '0');
+        String mm = parsed.month.toString().padLeft(2, '0');
+        String yy = (parsed.year + 543).toString().substring(2);
+        _startDate = "$dd/$mm/$yy";
+      } catch (e) {
+        _startDate = "--/--/--";
+      }
+    } else {
+      _startDate = "--/--/--";
+    }
 
     if (q['due_date'] != null) {
       try {
@@ -56,6 +74,84 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
       _imagePath = img;
     } else {
       _imagePath = null;
+    }
+
+    _fetchQuestProgress();
+  }
+
+  // 🌟 ฟังก์ชันสำหรับแสดง Dialog รูปภาพแบบเต็ม
+  void _showFullScreenImage(BuildContext context, String path) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.9), // พื้นหลังดำเข้มโปร่งแสง
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.zero, // ให้ขยายเต็มหน้าจอ
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // 🌟 สามารถบีบซูมรูปได้
+              InteractiveViewer(
+                panEnabled: true,
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: path.startsWith('http')
+                    ? Image.network(path, fit: BoxFit.contain)
+                    : Image.asset(path, fit: BoxFit.contain),
+              ),
+              // ปุ่มปิดสีขาวมุมขวาบน
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 10,
+                right: 10,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 🌟 ฟังก์ชันดึงสถิติคนที่ทำเควสนี้
+  Future<void> _fetchQuestProgress() async {
+    try {
+      final supabase = Supabase.instance.client;
+      
+      final clubId = widget.questData['club_id'];
+      final questId = widget.questData['id'];
+
+      if (clubId == null || questId == null) return;
+
+      // 1. นับจำนวนลูกน้องในคลับ
+      final membersRes = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('club_id', clubId)
+          .neq('club_role', 'owner');
+      
+      final total = (membersRes as List).length;
+
+      // 2. นับคนที่ทำเควสนี้เสร็จ
+      final doQuestsRes = await supabase
+          .from('do_quests')
+          .select('user_id') 
+          .eq('quest_id', questId)
+          .eq('status', 'completed');
+          
+      final completed = (doQuestsRes as List).length;
+
+      if (mounted) {
+        setState(() {
+          _totalMembers = total;
+          _completedMembers = completed;
+        });
+      }
+    } catch (e) {
+      debugPrint("❌ Error fetching progress: $e");
     }
   }
 
@@ -149,11 +245,23 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
             if (apiRewards.isNotEmpty) {
               // แปลงข้อมูลจาก API เป็น RewardData
               List<RewardData> popupRewards = apiRewards.map<RewardData>((rw) {
+                final String rwName = (rw['name'] ?? '').toUpperCase();
+                final int rwItemId = rw['item_id'] ?? 0;
+                // 🌟 ตรวจสอบ item_id ก่อน (20=Coin, 22=EXP) แล้ว fallback ไปเช็ค item_type/name
+                final String rwItemType = (rw['item_type'] ?? '').toUpperCase();
+                String rwType = 'ITEM';
+                if (rwItemId == 22 || rwItemType == 'EXP' || rwName.contains('EXP')) {
+                  rwType = 'EXP';
+                } else if (rwItemId == 20 || rwItemType == 'COIN' || rwItemType == 'CURRENCY' ||
+                    rwName.contains('COIN') || rwName.contains('เหรียญ')) {
+                  rwType = 'COIN';
+                }
+
                 return RewardData(
-                  type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM',
-                  amount: rw['amount'] ?? 0, // API ชมรมส่งกลับมาเป็นคีย์ 'amount'
+                  type: rwType,
+                  amount: rw['amount'] ?? 0,
                   itemName: rw['name'],
-                  itemImage: rw['image'], // โชว์รูปภาพไอเทมถ้า API มีส่งมา
+                  itemImage: rw['image'],
                 );
               }).toList();
 
@@ -276,13 +384,16 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
                             clipBehavior: Clip.none,
                             children: [
                               // Scrollable Content
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
-                                child: SingleChildScrollView(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
+                              Column(
+                                children: [
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
+                                      child: SingleChildScrollView(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
                                           Expanded(
@@ -299,6 +410,13 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
                                           Column(
                                             crossAxisAlignment: CrossAxisAlignment.end,
                                             children: [
+                                              Text(
+                                                'สร้าง $_startDate',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                              ),
                                               Text(
                                                 'วันที่สิ้นสุด $_endDate',
                                                 style: TextStyle(
@@ -358,23 +476,26 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
                                                       ),
                                                       child: AspectRatio(
                                                         aspectRatio: 1,
-                                                        child: ClipRRect(
-                                                          borderRadius: BorderRadius.circular(12),
-                                                          child: Image.network(
-                                                            _imagePath!,
-                                                            fit: BoxFit.cover,
-                                                            errorBuilder: (context, error, stackTrace) {
-                                                              return Container(
-                                                                color: Color(0xFFE8F4F8),
-                                                                child: Center(
-                                                                  child: Icon(
-                                                                    Icons.broken_image,
-                                                                    size: 60,
-                                                                    color: Colors.grey,
+                                                        child: GestureDetector(
+                                                          onTap: () => _showFullScreenImage(context, _imagePath!),
+                                                          child: ClipRRect(
+                                                            borderRadius: BorderRadius.circular(12),
+                                                            child: Image.network(
+                                                              _imagePath!,
+                                                              fit: BoxFit.cover,
+                                                              errorBuilder: (context, error, stackTrace) {
+                                                                return Container(
+                                                                  color: Color(0xFFE8F4F8),
+                                                                  child: Center(
+                                                                    child: Icon(
+                                                                      Icons.broken_image,
+                                                                      size: 60,
+                                                                      color: Colors.grey,
+                                                                    ),
                                                                   ),
-                                                                ),
-                                                              );
-                                                            },
+                                                                );
+                                                              },
+                                                            ),
                                                           ),
                                                         ),
                                                       ),
@@ -400,8 +521,59 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
                                   ),
                                 ),
                               ),
+                            ),
+                            
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                              child: Column(
+                                children: [
+                                  // 🌟 1. ข้อความสรุปจำนวน
+                                  Builder(builder: (context) {
+                                    final bool allDone = _totalMembers > 0 && _completedMembers >= _totalMembers;
+                                    return Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: allDone ? const Color(0xFFE6F9EE) : const Color(0xFFE8F4F8),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: allDone ? const Color(0xFF34C759) : const Color(0xFF9DD0E7),
+                                        ),
+                                      ),
+                                      child: allDone
+                                          ? const Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(Icons.check_circle, color: Color(0xFF34C759), size: 18),
+                                                SizedBox(width: 8),
+                                                Text(
+                                                  'สมาชิกทุกคนทำภารกิจนี้สำเร็จแล้ว',
+                                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF34C759)),
+                                                ),
+                                              ],
+                                            )
+                                          : Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                const Text(
+                                                  'ความคืบหน้าภารกิจของสมาชิก',
+                                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF002A50)),
+                                                ),
+                                                Text(
+                                                  '$_completedMembers / $_totalMembers คน',
+                                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2374B5)),
+                                                ),
+                                              ],
+                                            ),
+                                    );
+                                  }),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
 
-                              Positioned(
+                        Positioned(
                                 top: 0,
                                 left: 0,
                                 right: 0,
@@ -520,38 +692,66 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
     // 🌟 2. กำหนดข้อความปุ่มตามเงื่อนไข
     final String buttonText = passingScore > 0 ? 'ตอบคำถาม' : 'สำเร็จภารกิจ';
 
+    if (widget.isCompleted) {
+      return Positioned(
+        bottom: bottomPadding + 30,
+        left: 0,
+        right: 0,
+        child: const Center(
+          child: Text(
+            'ภารกิจสำเร็จ',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF6CC732),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Positioned(
       bottom: bottomPadding + 20,
-      left: MediaQuery.of(context).size.width * 0.1,
-      right: MediaQuery.of(context).size.width * 0.1,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Expanded(
-            child: widget.isCompleted
-                ? Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.check_circle, color: Colors.green, size: 28),
-                      SizedBox(width: 8),
-                      Text(
-                        'ภารกิจสำเร็จ',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green, 
-                        ),
-                      ),
-                    ],
-                  )
-                : _buildButton(
-                    text: buttonText, // 🌟 3. นำข้อความปุ่มที่เช็คแล้วมาใส่ตรงนี้
-                    color: Color(0xFF4A8FE7),
-                    useGradient: true,
-                    onPressed: _checkCooldownAndProceed, 
-                  ),
+      left: 0,
+      right: 0,
+      child: Center(
+        child: Container(
+          width: 150,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF556AEB), Color(0xFF59ABEC)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            borderRadius: BorderRadius.circular(25),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF4A8FE7).withOpacity(0.35),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
+          child: ElevatedButton(
+            onPressed: _checkCooldownAndProceed,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(25),
+              ),
+            ),
+            child: Text(
+              buttonText,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

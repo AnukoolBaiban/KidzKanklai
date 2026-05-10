@@ -48,7 +48,9 @@ class _AchievementScreenState extends State<AchievementScreen> {
               quantity,
               items (
                 name,
-                image
+                image,
+                description,
+                category_id
               )
             )
           ''')
@@ -82,11 +84,19 @@ class _AchievementScreenState extends State<AchievementScreen> {
           final itemData = giveData['items'];
           String itemName = "Item";
           String itemImage = "assets/images/item/default_item.png";
+          bool isFashion = false;
 
           if (itemData != null) {
-             itemName = itemData['name'] ?? "Item";
+             itemName = itemData['description'] ?? itemData['name'] ?? "Item";
              if (itemData['image'] != null) {
                itemImage = itemData['image'];
+               if (itemImage.contains('Fashion') || itemImage.contains('fashion')) {
+                 isFashion = true;
+               }
+             }
+             if (itemData['category_id'] != null) {
+               final cid = itemData['category_id'];
+               if (cid >= 10 && cid <= 13) isFashion = true;
              }
           }
 
@@ -94,6 +104,7 @@ class _AchievementScreenState extends State<AchievementScreen> {
             amount: quantity,
             name: itemName,
             imagePath: itemImage,
+            isFashion: isFashion,
           );
         }
 
@@ -437,19 +448,34 @@ class _AchievementScreenState extends State<AchievementScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Image.asset(
-                        achievement.reward!.imagePath,
-                        width: 40,
-                        height: 40,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(Icons.stars, size: 40, color: Color(0xFFFFA726));
-                        },
+                      Transform.translate(
+                        offset: achievement.reward!.isFashion ? const Offset(1, 1) : Offset.zero,
+                        child: Transform.scale(
+                          scale: achievement.reward!.isFashion ? 3.0 : 1.0,
+                          child: Image.asset(
+                            achievement.reward!.imagePath,
+                            width: 40,
+                            height: 40,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(Icons.stars, size: 40, color: Color(0xFFFFA726));
+                            },
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        '+${achievement.reward!.amount}',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            achievement.reward!.isFashion 
+                                ? achievement.reward!.name 
+                                : '+${achievement.reward!.amount}',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -541,19 +567,34 @@ class _AchievementScreenState extends State<AchievementScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Image.asset(
-                        achievement.reward?.imagePath ?? "assets/images/item/default_item.png",
-                        width: 40,
-                        height: 40,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(Icons.stars, size: 40, color: Color(0xFFFFA726));
-                        },
+                      Transform.translate(
+                        offset: (achievement.reward?.isFashion ?? false) ? const Offset(5, 5) : Offset.zero,
+                        child: Transform.scale(
+                          scale: (achievement.reward?.isFashion ?? false) ? 3.0 : 1.0,
+                          child: Image.asset(
+                            achievement.reward?.imagePath ?? "assets/images/item/default_item.png",
+                            width: 40,
+                            height: 40,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(Icons.stars, size: 40, color: Color(0xFFFFA726));
+                            },
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        '+${achievement.reward?.amount ?? 0}',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            (achievement.reward?.isFashion ?? false)
+                                ? achievement.reward!.name
+                                : '+${achievement.reward?.amount ?? 0}',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -647,10 +688,12 @@ class AchievementReward {
   final int amount;
   final String name;
   final String imagePath;
+  final bool isFashion;
 
   AchievementReward({
     required this.amount,
     this.name = 'Item',
     this.imagePath = 'assets/images/item/default_item.png',
+    this.isFashion = false,
   });
 }
