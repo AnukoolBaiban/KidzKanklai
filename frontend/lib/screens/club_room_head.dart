@@ -5,6 +5,7 @@ import 'package:flutter_application_1/widgets/reward_popup.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_application_1/screens/all_quest.dart';
 import 'package:flutter_application_1/screens/club_quest/club_quest_detail_leader.dart';
+import 'package:flutter_application_1/api_service.dart';
 
 class ClubRoomHeadScreen extends StatefulWidget {
   final bool isNewClub; // 🌟 true = เพิ่งสร้างชมรมใหม่ → แสดง popup ตั๋ว
@@ -32,29 +33,31 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchClubData().then((_) {
-      // 🌟 ถ้าเพิ่งสร้างชมรมใหม่ ให้แสดง popup ตั๋วสร้างภารกิจชมรมทันที
-      if (widget.isNewClub && mounted) {
-        _showNewClubTicketPopup();
-      }
-    });
+    _fetchClubData();
+    _checkDailyLoginRewards();
     // โหลดข้อมูลของหน้ารายละเอียดล่วงหน้าแบบ Background
     Future.microtask(() => ClubDetailHeadPreloader.preload());
   }
 
-  // 🌟 แสดง RewardPopup ตั๋วสร้างภารกิจชมรม 3 ใบ เมื่อสร้างชมรมสำเร็จ
-  Future<void> _showNewClubTicketPopup() async {
-    if (!mounted) return;
-    await RewardPopup.show(
-      context,
-      rewards: [
-        RewardData.item(
-          name: 'ตั๋วสร้างภารกิจชมรม',
-          amount: 3,
-          image: 'assets/images/item/Ticket_clubquest_img.png',
-        ),
-      ],
-    );
+  // ฟังก์ชันเช็คและโชว์ป๊อปอัป
+  Future<void> _checkDailyLoginRewards() async {
+    final apiRewards = await ApiService.claimLoginBonus();
+
+    if (apiRewards.isNotEmpty && mounted) {
+      List<RewardData> collectedRewards = [];
+
+      for (var reward in apiRewards) {
+        collectedRewards.add(
+          RewardData.item(
+            name: reward['name'],
+            amount: reward['added'],
+            image: reward['image'], // 🌟 จับค่าใส่ตรงๆ ได้เลย โค้ดสั้นลงมาก!
+          ),
+        );
+      }
+
+      await RewardPopup.show(context, rewards: collectedRewards);
+    }
   }
 
   // 🌟 ฟังก์ชันดึงข้อมูลชมรมและเควส
