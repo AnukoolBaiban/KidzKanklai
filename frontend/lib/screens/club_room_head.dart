@@ -709,6 +709,14 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
                         runSpacing: 8,
                         children: badges,
                       ),
+
+                    // 🌟 Progress Bar ใต้ของรางวัล
+                    const SizedBox(height: 10),
+                    _buildProgressBar(
+                      isCompleted,
+                      _questProgressMap[questId] ?? 0,
+                      _totalMembersCount,
+                    ),
                   ],
                 ),
               ),
@@ -756,13 +764,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    _buildProgressBar(
-                      isCompleted,
-                      _questProgressMap[questId] ?? 0,
-                      _totalMembersCount,
-                    ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     if (isCompleted)
                       const Text(
                         "สำเร็จ",
@@ -795,9 +797,10 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
   Widget _buildProgressBar(bool isDone, int progress, int totalReq) {
     double percent = totalReq > 0 ? (progress / totalReq).clamp(0.0, 1.0) : 0.0;
     if (isDone) percent = 1.0;
+    final String countText = isDone ? "$totalReq/$totalReq" : "$progress/$totalReq";
 
     return Container(
-      height: 14,
+      height: 20,
       decoration: BoxDecoration(
         color: Colors.grey.shade300,
         borderRadius: BorderRadius.circular(10),
@@ -820,7 +823,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
           ),
           Center(
             child: Text(
-              isDone ? "$totalReq/$totalReq" : "$progress/$totalReq",
+              'จำนวนคนที่สำเร็จภารกิจนี้ $countText',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
