@@ -195,6 +195,16 @@ func ClaimLoginTickets(c *gin.Context) {
 		return
 	}
 
+	// 🌟 แทรกตรงนี้: เรียกฟังก์ชันเช็คเควสชมรมที่หมดเวลา
+	// 1. แปลง userId จาก context เป็น uuid.UUID
+	userIDStr := fmt.Sprintf("%v", userId)
+	if parsedUserID, err := uuid.Parse(userIDStr); err == nil {
+		// 2. สั่งรันอยู่เบื้องหลัง (Goroutine) โดยใช้ context.Background() 
+		// เพื่อให้ทำงานต่อได้จนจบ แม้ว่า API นี้จะส่ง Response กลับไปให้แอปแล้วก็ตาม
+		go ProcessExpiredClubQuests(context.Background(), parsedUserID)
+	}
+
+
 	// ส่ง Response กลับไปให้ Flutter
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,

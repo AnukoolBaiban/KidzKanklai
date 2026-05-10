@@ -12,6 +12,7 @@ import (
 
 	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
+	"github.com/jackc/pgx/v5" // 🌟 เพิ่มบรรทัดนี้เข้าไป!
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -450,7 +451,7 @@ func SubmitClubQuest(c *gin.Context) {
 			rewards = append(rewards, map[string]interface{}{"item_id": item.ItemID, "name": item.Name, "amount": item.Qty})
 		}
 
-		// 🌟 8. ตรวจสอบว่าถึง 50% หรือยัง (ถ้ามีรางวัลถึงจะแจกหัวหน้า)
+		// 🌟 8. ตรวจสอบว่าสำเร็จ "100% ครบทุกคน" หรือไม่ (เพื่อแจกโบนัสทันที)
 		if hasOriginalRewards {
 			var ownerRewarded bool
 			err := tx.QueryRow(ctx, `SELECT COALESCE(owner_rewarded, false) FROM public.quests WHERE id = $1`, input.QuestID).Scan(&ownerRewarded)
@@ -462,52 +463,43 @@ func SubmitClubQuest(c *gin.Context) {
 				var completedMembers int
 				tx.QueryRow(ctx, `SELECT COUNT(*) FROM public.do_quests WHERE quest_id = $1 AND status = 'completed'`, input.QuestID).Scan(&completedMembers)
 
-				// ถ้ามีสมาชิก (ไม่รวมหัวหน้า) อย่างน้อย 1 คน และทำเสร็จเกิน 50%
-				if totalMembers > 0 && float64(completedMembers) >= float64(totalMembers)*0.5 {
+				// 🌟 ถ้าสมาชิก (ไม่รวมหัวหน้า) ทำเสร็จครบ 100% ทุกคน!
+				if totalMembers > 0 && completedMembers == totalMembers {
 					
-					// ล็อกสถานะว่าแจกแล้ว
+					// ล็อกสถานะว่าเคลียร์บิลแล้ว
 					tx.Exec(ctx, `UPDATE public.quests SET owner_rewarded = true WHERE id = $1`, input.QuestID)
 
-					// หา UUID หัวหน้า
+					// 8.1 เตรียมของรางวัลให้ "หัวหน้า" (รางวัลฐาน + เหรียญตามจำนวนคน + โบนัส 500)
 					var ownerID uuid.UUID
 					err = tx.QueryRow(ctx, `SELECT id FROM public.user_profiles WHERE club_id = $1 AND club_role = 'owner'`, questClubID).Scan(&ownerID)
-					
 					if err == nil {
-						// 8.1 เตรียมของรางวัลรวม
 						ownerRewardsMap := make(map[int64]int)
 						for _, pr := range pendingRewards {
 							ownerRewardsMap[pr.ItemID] += pr.Qty
 						}
-						ownerRewardsMap[20] += 10 * totalMembers // โบนัสเหรียญ (สมมติว่าไอเทม ID 20 คือเหรียญ)
+						ownerRewardsMap[20] += 10 * totalMembers // โบนัสพื้นฐาน
+						ownerRewardsMap[20] += 500               // 🌟 โบนัส 100% สำหรับหัวหน้า
 
-						// 8.2 สร้างกล่องจดหมาย (เพิ่ม Image และ DueDate)
-						var notiID int64
-						title := "ของรางวัลสำหรับหัวหน้าชมรม🎉"
-						detail := fmt.Sprintf("ภารกิจชมรม \"%s\" สำเร็จทะลุเป้า 50%% แล้ว! คุณได้รับรางวัลประจำภารกิจและโบนัสพิเศษ %d เหรียญตามจำนวนสมาชิก", questName, 10*totalMembers)
-						notiType := "reward"
-						imgUrl := "assets/images/icon/icon-gift.png" // ใส่รูปกล่องของขวัญได้เลย
-						dueDate := time.Now().AddDate(0, 0, 7) // ให้เวลาเก็บ 7 วัน
-						
-						errNoti := tx.QueryRow(ctx, `
-							INSERT INTO public.notifications (title, detail, type, image, start_date, due_date) 
-							VALUES ($1, $2, $3, $4, NOW(), $5) RETURNING id
-						`, title, detail, notiType, imgUrl, dueDate).Scan(&notiID)
-						
-						if errNoti == nil && notiID > 0 {
-							// ส่งจดหมายให้หัวหน้า
-							tx.Exec(ctx, `INSERT INTO public.get_notifications (user_id, notification_id, status, reward_claimed) VALUES ($1, $2, 'unread', false)`, ownerID, notiID)
+						sendRewardNotificationHelper(ctx, tx, ownerID, "🎉 ภารกิจชมรมสำเร็จ 100%!", 
+							fmt.Sprintf("สุดยอด! สมาชิกทุกคนทำภารกิจ \"%s\" สำเร็จ! คุณได้รับรางวัลและโบนัสพิเศษ 500 เหรียญ", questName), 
+							ownerRewardsMap)
+					}
 
-							// แนบของลง obtain
-							for itemID, qty := range ownerRewardsMap {
-								tx.Exec(ctx, `
-									INSERT INTO public.obtain (notification_id, item_id, quantity, reward_claimed) 
-									VALUES ($1, $2, $3, false)
-								`, notiID, itemID, qty)
-							}
-							fmt.Println("✅ [Success] Reward Notification sent to Club Owner!")
-						} else {
-							fmt.Println("❌ [Error] Failed to insert notification:", errNoti)
-						}
+					// 8.2 เตรียมของรางวัลโบนัสให้ "ลูกน้องทุกคนที่ทำเสร็จ" (โบนัส 500)
+					memberBonusMap := map[int64]int{20: 500}
+					rowsMembers, _ := tx.Query(ctx, `SELECT user_id FROM public.do_quests WHERE quest_id = $1 AND status = 'completed'`, input.QuestID)
+					var memberIDs []uuid.UUID
+					for rowsMembers.Next() {
+						var mID uuid.UUID
+						rowsMembers.Scan(&mID)
+						memberIDs = append(memberIDs, mID)
+					}
+					rowsMembers.Close()
+
+					for _, mID := range memberIDs {
+						sendRewardNotificationHelper(ctx, tx, mID, "🎁 โบนัสทีมเวิร์ค! ภารกิจสำเร็จ 100%", 
+							fmt.Sprintf("ยอดเยี่ยมมาก! สมาชิกทุกคนทำภารกิจ \"%s\" สำเร็จ คุณได้รับโบนัส 500 เหรียญ!", questName), 
+							memberBonusMap)
 					}
 				}
 			}
@@ -675,4 +667,130 @@ func UpdateClubQuest(c *gin.Context) {
 		"success": true,
 		"message": "แก้ไขภารกิจสำเร็จ!",
 	})
+}
+
+// ProcessExpiredClubQuests - เรียกใช้ทุกครั้งเมื่อเข้า Lobby/Club เพื่อประเมินเควสชมรมที่หมดอายุ
+func ProcessExpiredClubQuests(ctx context.Context, userID uuid.UUID) {
+	// เช็คก่อนว่ามีคลับไหม
+	var clubID int64
+	err := configs.DB.QueryRow(ctx, `SELECT club_id FROM public.user_profiles WHERE id = $1`, userID).Scan(&clubID)
+	if err != nil || clubID == 0 {
+		return
+	}
+
+	tx, err := configs.DB.Begin(ctx)
+	if err != nil {
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// ล็อกระดับคลับ ป้องกันผู้เล่นหลายคนในคลับเดียวกันเข้าหน้า Lobby พร้อมกันแล้วเรียกซ้ำซ้อน
+	_, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1::text))", fmt.Sprintf("club_eval_%d", clubID))
+	if err != nil {
+		return
+	}
+
+	// หาเควสชมรมที่หมดเวลาแล้ว แต่ยังไม่ได้สรุปผลแจกรางวัล
+	query := `
+		SELECT id, name FROM public.quests 
+		WHERE club_id = $1 AND due_date <= NOW() AND owner_rewarded = false AND type = 'ชมรม'
+	`
+	rows, err := tx.Query(ctx, query, clubID)
+	if err != nil {
+		return
+	}
+
+	type expiredQuest struct {
+		ID   int64
+		Name string
+	}
+	var quests []expiredQuest
+	for rows.Next() {
+		var q expiredQuest
+		rows.Scan(&q.ID, &q.Name)
+		quests = append(quests, q)
+	}
+	rows.Close()
+
+	for _, q := range quests {
+		// 1. นับจำนวนคน
+		var totalMembers, completedMembers int
+		tx.QueryRow(ctx, `SELECT COUNT(*) FROM public.user_profiles WHERE club_id = $1 AND club_role != 'owner'`, clubID).Scan(&totalMembers)
+		tx.QueryRow(ctx, `SELECT COUNT(*) FROM public.do_quests WHERE quest_id = $1 AND status = 'completed'`, q.ID).Scan(&completedMembers)
+
+		// 2. ปิดจ๊อบเควสนี้ (ไม่ว่าจะผ่านหรือไม่ผ่านเกณฑ์ ก็จะไม่กลับมาเช็คซ้ำ)
+		tx.Exec(ctx, `UPDATE public.quests SET owner_rewarded = true WHERE id = $1`, q.ID)
+
+		// 3. ถ้าสำเร็จตั้งแต่ 50% ขึ้นไป แจกรางวัลให้หัวหน้า
+		if totalMembers > 0 && float64(completedMembers) >= float64(totalMembers)*0.5 {
+			
+			// เช็คว่าเควสนี้สร้างด้วยตั๋วไหม (มีตาราง receive ไหม)
+			var hasRewards bool
+			tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM public.receive WHERE quest_id = $1)`, q.ID).Scan(&hasRewards)
+
+			if hasRewards {
+				var ownerID uuid.UUID
+				err = tx.QueryRow(ctx, `SELECT id FROM public.user_profiles WHERE club_id = $1 AND club_role = 'owner'`, clubID).Scan(&ownerID)
+				
+				if err == nil {
+					ownerRewardsMap := make(map[int64]int)
+					// ดึงของรางวัลตั้งต้น
+					rRows, _ := tx.Query(ctx, `SELECT item_id, quantity FROM public.receive WHERE quest_id = $1`, q.ID)
+					for rRows.Next() {
+						var iID int64
+						var qty int
+						rRows.Scan(&iID, &qty)
+						ownerRewardsMap[iID] += qty
+					}
+					rRows.Close()
+
+					ownerRewardsMap[20] += 10 * totalMembers // บวกเหรียญโบนัสตามจำนวนคน
+
+					// ถ้าเกิดกรณีที่ครบ 100% เป๊ะตอนวินาทีสุดท้ายที่หมดเวลาพอดี ก็แจกโบนัสให้หัวหน้าด้วย
+					is100Percent := (completedMembers == totalMembers)
+					if is100Percent {
+						ownerRewardsMap[20] += 500
+						sendRewardNotificationHelper(ctx, tx, ownerID, "🎉 ภารกิจชมรมหมดเวลา (สำเร็จ 100%)", 
+							fmt.Sprintf("ยอดเยี่ยมมาก! ภารกิจ \"%s\" หมดเวลาและสมาชิกทุกคนทำสำเร็จ คุณได้รับโบนัส 500 เหรียญ!", q.Name), ownerRewardsMap)
+						
+						// แจก 500 ให้ลูกน้องด้วย
+						memberBonusMap := map[int64]int{20: 500}
+						mRows, _ := tx.Query(ctx, `SELECT user_id FROM public.do_quests WHERE quest_id = $1 AND status = 'completed'`, q.ID)
+						for mRows.Next() {
+							var mID uuid.UUID
+							mRows.Scan(&mID)
+							sendRewardNotificationHelper(ctx, tx, mID, "🎁 โบนัสทีมเวิร์ค! ภารกิจสำเร็จ 100%", 
+								fmt.Sprintf("ภารกิจ \"%s\" หมดเวลาและทุกคนทำสำเร็จ! รับโบนัส 500 เหรียญ", q.Name), memberBonusMap)
+						}
+						mRows.Close()
+					} else {
+						// กรณีปกติ ทะลุ 50% แต่ไม่ถึง 100% (หัวหน้าได้คนเดียว)
+						sendRewardNotificationHelper(ctx, tx, ownerID, "สรุปผลภารกิจชมรม (สำเร็จ > 50%) 🎉", 
+							fmt.Sprintf("ภารกิจ \"%s\" หมดเวลาแล้ว สมาชิกช่วยกันทำสำเร็จเกินครึ่ง! เข้ามารับของรางวัลได้เลย", q.Name), ownerRewardsMap)
+					}
+				}
+			}
+		}
+	}
+	tx.Commit(ctx)
+}
+
+// Helper Function สำหรับสร้างจดหมายและยัดของรางวัล
+func sendRewardNotificationHelper(ctx context.Context, tx pgx.Tx, userID uuid.UUID, title string, detail string, rewards map[int64]int) {
+	var notifID int64
+	notiType := "reward"
+	imgUrl := "assets/images/icon/icon-gift.png"
+	dueDate := time.Now().AddDate(0, 0, 7) // เก็บได้ 7 วัน
+
+	err := tx.QueryRow(ctx, `
+		INSERT INTO public.notifications (title, detail, type, image, start_date, due_date) 
+		VALUES ($1, $2, $3, $4, NOW(), $5) RETURNING id
+	`, title, detail, notiType, imgUrl, dueDate).Scan(&notifID)
+	
+	if err == nil && notifID > 0 {
+		tx.Exec(ctx, `INSERT INTO public.get_notifications (user_id, notification_id, status, reward_claimed) VALUES ($1, $2, 'unread', false)`, userID, notifID)
+		for itemID, qty := range rewards {
+			tx.Exec(ctx, `INSERT INTO public.obtain (notification_id, item_id, quantity, reward_claimed) VALUES ($1, $2, $3, false)`, notifID, itemID, qty)
+		}
+	}
 }
