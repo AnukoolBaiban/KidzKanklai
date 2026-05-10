@@ -246,10 +246,14 @@ class _ClubQuestDetailScreenState extends State<ClubQuestDetailScreen> {
               // แปลงข้อมูลจาก API เป็น RewardData
               List<RewardData> popupRewards = apiRewards.map<RewardData>((rw) {
                 final String rwName = (rw['name'] ?? '').toUpperCase();
+                final int rwItemId = rw['item_id'] ?? 0;
+                // 🌟 ตรวจสอบ item_id ก่อน (20=Coin, 22=EXP) แล้ว fallback ไปเช็ค item_type/name
+                final String rwItemType = (rw['item_type'] ?? '').toUpperCase();
                 String rwType = 'ITEM';
-                if (rwName.contains('EXP')) {
+                if (rwItemId == 22 || rwItemType == 'EXP' || rwName.contains('EXP')) {
                   rwType = 'EXP';
-                } else if (rwName.contains('COIN') || rwName.contains('เหรียญ')) {
+                } else if (rwItemId == 20 || rwItemType == 'COIN' || rwItemType == 'CURRENCY' ||
+                    rwName.contains('COIN') || rwName.contains('เหรียญ')) {
                   rwType = 'COIN';
                 }
 

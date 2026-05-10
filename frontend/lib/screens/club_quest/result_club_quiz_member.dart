@@ -397,9 +397,13 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
                               final String name = reward['name'] ?? '';
                               final int amount = reward['amount'] ?? 1;
                               
-                              if (name.toUpperCase().contains('EXP')) {
+                              // 🌟 ตรวจสอบ item_id ก่อน (20=Coin, 22=EXP) แล้ว fallback ไปเช็คจาก name
+                              final int itemId = reward['item_id'] ?? 0;
+                              final String itemType = (reward['item_type'] ?? '').toUpperCase();
+                              if (itemId == 22 || itemType == 'EXP' || name.toUpperCase().contains('EXP')) {
                                 popupRewards.add(RewardData.exp(amount));
-                              } else if (name.toUpperCase().contains('COIN') || name.contains('เหรียญ')) {
+                              } else if (itemId == 20 || itemType == 'COIN' || itemType == 'CURRENCY' ||
+                                  name.toUpperCase().contains('COIN') || name.contains('เหรียญ')) {
                                 popupRewards.add(RewardData.coin(amount));
                               } else {
                                 popupRewards.add(RewardData.item(name: name, amount: amount, image: reward['image']));
@@ -464,9 +468,12 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
       final String name = reward['name'] ?? 'Item';
       final int amount = reward['amount'] ?? 1;
 
-      // จัดการรูปภาพและสีแบบฉุกเฉิน (เหมือนที่คุณทำในหน้าคลับ)
-      bool isExp = name.toUpperCase().contains('EXP');
-      bool isCoin = name.toUpperCase().contains('COIN') || name.contains('เหรียญ');
+      // 🌟 ตรวจสอบ item_id ก่อน (20=Coin, 22=EXP) แล้ว fallback ไปเช็คจาก name
+      final int itemId = reward['item_id'] ?? 0;
+      final String itemType = (reward['item_type'] ?? '').toUpperCase();
+      bool isExp = itemId == 22 || itemType == 'EXP' || name.toUpperCase().contains('EXP');
+      bool isCoin = itemId == 20 || itemType == 'COIN' || itemType == 'CURRENCY' ||
+          name.toUpperCase().contains('COIN') || name.contains('เหรียญ');
       
       String imagePath = 'assets/images/item/Gasha.png';
       IconData icon = Icons.card_giftcard;
