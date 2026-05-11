@@ -319,8 +319,8 @@ class MusicRouteObserver extends NavigatorObserver {
     if (route is MaterialPageRoute) {
       final s = route.builder.runtimeType.toString();
       if (s.contains('LobbyScreen')) return '/lobby';
-      if (s.contains('Quest') || s.contains('Countdown')) return '/all_quest';
       if (s.contains('Club')) return '/club';
+      if (s.contains('Quest') || s.contains('Countdown')) return '/all_quest';
       if (s.contains('Achievement')) return '/achievement';
       if (s.contains('Map') || s.contains('LocationUpgrade')) return '/map';
       if (s.contains('Fashion')) return '/fashion';
