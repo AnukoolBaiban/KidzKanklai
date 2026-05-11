@@ -396,7 +396,7 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
             children: [
               ClubTopBar(topPadding: topPadding),
               ClubBlueHeader(
-                title: _clubName.isEmpty ? 'ชมรม' : _clubName,
+                title: 'ข้อมูลชมรม',
                 onBackPressed: () => Navigator.pop(context),
               ),
             ],

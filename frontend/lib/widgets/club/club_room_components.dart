@@ -106,8 +106,8 @@ class _ClubBlueHeaderState extends State<ClubBlueHeader> {
             Positioned.fill(
               child: Center(
                 child: Padding(
-                  padding: EdgeInsets.only(
-                    left: widget.onBackPressed != null ? 60 : 30,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: widget.onBackPressed != null ? 60 : 30,
                   ),
                   child: Text(
                     widget.title,
