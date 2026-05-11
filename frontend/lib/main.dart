@@ -35,6 +35,7 @@ import 'screens/quest_detail.dart';
 import 'config/rive_cache.dart';
 import 'config/user_pose_provider.dart';
 import 'services/audio_manager.dart';
+import 'services/touch_manager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -93,7 +94,9 @@ class KidzKanklaiApp extends StatelessWidget {
       navigatorObservers: [musicObserver],
 
       // ห่อทั้งแอปด้วย AppSoundLayer เพื่อให้ทุกการกดปุ่มเล่นเสียงอัตโนมัติ
-      builder: (context, child) => AppSoundLayer(child: child!),
+      builder: (context, child) => TouchRippleLayer(
+        child: AppSoundLayer(child: child!),
+      ),
 
       home: const LoadingScreen(),
 
