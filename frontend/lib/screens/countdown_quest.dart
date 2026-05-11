@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/api_service.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter_application_1/widgets/music_select_popup.dart';
 
 import 'package:flutter_application_1/widgets/custom_top_bar.dart';
 import 'package:flutter_application_1/widgets/annotation_instant.dart';
@@ -15,6 +17,7 @@ import 'package:flutter_application_1/widgets/level_up_popup.dart';
 import 'package:flutter_application_1/widgets/character_up_popup.dart';
 import 'package:flutter_application_1/widgets/character_widget.dart';
 import 'package:flutter_application_1/screens/setting.dart';
+import 'package:flutter_application_1/services/audio_manager.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 
 class CountdownQuestScreen extends StatefulWidget {
@@ -26,7 +29,7 @@ class CountdownQuestScreen extends StatefulWidget {
 }
 
 class _CountdownQuestScreenState extends State<CountdownQuestScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   // ==========================================
   // State Variables & Controllers
   // ==========================================
@@ -64,11 +67,22 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
   late AnimationController _blinkController;
   late Animation<double> _blinkAnimation;
 
+  // 🎵 Music Player
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  String? _currentTrackPath; // null = ไม่เล่นเพลง
+
   @override
   void initState() {
     super.initState();
     _initBlinkAnimation();
     _fetchUser();
+    
+    // ตั้งค่าระดับเสียงเริ่มต้นให้ตัวเล่นเพลงของหน้าตาม Setting
+    final audioManager = AudioManager();
+    _audioPlayer.setVolume(audioManager.isMuted ? 0 : audioManager.musicVolume);
+
+    // ลงทะเบียน lifecycle observer เพื่อจัดการเพลงตอนกด Home / ออกแอป
+    WidgetsBinding.instance.addObserver(this);
   }
 
   /// โหลด user พร้อม fashion data ล่าสุดด้วยตัวเอง
@@ -95,9 +109,36 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
   @override
   void dispose() {
     _timer?.cancel();
+    _encouragementTimer?.cancel();
     _blinkController.dispose();
     _detailController.dispose();
+    _audioPlayer.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  // ─── Lifecycle Handler ────────────────────────────────────────────────────
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        // กด Home / ออกแอป → หยุดเพลง
+        _audioPlayer.stop();
+        break;
+      case AppLifecycleState.resumed:
+        // กลับเข้าแอป → เล่นเพลงต่อถ้าเคยเลือกเพลงไว้
+        if (_currentTrackPath != null) {
+          final audioManager = AudioManager();
+          if (!audioManager.isMuted) {
+            _audioPlayer.play(AssetSource(_currentTrackPath!));
+          }
+        }
+        break;
+      default:
+        break;
+    }
   }
 
   // ==========================================
@@ -469,6 +510,13 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
               child: Center(child: _buildStartButton(size, isSmallScreen)),
             ),
 
+            // ── ปุ่มโน้ตดนตรี (เหนือปุ่มเริ่มทางขวา) ──
+            Positioned(
+              bottom: bottomPadding + 160,
+              right: size.width * 0.08,
+              child: _buildMusicButton(),
+            ),
+
             // ── Bubble ข้อความให้กำลังใจ (ด้านซ้ายของตัวละคร) ──
             if (_showEncouragement && _encouragementMessage != null)
               Positioned(
@@ -542,14 +590,24 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
         child: CustomTopBar(
           onNotificationTapped: () =>
               Navigator.pushNamed(context, '/notification'),
-          onSettingsTapped: () {
+          onSettingsTapped: () async {
             // 🌟 เปลี่ยนมาใช้ push แบบ MaterialPageRoute เพื่อแอบส่งค่า hideLogout = true ไปให้หน้า Setting
-            Navigator.push(
+            await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => const SettingScreen(hideLogout: true),
               ),
             );
+            // เมื่อกลับมาจากหน้า Setting ให้อัปเดตระดับเสียงเผื่อผู้ใช้เปลี่ยนค่ามา
+            if (!mounted) return;
+            final audioManager = AudioManager();
+            _audioPlayer.setVolume(audioManager.isMuted ? 0 : audioManager.musicVolume);
+
+            // 🎵 หากมีเพลงที่เลือกเองเล่นอยู่ ให้หยุด BGM หลักอีกรอบ 
+            // (ป้องกัน NavigatorObserver สั่งเล่นเพลงประจำหน้าซ้ำตอนกลับมาจาก Setting)
+            if (_currentTrackPath != null) {
+              audioManager.stopBGM();
+            }
           },
         ),
     );
@@ -950,6 +1008,76 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
             ),
           ),
       ],
+    );
+  }
+
+  // ปุ่มโน้ตดนตรีสำหรับเลือกเพลง
+  Widget _buildMusicButton() {
+    final bool isPlaying = _currentTrackPath != null;
+    return GestureDetector(
+      onTap: () async {
+        final finalSelected = await MusicSelectPopup.show(
+          context,
+          audioPlayer: _audioPlayer,
+          currentTrackPath: _currentTrackPath,
+          onSelect: (selected) async {
+            // ฟังก์ชันนี้จะถูกเรียกทันทีที่กดเลือกเพลงใน Popup โดยไม่ต้องปิด Popup
+            if (!mounted) return;
+            setState(() => _currentTrackPath = selected);
+            
+            // 🎵 หยุดเพลง BGM หลัก
+            await AudioManager().stopBGM();
+
+            if (selected == null) {
+              await _audioPlayer.stop();
+            } else {
+              final audioManager = AudioManager();
+              await _audioPlayer.setVolume(audioManager.isMuted ? 0 : audioManager.musicVolume);
+              await _audioPlayer.play(AssetSource(selected));
+              await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+            }
+          },
+        );
+
+        // เมื่อ Popup ปิดลง เราอัปเดตสถานะสุดท้ายอีกครั้ง (เพื่อให้ UI ปุ่มโน้ตซิงค์กับเพลงล่าสุดที่เลือก)
+        if (mounted) {
+           setState(() => _currentTrackPath = finalSelected);
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF59ABEC), Color(0xFF2374B5)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          border: Border.all(color: Colors.white, width: 2),
+        ),
+        child: Center(
+          child: Image.asset(
+            'assets/images/button/music-note1.png',
+            width: 28,
+            height: 28,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => Icon(
+              isPlaying ? Icons.music_note : Icons.music_off,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+        ),
+      ),
     );
   }
 

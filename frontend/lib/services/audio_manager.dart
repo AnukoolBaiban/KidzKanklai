@@ -161,7 +161,7 @@ class AudioManager with WidgetsBindingObserver {
       case AppLifecycleState.resumed:
         // กลับเข้าแอป → เล่นเพลงต่อจากหน้าที่ค้างอยู่
         if (_currentBGM != null && !_isMuted) {
-          _musicPlayer.play(AssetSource('audio/$_currentBGM!'));
+          _musicPlayer.play(AssetSource('audio/$_currentBGM'));
         }
         break;
       case AppLifecycleState.inactive:
@@ -265,6 +265,7 @@ class MusicRouteObserver extends NavigatorObserver {
       case '/auth':
       case '/me':
       case '/video':
+      case '/countdown':
         return _kSilent;
 
       // หน้า Menu/Login group (ใช้เพลงเดียวกัน รอใส่ไฟล์เพลงภายหลัง) ──────────
@@ -286,7 +287,6 @@ class MusicRouteObserver extends NavigatorObserver {
       case '/allquest':
       case '/createnormalquest':
       case '/questdetail':
-      case '/countdown':
         return 'quest.mp3';
       case '/map':
         return 'map.mp3';
@@ -320,7 +320,8 @@ class MusicRouteObserver extends NavigatorObserver {
       final s = route.builder.runtimeType.toString();
       if (s.contains('LobbyScreen')) return '/lobby';
       if (s.contains('Club')) return '/club';
-      if (s.contains('Quest') || s.contains('Countdown')) return '/all_quest';
+      if (s.contains('Countdown')) return '/countdown';
+      if (s.contains('Quest')) return '/all_quest';
       if (s.contains('Achievement')) return '/achievement';
       if (s.contains('Map') || s.contains('LocationUpgrade')) return '/map';
       if (s.contains('Fashion')) return '/fashion';
