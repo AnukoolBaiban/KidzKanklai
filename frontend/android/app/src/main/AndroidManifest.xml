@@ -2,7 +2,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     package="com.example.flutter_application_1">
     <application
-        android:label="flutter_application_1"
+        android:label="KidzKanklai"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         tools:replace="android:label, android:icon">
@@ -48,11 +48,6 @@
             android:name="flutterEmbedding"
             android:value="2" />    
 
-        <activity
-            android:name=".GameActivity"
-            android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
-            android:configChanges="orientation|keyboardHidden|screenSize|smallestScreenSize|density|keyboard|navigation|screenLayout|uiMode"
-            android:launchMode="singleTask" />
     </application>
 
     <queries>

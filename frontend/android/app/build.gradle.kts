@@ -37,6 +37,14 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val output = this as com.android.build.gradle.internal.api.ApkVariantOutputImpl
+            output.outputFileName = "KidzKanklai-${variant.name}.apk"
+        }
+    }
 }
 
 flutter {
@@ -44,14 +52,5 @@ flutter {
 }
 
 dependencies {
-    // 1. เชื่อมต่อกับไฟล์ Godot .aar (ซึ่งอาจจะเป็นแค่ Game Logic/Plugins)
-    implementation(files("libs/my-game.aar")) 
-
-    // 2. *** เพิ่ม Godot Engine Library ***
-    // จำเป็นต้องมีตัวนี้เพราะ AAR ของคุณขนาดเล็ก (290KB) น่าจะไม่มีตัว Engine ติดมาด้วย
-    // (ถ้าใช้ Godot Version อื่น แก้เลขเวอร์ชันตรงนี้ให้ตรงกันนะครับ เช่น 4.2.1.stable)
-    implementation("org.godotengine:godot:4.3.0.stable")
-
-    // 3. เพื่อแก้ Error Splash Screen
-    implementation("androidx.core:core-splashscreen:1.0.1")
+    // Flutter dependencies only
 }
