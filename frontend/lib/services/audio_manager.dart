@@ -8,10 +8,10 @@ class AudioManager with WidgetsBindingObserver {
   factory AudioManager() => _instance;
   AudioManager._internal();
 
-  // 2. ตัวเล่นเสียง
+  // 2. ตัวเล่นเสียง — BGM ใช้ player เดียว loop ตลอด
+  //    SFX & Button ใช้ player ชั่วคราว (สร้างใหม่ทุกครั้ง) เพื่อไม่ให้ชิง session กับ BGM
   final AudioPlayer _musicPlayer = AudioPlayer(); // สำหรับ BGM
-  final AudioPlayer _sfxPlayer = AudioPlayer();   // สำหรับ SFX ทั่วไป
-  final AudioPlayer _buttonPlayer = AudioPlayer(); // สำหรับเสียงปุ่มโดยเฉพาะ (แยกเพื่อไม่ conflict)
+  late final AudioContext _audioCtx; // เก็บ context ไว้ใช้กับ SFX player ชั่วคราว
 
   // 3. ค่า Config เริ่มต้น
   double _musicVolume = 0.7;
@@ -33,16 +33,33 @@ class AudioManager with WidgetsBindingObserver {
     _sfxVolume = prefs.getDouble('sfxVolume') ?? 0.7;
     _isMuted = prefs.getBool('isMuted') ?? false;
 
-    // ตั้งค่าเริ่มต้นให้ Player
-    await _updatePlayersVolume();
+    // ─── ตั้ง AudioContext ระดับ Global ให้ "ผสมเสียง" ได้ ──────────────────
+    // บน iOS → mixWithOthers + duckOthers: ลดเสียงอื่นเบาลงชั่วคราวแทนการหยุด
+    // บน Android → audioFocus = none → ไม่แย่ง focus จากเสียงอื่น
+    final ctx = AudioContext(
+      iOS: AudioContextIOS(
+        category: AVAudioSessionCategory.playback,
+        options: {
+          AVAudioSessionOptions.mixWithOthers,
+          AVAudioSessionOptions.duckOthers,
+        },
+      ),
+      android: AudioContextAndroid(
+        isSpeakerphoneOn: false,
+        audioMode: AndroidAudioMode.normal,
+        stayAwake: false,
+        contentType: AndroidContentType.music,
+        usageType: AndroidUsageType.game,
+        audioFocus: AndroidAudioFocus.none,
+      ),
+    );
+    AudioPlayer.global.setAudioContext(ctx);
+    _audioCtx = ctx;
 
-    // ตั้งค่า Mode ให้เล่นทับกันได้ (Low Latency)
+    // ─── ตั้งค่าเริ่มต้นให้ BGM Player ────────────────────────────────────────
+    await _musicPlayer.setAudioContext(ctx);
     await _musicPlayer.setReleaseMode(ReleaseMode.loop); // BGM วนซ้ำ
-    await _sfxPlayer.setReleaseMode(ReleaseMode.stop);
-    await _buttonPlayer.setReleaseMode(ReleaseMode.stop); // เสียงปุ่ม
-
-    // Preload เสียงปุ่มเพื่อลด latency ครั้งแรก
-    await _buttonPlayer.setVolume(_sfxVolume);
+    await _updatePlayersVolume();
 
     // ลงทะเบียน lifecycle observer เพื่อจัดการเพลงตอนกด Home / ออกแอป
     WidgetsBinding.instance.addObserver(this);
@@ -66,24 +83,29 @@ class AudioManager with WidgetsBindingObserver {
     await _musicPlayer.stop();
   }
 
-  // 6. ฟังก์ชันเล่น SFX
+  // 6. ฟังก์ชันเล่น SFX — สร้าง player ชั่วคราวทุกครั้ง แล้ว dispose หลังเล่นจบ
+  //    ทำให้ SFX ไม่มีทางไป interrupt session ของ BGM
   Future<void> playSFX(String fileName) async {
-    if (_isMuted) return; // ถ้า Mute อยู่ ไม่ต้องเล่น SFX
-    // สร้าง Player ใหม่ชั่วคราวสำหรับ SFX ที่อาจเกิดซ้อนกัน หรือใช้ player เดียวก็ได้
-    await _sfxPlayer.play(AssetSource('audio/$fileName'), volume: _sfxVolume);
+    if (_isMuted) return;
+    final player = AudioPlayer();
+    await player.setAudioContext(_audioCtx);
+    await player.setReleaseMode(ReleaseMode.stop);
+    await player.play(AssetSource('audio/$fileName'), volume: _sfxVolume);
+    player.onPlayerComplete.listen((_) => player.dispose());
   }
 
   // 6.1 ฟังก์ชันเล่นเสียงปุ่ม (Button Sound) — เรียกใช้ได้จากทุกที่ในแอป
-  /// ใช้ _buttonPlayer แยกต่างหาก เพื่อไม่ conflict กับ SFX อื่น
-  /// และ stop ก่อน play เสมอ เพื่อรองรับการกดถี่ๆ อย่างรวดเร็ว
+  /// สร้าง player ชั่วคราวเช่นเดียวกับ SFX เพื่อไม่ให้ชิง audio session กับ BGM
   Future<void> playButtonSound() async {
     if (_isMuted) return;
-    // stop ก่อนเสมอ เพื่อให้เสียงเริ่มใหม่ทันทีแม้กดถี่
-    await _buttonPlayer.stop();
-    await _buttonPlayer.play(
+    final player = AudioPlayer();
+    await player.setAudioContext(_audioCtx);
+    await player.setReleaseMode(ReleaseMode.stop);
+    await player.play(
       AssetSource('audio/button_sound.MP3'),
       volume: _sfxVolume,
     );
+    player.onPlayerComplete.listen((_) => player.dispose());
   }
 
   // 7. ฟังก์ชันปรับระดับเสียง Music
@@ -134,7 +156,6 @@ class AudioManager with WidgetsBindingObserver {
       case AppLifecycleState.detached:
       case AppLifecycleState.hidden:
         // กด Home / ออกแอป → หยุดเพลงทันที
-        // ใช้ stop() แทน pause() เพราะบาง device ไม่ยอมหยุดถ้าใช้แค่ pause()
         _musicPlayer.stop();
         break;
       case AppLifecycleState.resumed:
@@ -144,7 +165,6 @@ class AudioManager with WidgetsBindingObserver {
         }
         break;
       case AppLifecycleState.inactive:
-        // ระหว่างเปลี่ยน state ไม่ต้องทำอะไร
         break;
     }
   }
@@ -153,8 +173,6 @@ class AudioManager with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _musicPlayer.dispose();
-    _sfxPlayer.dispose();
-    _buttonPlayer.dispose();
   }
 }
 
