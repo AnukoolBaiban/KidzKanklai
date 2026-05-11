@@ -94,9 +94,9 @@ class _LoadingScreenState extends State<LoadingScreen> {
     String dots = '.' * _dotCount;
 
     return Text(
-      'Loading$dots',
-      style: GoogleFonts.josefinSans(
-        fontSize: 24,
+      'กำลังโหลด$dots',
+      style: GoogleFonts.kanit(
+        fontSize: 22,
         fontWeight: FontWeight.bold,
         color: Colors.white,
       ),

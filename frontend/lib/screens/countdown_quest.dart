@@ -18,6 +18,8 @@ import 'package:flutter_application_1/widgets/character_up_popup.dart';
 import 'package:flutter_application_1/widgets/character_widget.dart';
 import 'package:flutter_application_1/screens/setting.dart';
 import 'package:flutter_application_1/services/audio_manager.dart';
+import 'package:flutter_application_1/config/rive_cache.dart';
+import 'package:flutter_application_1/screens/loading.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 
 class CountdownQuestScreen extends StatefulWidget {
@@ -63,6 +65,7 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
 
   // 👤 User data (โหลดเองเพื่อได้ fashion ล่าสุดเสมอ)
   User? _loadedUser;
+  bool _isPageReady = false;
 
   late AnimationController _blinkController;
   late Animation<double> _blinkAnimation;
@@ -75,7 +78,7 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
   void initState() {
     super.initState();
     _initBlinkAnimation();
-    _fetchUser();
+    _initializePage();
     
     // ตั้งค่าระดับเสียงเริ่มต้นให้ตัวเล่นเพลงของหน้าตาม Setting
     final audioManager = AudioManager();
@@ -85,7 +88,32 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
     WidgetsBinding.instance.addObserver(this);
   }
 
-  /// โหลด user พร้อม fashion data ล่าสุดด้วยตัวเอง
+  /// โหลดข้อมูลที่จำเป็นทั้งหมดก่อนเข้าหน้าจอ
+  Future<void> _initializePage() async {
+    try {
+      // 1. โหลดข้อมูล User พร้อมแฟชั่น
+      final user = await ApiService.getProfile(0);
+      if (mounted && user != null) {
+        setState(() => _loadedUser = user);
+      }
+
+      // 2. โหลดโมเดลตัวละครไว้ใน RAM (ใช้ตัวเลือกเดียวกับ LoadingScreen)
+      await RiveCache().loadAssets([
+        'assets/animation/kid.riv',
+        'assets/animation/teen.riv',
+        'assets/animation/adult.riv',
+      ]);
+
+      if (mounted) {
+        setState(() => _isPageReady = true);
+      }
+    } catch (e) {
+      debugPrint("Error initializing page: $e");
+      if (mounted) setState(() => _isPageReady = true); // Fallback เข้าไปเลยถ้าพัง
+    }
+  }
+
+  /// โหลด user พร้อม fashion data ล่าสุดด้วยตัวเอง (เก็บไว้เรียกซ้ำได้ถ้าต้องการรีเฟรช)
   Future<void> _fetchUser() async {
     final user = await ApiService.getProfile(0);
     if (mounted && user != null) {
@@ -423,6 +451,17 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
 
   @override
   Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 600),
+      switchInCurve: Curves.easeIn,
+      switchOutCurve: Curves.easeOut,
+      child: !_isPageReady 
+        ? const LoadingScreen(isStandalone: false)
+        : _buildActualPage(context),
+    );
+  }
+
+  Widget _buildActualPage(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final topPadding = MediaQuery.of(context).padding.top;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
@@ -433,6 +472,7 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
     final titleFontSize = isSmallScreen ? 28.0 : 36.0;
 
     return PopScope(
+      key: const ValueKey('countdown_quest_main'),
       canPop: !_isRunning && !_hasUnsavedChanges(),
       onPopInvokedWithResult: (bool didPop, dynamic result) {
         if (didPop) return;
