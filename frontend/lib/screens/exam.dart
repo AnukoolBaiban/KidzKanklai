@@ -13,6 +13,7 @@ import 'package:flutter_application_1/screens/result_exam.dart';
 import 'package:flutter_application_1/widgets/ticket_box.dart';
 import 'package:flutter_application_1/widgets/energy_bar.dart'; // 🌟 นำเข้า EnergyBar Widget
 import 'package:flutter_application_1/screens/video_transition_screen.dart';
+import 'package:flutter_application_1/widgets/confirm_exam_popup.dart';
 
 // 🌟 เปลี่ยนจาก level เป็น energy
 enum StatType { energy, intelligence, strength, creativity }
@@ -70,6 +71,7 @@ class _ExamScreenState extends State<ExamScreen> {
   Map<String, List<Map<String, dynamic>>> _examRewards = {}; // 🌟 1. เพิ่มตัวแปรเก็บของรางวัล
   Map<String, int> _examIds = {}; // 🌟 เพิ่มตัวแปรเก็บ ID ข้อสอบ
   Map<String, String> _examStatuses = {}; // 🌟 1. เพิ่มตัวแปรเก็บสถานะว่าผ่านหรือยัง
+  int _examTicketCount = -1; // 🌟 เก็บจำนวนตั๋วสอบ (-1 = ยังไม่โหลด)
 
   String _getStatName(StatType type) {
     switch (type) {
@@ -110,6 +112,7 @@ class _ExamScreenState extends State<ExamScreen> {
     _fetchUserProfile();
     _fetchFullProfileForRive();
     _fetchExams(); // 🌟 สั่งให้ดึงข้อสอบตอนเปิดหน้าต่าง
+    _fetchExamTicketCount(); // 🌟 ดึงจำนวนตั๋วสอบ
   }
 
   void _updateLevelUI(int dbLevel, int totalExp) {
@@ -284,6 +287,30 @@ class _ExamScreenState extends State<ExamScreen> {
       }
     } catch (e) {
       debugPrint('Error fetching exams: $e');
+    }
+  }
+
+  // 🌟 ดึงจำนวนตั๋วสอบ (item_id = 18) จากตาราง collect
+  Future<void> _fetchExamTicketCount() async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final response = await _supabase
+          .from('collect')
+          .select('quantity')
+          .eq('user_id', userId)
+          .eq('item_id', 18)
+          .maybeSingle();
+
+      if (mounted) {
+        setState(() {
+          _examTicketCount = response != null ? (response['quantity'] ?? 0) : 0;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching exam ticket count: $e');
+      if (mounted) setState(() => _examTicketCount = 0);
     }
   }
 
@@ -776,6 +803,8 @@ class _ExamScreenState extends State<ExamScreen> {
   Widget _buildExamStartButton(bool canStart, String examName) {
     // 🌟 3.1 เช็คสถานะว่าสอบผ่านไปแล้วหรือยัง
     bool isPassed = _examStatuses[examName] == 'completed';
+    bool isNoTicket = _examTicketCount == 0; // 🌟 เช็คว่าตั๋วหมดหรือไม่
+    bool isDisabled = isPassed || isNoTicket; // 🌟 ปุ่มกดไม่ได้ถ้าสอบผ่าน หรือ ตั๋วหมด
 
     return Stack(
       clipBehavior: Clip.none,
@@ -785,8 +814,8 @@ class _ExamScreenState extends State<ExamScreen> {
           height: 48,
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: isPassed 
-                ? [Color(0xFF9E9E9E), Color(0xFFBDBDBD)] // สีเทาเมื่อสอบผ่านแล้ว
+              colors: isDisabled 
+                ? [Color(0xFF9E9E9E), Color(0xFFBDBDBD)] // สีเทาเมื่อสอบผ่านแล้ว หรือ ตั๋วหมด
                 : [Color(0xFF556AEB), Color(0xFF59ABEC)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
@@ -794,7 +823,7 @@ class _ExamScreenState extends State<ExamScreen> {
             borderRadius: BorderRadius.circular(25),
             boxShadow: [
               BoxShadow(
-                color: isPassed 
+                color: isDisabled 
                   ? Colors.grey.withOpacity(0.3) 
                   : Color(0xFF556AEB).withOpacity(0.4),
                 blurRadius: 8,
@@ -803,15 +832,28 @@ class _ExamScreenState extends State<ExamScreen> {
             ],
           ),
           child: ElevatedButton(
-            // 🌟 3.2 ถ้าสอบผ่านแล้วให้ใส่ null จะทำให้ปุ่มล็อกและกดไม่ได้
-            onPressed: isPassed ? null : () async {
+            // 🌟 3.2 ถ้าสอบผ่านแล้ว หรือ ตั๋วหมด ให้ใส่ null จะทำให้ปุ่มล็อคและกดไม่ได้
+            onPressed: isDisabled ? null : () async {
               if (examName.isEmpty) return;
-              
+
               int currentExamId = _examIds[examName] ?? 0;
               if (currentExamId == 0) {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ไม่พบข้อมูลข้อสอบ!')));
                 return;
               }
+
+              // 🌟 แสดง Popup ยืนยันการเริ่มสอบก่อน
+              bool confirmed = false;
+              await ConfirmExamPopup.show(
+                context,
+                ticketCount: _examTicketCount,
+                onConfirm: () {
+                  confirmed = true;
+                  Navigator.pop(context);
+                },
+              );
+
+              if (!confirmed || !mounted) return;
 
               showDialog(
                 context: context,
@@ -845,16 +887,16 @@ class _ExamScreenState extends State<ExamScreen> {
 
                 if (result['success'] == true) {
                   bool resultPassed = result['is_passed'] ?? false;
-                  
+
                   // บันทึกว่าสอบผ่านเพื่อส่งกลับไปหน้า location_upgrade
                   if (resultPassed) {
                     _didPassExam = true;
                   }
-                  
+
                   Map<String, int> finalRewards = {};
                   if (resultPassed && result['rewards'] != null) {
                     for (var r in result['rewards']) {
-                      finalRewards[r['name']] = r['amount']; 
+                      finalRewards[r['name']] = r['amount'];
                     }
                   }
 
@@ -864,7 +906,7 @@ class _ExamScreenState extends State<ExamScreen> {
                   final didLevelUp = actualNewLevel > oldLevel;
 
                   _fetchUserProfile();
-                  
+
                   if (mounted) {
                     // 🌟 3.3 ใส่ await เพื่อให้แอปหยุดรอจนกว่าผู้เล่นจะกดปิดหน้าผลสอบ
                     await Navigator.push(
@@ -881,9 +923,10 @@ class _ExamScreenState extends State<ExamScreen> {
                         ),
                       ),
                     );
-                    
+
                     // 🌟 3.4 พอกลับมาหน้านี้ ให้รีเฟรชข้อสอบทันที เพื่อให้ปุ่มเปลี่ยนเป็น "สอบผ่านแล้ว"
                     _fetchExams();
+                    _fetchExamTicketCount(); // 🌟 รีเฟรชตั๋วด้วย
                   }
                 } else {
                   if (mounted) {
@@ -925,7 +968,7 @@ class _ExamScreenState extends State<ExamScreen> {
           ),
         ),
         
-        // 🌟 3.6 ถ้าสอบผ่านแล้วให้ซ่อนป้ายตั๋วทิ้งไปเลย จะได้ดูสมจริง
+        // 🌟 3.6 ถ้าสอบผ่านแล้วให้ซ่อนป้ายตั๋วทิ้งไปเลย จะได้ดูสมจริง (ตั๋วหมดยังคงโชว์)
         if (!isPassed)
         Positioned(
           top: -12,

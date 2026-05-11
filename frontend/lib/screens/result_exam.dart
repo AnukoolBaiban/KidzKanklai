@@ -434,11 +434,26 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
                           if (widget.isPassed && (widget.rawRewards.isNotEmpty || widget.leveledUp)) {
                             // 🌟 แปลง rawRewards เป็น RewardData สำหรับ Popup
                             List<RewardData> popupRewards = widget.rawRewards.map<RewardData>((rw) {
+                              String itemName = (rw['name'] ?? '').toString().toUpperCase();
+                              String type = 'ITEM';
+                              String? itemImage = rw['image'];
+
+                              if (itemName == 'EXP') {
+                                type = 'EXP';
+                              } else if (itemName.contains('COIN') || itemName.contains('เหรียญ')) {
+                                type = 'COIN';
+                              } else if (itemName.contains('TICKET') || itemName.contains('ตั๋ว')) {
+                                type = 'TICKET';
+                                itemImage = itemImage ?? 'assets/images/item/Ticket_exam_img.png';
+                              } else if (itemName.contains('GASHA') || itemName.contains('กาชา')) {
+                                itemImage = itemImage ?? 'assets/images/item/Gasha.png';
+                              }
+
                               return RewardData(
-                                type: rw['name'] == 'EXP' ? 'EXP' : 'ITEM',
+                                type: type,
                                 amount: rw['added'] ?? rw['amount'] ?? 0,
                                 itemName: rw['name'],
-                                itemImage: rw['image'],
+                                itemImage: itemImage,
                               );
                             }).toList();
                             

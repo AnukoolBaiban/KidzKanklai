@@ -51,6 +51,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
   String _strStat = "10";
   String _creStat = "10";
   String _stamina = "0"; // 🌟 1. เพิ่มตัวแปรเก็บค่าพลังงานตรงนี้
+  int _energyTicketCount = -1; // 🌟 เก็บจำนวนตั๋วพลังงาน (-1 = ยังไม่โหลด)
 
   SMINumber? _poseInput;
   SMINumber? _hairInput;
@@ -85,6 +86,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
     super.initState();
     _fetchUserProfile();
     _fetchFullProfileForRive();
+    _fetchEnergyTicketCount(); // 🌟 ดึงจำนวนตั๋วพลังงาน
     if (widget.locationName == 'สนามสอบ') {
       _fetchExamStatuses();
     }
@@ -134,6 +136,30 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
       }
     } catch (e) {
       debugPrint('Error fetching exam statuses: $e');
+    }
+  }
+
+  // 🌟 ดึงจำนวนตั๋วพลังงาน (item_id = 21) จากตาราง collect
+  Future<void> _fetchEnergyTicketCount() async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final response = await _supabase
+          .from('collect')
+          .select('quantity')
+          .eq('user_id', userId)
+          .eq('item_id', 21)
+          .maybeSingle();
+
+      if (mounted) {
+        setState(() {
+          _energyTicketCount = response != null ? (response['quantity'] ?? 0) : 0;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching energy ticket count: $e');
+      if (mounted) setState(() => _energyTicketCount = 0);
     }
   }
 
@@ -616,21 +642,25 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                 height: 48,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [Color(0xFF556AEB), Color(0xFF59ABEC)],
+                    colors: _energyTicketCount == 0
+                        ? [Color(0xFF9E9E9E), Color(0xFFBDBDBD)] // 🌟 สีเทาเมื่อตั๋วหมด
+                        : [Color(0xFF556AEB), Color(0xFF59ABEC)],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                   ),
                   borderRadius: BorderRadius.circular(25),
                   boxShadow: [
                     BoxShadow(
-                      color: Color(0xFF4A8FE7).withOpacity(0.4),
+                      color: _energyTicketCount == 0
+                          ? Colors.grey.withOpacity(0.3)
+                          : Color(0xFF4A8FE7).withOpacity(0.4),
                       blurRadius: 8,
                       offset: Offset(0, 4),
                     ),
                   ],
                 ),
                 child: ElevatedButton(
-                  onPressed: () async {
+                  onPressed: _energyTicketCount == 0 ? null : () async {
                   // 🌟 1. แปลงชื่อสถานที่เป็นภาษาอังกฤษเพื่อส่งให้ API
                   String apiLocation = '';
                   switch (widget.locationName) {
@@ -727,6 +757,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                             _energyBarKey++; // บังคับให้ EnergyBar รีโหลดใหม่
                           });
                           _fetchUserProfile(); // อัปเดต state ตัวละคร
+                          _fetchEnergyTicketCount(); // 🌟 รีเฟรชตั๋วด้วย
                         }
                       }
                     } else {
@@ -770,6 +801,7 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                           _energyBarKey++;
                         });
                         _fetchUserProfile();
+                        _fetchEnergyTicketCount(); // 🌟 รีเฟรชตั๋วด้วย
                       }
                     }
                   }
@@ -777,6 +809,8 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
+                  disabledBackgroundColor: Colors.transparent, // 🌟 ป้องกันพื้นหลังเทาซ้อน
+                  disabledForegroundColor: Colors.white, // 🌟 ตัวหนังสือยังคงเป็นสีขาว
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(25),
                   ),

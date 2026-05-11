@@ -823,7 +823,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
           ),
           Center(
             child: Text(
-              'จำนวนคนที่สำเร็จภารกิจนี้ $countText',
+              'จำนวนสมาชิกที่สำเร็จภารกิจนี้ $countText',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
