@@ -74,13 +74,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
         _isSelectionMode = false;
         _selectedIds.clear();
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ลบการแจ้งเตือนทั้งหมดแล้ว')),
-      );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('เกิดข้อผิดพลาด ลองใหม่อีกครั้ง')),
-      );
+      // Error handled silently
     }
   }
 
@@ -107,10 +102,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
       _selectedIds.clear();
       _isSelectionMode = false;
     });
-
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('ลบการแจ้งเตือนที่เลือกแล้ว')));
   }
 
   void _toggleSelection(int id) {

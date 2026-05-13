@@ -447,15 +447,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     if (columnToUpdate == 'user_detail') _displayBio = newValue;
                                   });
                                   Navigator.pop(context);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('บันทึกข้อมูลเรียบร้อย')),
-                                  );
                                 }
                             } else {
                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('เกิดข้อผิดพลาดในการบันทึก')),
-                                  );
+                                  // Error handled silently or via other UI elements if needed
                                }
                             }
                           },
