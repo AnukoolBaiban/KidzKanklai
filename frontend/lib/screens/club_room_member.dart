@@ -232,10 +232,11 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
           ),
           child: Center(
             child: Image.asset(
-              "assets/images/icon/club-detail.png",
+              "assets/images/icon/club-detail2.png",
               width: 28,
               height: 28,
               fit: BoxFit.contain,
+              color: Colors.white,
               errorBuilder: (_, __, ___) => const Icon(
                 Icons.image_not_supported,
                 size: 20,
