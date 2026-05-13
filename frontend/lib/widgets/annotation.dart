@@ -7,6 +7,7 @@ class AnnotationButton extends StatelessWidget {
   final bool isClub;
   final bool isExam;
   final bool isUpgrade;
+  final bool isCreateClubQuest;
 
   const AnnotationButton({
     super.key,
@@ -15,6 +16,7 @@ class AnnotationButton extends StatelessWidget {
     this.isClub = false,
     this.isExam = false,
     this.isUpgrade = false,
+    this.isCreateClubQuest = false,
   });
 
   void _showAnnotationPopup(BuildContext context) {
@@ -93,8 +95,46 @@ class AnnotationButton extends StatelessWidget {
                 ? _buildClubDescription() 
                 : (isExam 
                     ? _buildExamDescription() 
-                    : (isUpgrade ? _buildUpgradeDescription() : _buildDefaultDescription()))),
+                    : (isUpgrade 
+                        ? _buildUpgradeDescription() 
+                        : (isCreateClubQuest ? _buildCreateClubQuestDescription() : _buildDefaultDescription())))),
       ),
+    );
+  }
+
+  Widget _buildCreateClubQuestDescription() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "การสร้างภารกิจชมรมมีรายละเอียดดังนี้:",
+          style: GoogleFonts.kanit(
+            fontSize: 16,
+            color: Colors.black87,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildSection(
+          "1. การใช้บัตรสร้างภารกิจ\n",
+          "ต้องใช้บัตรสร้างภารกิจชมรมในการสร้างภารกิจแต่ละครั้ง โดยจำนวนที่ต้องใช้จะขึ้นอยู่กับประเภทของภารกิจ",
+        ),
+        const SizedBox(height: 12),
+        _buildSection(
+          "2. การตั้งชื่อและรายละเอียด\n",
+          "กำหนดชื่อภารกิจและคำอธิบายที่ชัดเจนเพื่อให้สมาชิกเข้าใจสิ่งที่ต้องทำ",
+        ),
+        const SizedBox(height: 12),
+        _buildSection(
+          "3. การสร้างคำถาม\n",
+          "หัวหน้าชมรมสามารถเพิ่มคำถามและกำหนดคำตอบที่ถูกต้อง เพื่อใช้ในการตรวจสอบการทำภารกิจของสมาชิก",
+        ),
+        const SizedBox(height: 12),
+        _buildSection(
+          "4. รางวัลของหัวหน้าชมรม\n",
+          "หัวหน้าชมรมจะได้รับของรางวัลเมื่อมีสมาชิกในชมรมทำภารกิจสำเร็จมากกว่าครึ่งหนึ่งของจำนวนสมาชิกทั้งหมดในชมรม",
+        ),
+      ],
     );
   }
 

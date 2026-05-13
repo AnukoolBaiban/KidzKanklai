@@ -3,11 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_application_1/api_service.dart';
 import 'package:flutter_application_1/screens/club_room_head.dart';
 import 'package:flutter_application_1/widgets/custom_top_bar.dart';
+import 'package:flutter_application_1/widgets/annotation.dart';
 import 'package:flutter_application_1/screens/club_quest/club_quest_detail_leader.dart';
 import 'package:flutter_application_1/widgets/confirm_exit_popup.dart';
 import 'package:flutter_application_1/widgets/exit_edit_club_quest_popup.dart';
 import 'package:flutter_application_1/widgets/club_confirm_save_popup.dart';
-import 'package:flutter_application_1/widgets/annotation_normal.dart';
 import 'create_club_quest_quiz.dart';
 import 'dart:io'; // 🌟 1. นำเข้า dart:io
 import 'package:image_picker/image_picker.dart'; // 🌟 2. นำเข้า image_picker
@@ -460,7 +460,7 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
             Positioned.fill(
               child: Center(
                 child: Text(
-                  widget.isEditing ? "แก้ไขภารกิจชมรม" : "สร้างภารกิจชมรม",
+                  widget.isEditing ? "แก้ไขภารกิจชมรม" : "ภารกิจชมรม",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 32,
@@ -468,6 +468,14 @@ class _CreateClubQuestScreenState extends State<CreateClubQuestScreen> {
                     color: Colors.white,
                   ),
                 ),
+              ),
+            ),
+            const Positioned(
+              bottom: 8,
+              right: 15,
+              child: AnnotationButton(
+                title: "การสร้างภารกิจชมรม",
+                isCreateClubQuest: true,
               ),
             ),
           ],
