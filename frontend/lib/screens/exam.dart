@@ -555,6 +555,8 @@ class _ExamScreenState extends State<ExamScreen> {
     final readiness = _getReadinessPercentage(examName);
     final canStart = _meetsAllRequirements(examName);
     final rewards = _examRewards[examName] ?? []; // 🌟 3.1 ดึงของรางวัลจาก state
+    final isPassed = _examStatuses[examName] == 'completed'; // 🌟 เช็คว่าสอบผ่านหรือยัง
+
     
 
     final statOrder = [
@@ -639,12 +641,12 @@ class _ExamScreenState extends State<ExamScreen> {
                       ? rewards.map((rw) {
                           return Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 5), // เว้นระยะห่าง 10 ระหว่างกล่อง (ซ้ายขวาอย่างละ 5)
-                            child: _buildRewardItem(rw['image'], rw['text'], 1.0),
+                            child: _buildRewardItem(rw['image'], rw['text'], 1.0, isPassed),
                           );
                         }).toList()
                       : [
                           // กรณีที่ข้อมูลยังไม่มา หรือ DB ไม่มีของรางวัลผูกไว้ ให้โชว์กล่องเปล่า
-                          _buildRewardItem('assets/images/item/EXP.png', '+0', 1.0),
+                          _buildRewardItem('assets/images/item/EXP.png', '+0', 1.0, isPassed),
                         ],
                 ),
 
@@ -665,10 +667,10 @@ class _ExamScreenState extends State<ExamScreen> {
     );
   }
 
-  Widget _buildRewardItem(String imagePath, String text, double scale) {
-    return Container(
+  Widget _buildRewardItem(String imagePath, String text, double scale, bool isClaimed) {
+    Widget item = Container(
       width: 60,
-      padding: EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
@@ -676,7 +678,7 @@ class _ExamScreenState extends State<ExamScreen> {
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
             blurRadius: 4,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -703,6 +705,29 @@ class _ExamScreenState extends State<ExamScreen> {
         ],
       ),
     );
+
+    if (isClaimed) {
+      return Stack(
+        alignment: Alignment.center,
+        children: [
+          item,
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.check_circle,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    return item;
   }
 
   Widget _buildRequirementRow({required StatType type, required int required, bool isMainStat = false}) { // 🌟 รับค่า isMainStat
