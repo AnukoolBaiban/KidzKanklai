@@ -27,6 +27,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   User? _user;
   late bool _isLoading;
   bool _hasUnclaimedAchievement = false;
+  bool _hasUnclaimedQuest = false;
 
   void _onReturnFromOtherPage() {
     if (mounted) {
@@ -36,6 +37,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
       });
       _loadUserData();
       _checkUnclaimedAchievements();
+      _checkUnclaimedQuests();
     }
   }
 
@@ -48,6 +50,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     // สั่งเช็คของรางวัลทันทีที่เปิดหน้านี้
     _checkDailyLoginRewards();
     _checkUnclaimedAchievements();
+    _checkUnclaimedQuests();
     // _giveMeCoins(); // สำหรับเทสเพิ่มเหรียญ
     
     // 🌟 แอบสั่งให้ Backend เช็คและสร้างข้อสอบประจำสัปดาห์
@@ -97,6 +100,40 @@ class _LobbyScreenState extends State<LobbyScreen> {
       debugPrint('Error checking unclaimed achievements: $e');
     }
   }
+  Future<void> _checkUnclaimedQuests() async {
+    try {
+      final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+      if (currentUserId == null) return;
+
+      final response = await Supabase.instance.client
+          .from('do_quests')
+          .select('progress, quests(target_amount, type)')
+          .eq('user_id', currentUserId)
+          .neq('status', 'completed');
+
+      bool hasUnclaimed = false;
+      for (var row in response) {
+        final progress = row['progress'] ?? 0;
+        final quest = row['quests'];
+        if (quest != null) {
+          final target = quest['target_amount'] ?? 1;
+          final type = quest['type'] ?? '';
+          if ((type == 'ระบบ' || type == 'แนะนำ') && progress >= target) {
+            hasUnclaimed = true;
+            break;
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _hasUnclaimedQuest = hasUnclaimed;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking unclaimed quests: $e');
+    }
+  }
 
   // ฟังก์ชันเช็คและโชว์ป๊อปอัป
   Future<void> _checkDailyLoginRewards() async {
@@ -132,6 +169,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     MenuItem(
       imagePath: "assets/images/icon/iconQuest.png",
       label: 'ภารกิจ',
+      hasNotification: _hasUnclaimedQuest,
       onTap: () {
         Navigator.pushNamed(context, '/allquest').then((_) => _onReturnFromOtherPage());
       },
