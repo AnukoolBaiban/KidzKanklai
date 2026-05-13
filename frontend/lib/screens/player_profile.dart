@@ -782,14 +782,17 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.black,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.black,
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 8),
