@@ -278,6 +278,41 @@ func CreateAchievementNotification(ctx context.Context, userID uuid.UUID, achiev
 	fmt.Printf("🔔 [CreateAchievementNotification] Created notification ID %d for user %s (Achievement: %s)\n", notifID, userID, achievementName)
 }
 
+// CreateClubKickNotification — สร้าง Notification เมื่อถูกไล่ออกจากชมรม
+func CreateClubKickNotification(ctx context.Context, userID uuid.UUID, clubName string) {
+	now := time.Now()
+	// กำหนดวันหมดอายุเป็น 6 วันข้างหน้า เวลา 17:00
+	dueDate := time.Date(now.Year(), now.Month(), now.Day()+6, 17, 0, 0, 0, now.Location())
+
+	var notifID int64
+	insertNotifQuery := `
+		INSERT INTO public.notifications (title, detail, type, image, start_date, due_date)
+		VALUES ($1, $2, 'club_kick', 'assets/images/icon/club-detail.png', NOW(), $3)
+		RETURNING id
+	`
+	title := "คุณพ้นสภาพสมาชิกชมรม 🛡️"
+	detail := fmt.Sprintf("คุณถูกหัวหน้าชมรมปลดออกจากชมรม \"%s\" แล้ว คุณสามารถเลือกเข้าร่วมชมรมอื่นๆ ได้ตามต้องการ", clubName)
+
+	err := configs.DB.QueryRow(ctx, insertNotifQuery, title, detail, dueDate).Scan(&notifID)
+	if err != nil {
+		fmt.Printf("❌ [CreateClubKickNotification] Failed to insert notification: %v\n", err)
+		return
+	}
+
+	linkQuery := `
+		INSERT INTO public.get_notifications (user_id, notification_id, status, read_date, reward_claimed)
+		VALUES ($1, $2, 'unread', NULL, false)
+		ON CONFLICT (user_id, notification_id) DO NOTHING
+	`
+	_, err = configs.DB.Exec(ctx, linkQuery, userID, notifID)
+	if err != nil {
+		fmt.Printf("❌ [CreateClubKickNotification] Failed to link user-notification: %v\n", err)
+		return
+	}
+
+	fmt.Printf("🔔 [CreateClubKickNotification] Created notification ID %d for user %s (Club: %s)\n", notifID, userID, clubName)
+}
+
 // ProcessQuestNotifications ตรวจสอบและสร้างการแจ้งเตือนสำหรับภารกิจที่กำลังจะหมดเวลาหรือหมดเวลาแล้ว
 func ProcessQuestNotifications(ctx context.Context, userID uuid.UUID) {
 	tx, err := configs.DB.Begin(ctx)

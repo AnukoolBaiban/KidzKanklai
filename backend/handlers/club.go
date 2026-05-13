@@ -446,6 +446,13 @@ func KickMember(c *gin.Context) {
 		return
 	}
 
+	// 🌟 6. สร้างการแจ้งเตือนบอกผู้เล่นที่โดนเตะ
+	var clubName string
+	err = tx.QueryRow(ctx, `SELECT name FROM public.clubs WHERE id = $1`, *ownerClubID).Scan(&clubName)
+	if err == nil {
+		CreateClubKickNotification(ctx, targetUserID, clubName)
+	}
+
 	// ยืนยัน Transaction
 	if err := tx.Commit(ctx); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction commit failed"})

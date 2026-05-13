@@ -8,6 +8,8 @@ class AnnotationButton extends StatelessWidget {
   final bool isExam;
   final bool isUpgrade;
   final bool isCreateClubQuest;
+  final String? iconPath;
+  final Color? iconColor;
 
   const AnnotationButton({
     super.key,
@@ -17,6 +19,8 @@ class AnnotationButton extends StatelessWidget {
     this.isExam = false,
     this.isUpgrade = false,
     this.isCreateClubQuest = false,
+    this.iconPath,
+    this.iconColor = Colors.white,
   });
 
   void _showAnnotationPopup(BuildContext context) {
@@ -210,7 +214,7 @@ class AnnotationButton extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "ชมรมคือพื้นที่สำหรับทำกิจกรรมร่วมกับเพื่อนๆ โดยแบ่งบทบาทหน้าที่ ดังนี้:",
+          "รายละเอียดการทำกิจกรรมในชมรม:",
           style: GoogleFonts.kanit(
             fontSize: 16,
             color: Colors.black87,
@@ -219,13 +223,22 @@ class AnnotationButton extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _buildSection(
-          "1. หัวหน้าชมรม\n",
-          "มีหน้าที่สร้างและมอบหมายภารกิจชมรมให้กับสมาชิก โดยจะได้รับของรางวัลเมื่อสมาชิกทำภารกิจสำเร็จมากกว่าครึ่งหนึ่งของสมาชิกทั้งหมด",
+          "1. บทบาทหัวหน้าชมรม\n",
+          "หัวหน้าชมรมมีหน้าที่สร้างและมอบหมายภารกิจให้กับสมาชิก โดยหัวหน้าจะได้รับของรางวัลพิเศษเมื่อสมาชิกในชมรมทำภารกิจสำเร็จรวมกันมากกว่าครึ่งหนึ่งของจำนวนสมาชิกทั้งหมด",
         ),
         const SizedBox(height: 16),
         _buildSection(
-          "2. สมาชิกชมรม\n",
-          "มีหน้าที่ทำภารกิจที่ได้รับมอบหมายจากหัวหน้าชมรมให้สำเร็จ โดยจะได้รับของรางวัลทันทีที่ทำภารกิจสำเร็จ",
+          "2. บทบาทสมาชิกชมรม\n",
+          "สมาชิกมีหน้าที่ทำภารกิจที่ได้รับมอบหมายจากหัวหน้าชมรมให้สำเร็จ โดยจะได้รับของรางวัลทันทีที่กดส่งภารกิจและผ่านการตรวจสอบ",
+        ),
+        const SizedBox(height: 16),
+        Text(
+          "* การร่วมมือกันเป็นหัวใจสำคัญของชมรม เพื่อให้ทุกคนได้รับรางวัลสูงสุด!",
+          style: GoogleFonts.kanit(
+            fontSize: 14,
+            color: Colors.black54,
+            fontStyle: FontStyle.italic,
+          ),
         ),
       ],
     );

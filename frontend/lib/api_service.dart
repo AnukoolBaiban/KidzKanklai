@@ -1305,6 +1305,7 @@ class NotificationModel {
       case 'quest':
         return 'assets/images/icon/trophy.png';
       case 'club':
+      case 'club_kick':
         return 'assets/images/icon/communication.png';
       case 'exam':
         return 'assets/images/icon/education.png';
