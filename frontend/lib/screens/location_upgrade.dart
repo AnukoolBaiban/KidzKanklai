@@ -719,13 +719,6 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                     };
 
                     if (result['success'] == true) {
-                      // 🎉 กรณีสำเร็จ (ฝึกฝน หรือ ฟื้นฟูพลังงาน)
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(result['message']), backgroundColor: Colors.green),
-                        );
-                      }
-
                       // _fetchUserProfile(); // รีเฟรชข้อมูลตัวละคร (ย้ายไปทำตอนกลับมาจาก popup)
 
                       if (mounted) {
@@ -761,13 +754,6 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                         }
                       }
                     } else {
-                      // ❌ กรณีล้มเหลว (เช่น พลังงานไม่พอตอนฝึกฝนจนเหลือ 0)
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(result['message']), backgroundColor: Colors.red),
-                        );
-                      }
-
                       // _fetchUserProfile(); // รีเฟรชให้เห็นหลอดพลังงานลด (ย้ายไปทำด้านล่าง)
 
                       // 🌟 โชว์หน้าจอฝึกไม่สำเร็จสำหรับทุกสถานที่ (รวมถึงสวนสาธารณะเวลาตั๋วไม่พอ)

@@ -618,11 +618,22 @@ class _AnimatedStatValueState extends State<AnimatedStatValue>
             ),
             children: [
               TextSpan(
-                text: "${widget.startValue} -> ",
+                text: "${widget.startValue}",
                 style: const TextStyle(color: Colors.black),
               ),
+              const WidgetSpan(
+                alignment: PlaceholderAlignment.middle,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Icon(
+                    Icons.trending_flat,
+                    size: 20,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
               TextSpan(
-                text: "$currentValue ${widget.suffix}".trim(),
+                text: "$currentValue ${widget.suffix}",
                 style: TextStyle(color: widget.textColor),
               ),
             ],
