@@ -188,7 +188,11 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
           Column(
             children: [
               ClubTopBar(topPadding: topPadding),
-              ClubBlueHeader(title: _clubName),
+              ClubBlueHeader(
+                title: _clubName,
+                annotationTitle: "รายละเอียดชมรม",
+                isClubAnnotation: true,
+              ),
             ],
           ),
 

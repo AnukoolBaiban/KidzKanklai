@@ -14,6 +14,7 @@ import 'package:flutter_application_1/widgets/ticket_box.dart';
 import 'package:flutter_application_1/widgets/energy_bar.dart'; // 🌟 นำเข้า EnergyBar Widget
 import 'package:flutter_application_1/screens/video_transition_screen.dart';
 import 'package:flutter_application_1/widgets/confirm_exam_popup.dart';
+import 'package:flutter_application_1/widgets/annotation.dart';
 
 // 🌟 เปลี่ยนจาก level เป็น energy
 enum StatType { energy, intelligence, strength, creativity }
@@ -1079,6 +1080,14 @@ class _ExamScreenState extends State<ExamScreen> {
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
+              ),
+            ),
+            const Positioned(
+              bottom: 8,
+              right: 15,
+              child: AnnotationButton(
+                title: "รายละเอียดการสอบ",
+                isExam: true,
               ),
             ),
           ],

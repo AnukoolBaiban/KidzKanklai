@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/widgets/bottom_navigation_bar.dart';
 import 'package:flutter_application_1/widgets/custom_top_bar.dart';
+import 'package:flutter_application_1/widgets/annotation.dart';
 
 class ClubBackground extends StatelessWidget {
   const ClubBackground({super.key});
@@ -77,11 +78,17 @@ class ClubBottomNavBar extends StatelessWidget {
 class ClubBlueHeader extends StatefulWidget {
   final String title;
   final VoidCallback? onBackPressed;
+  final String? annotationTitle;
+  final String? annotationDescription;
+  final bool isClubAnnotation;
 
   const ClubBlueHeader({
     super.key,
     required this.title,
     this.onBackPressed,
+    this.annotationTitle,
+    this.annotationDescription,
+    this.isClubAnnotation = false,
   });
 
   @override
@@ -152,6 +159,16 @@ class _ClubBlueHeaderState extends State<ClubBlueHeader> {
                       ),
                     ),
                   ),
+                ),
+              ),
+            if (widget.annotationTitle != null || widget.annotationDescription != null || widget.isClubAnnotation)
+              Positioned(
+                bottom: 8,
+                right: 15,
+                child: AnnotationButton(
+                  title: widget.annotationTitle,
+                  description: widget.annotationDescription,
+                  isClub: widget.isClubAnnotation,
                 ),
               ),
           ],

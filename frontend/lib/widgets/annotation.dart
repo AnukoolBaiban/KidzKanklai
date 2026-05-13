@@ -4,8 +4,18 @@ import 'package:google_fonts/google_fonts.dart';
 class AnnotationButton extends StatelessWidget {
   final String? title;
   final String? description;
+  final bool isClub;
+  final bool isExam;
+  final bool isUpgrade;
 
-  const AnnotationButton({super.key, this.title, this.description});
+  const AnnotationButton({
+    super.key,
+    this.title,
+    this.description,
+    this.isClub = false,
+    this.isExam = false,
+    this.isUpgrade = false,
+  });
 
   void _showAnnotationPopup(BuildContext context) {
     showDialog(
@@ -79,8 +89,105 @@ class AnnotationButton extends StatelessWidget {
       child: SingleChildScrollView(
         child: description != null
             ? _buildCustomDescription()
-            : _buildDefaultDescription(),
+            : (isClub 
+                ? _buildClubDescription() 
+                : (isExam 
+                    ? _buildExamDescription() 
+                    : (isUpgrade ? _buildUpgradeDescription() : _buildDefaultDescription()))),
       ),
+    );
+  }
+
+  Widget _buildExamDescription() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "การสอบเป็นการวัดระดับความรู้ในแต่ละด้าน โดยมีเงื่อนไขดังนี้:",
+          style: GoogleFonts.kanit(
+            fontSize: 16,
+            color: Colors.black87,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildSection(
+          "1. บัตรเข้าสอบ\n",
+          "ต้องมีบัตรเข้าสอบสำหรับการเข้าสอบแต่ละครั้ง",
+        ),
+        const SizedBox(height: 12),
+        _buildSection(
+          "2. พลังงาน\n",
+          "ต้องมีค่าพลังงานเพียงพอตามที่ข้อสอบกำหนด",
+        ),
+        const SizedBox(height: 12),
+        _buildSection(
+          "3. โอกาสผ่าน\n",
+          "ขึ้นอยู่กับค่าสถานะที่กำหนด ยิ่งมีค่าสถานะถึงเกณฑ์ที่กำหนด โอกาสสอบผ่านก็จะยิ่งมากขึ้น",
+        ),
+        const SizedBox(height: 12),
+        _buildSection(
+          "4. ของรางวัล\n",
+          "หากสอบผ่านจะได้รับของรางวัลและค่าประสบการณ์ที่เพิ่มขึ้น",
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUpgradeDescription() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "การฝึกฝนในแต่ละสถานที่ช่วยเพิ่มค่าสถานะในด้านต่างๆ ดังนี้:",
+          style: GoogleFonts.kanit(
+            fontSize: 16,
+            color: Colors.black87,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildSection(
+          "1. การเพิ่มค่าสถานะ\n",
+          "• หอสมุด: เพิ่มความฉลาด (Intelligence)\n• โรงยิม: เพิ่มความแข็งแรง (Strength)\n• สวนสนุก: เพิ่มความคิดสร้างสรรค์ (Creativity)",
+        ),
+        const SizedBox(height: 16),
+        _buildSection(
+          "2. การฟื้นฟูพลังงาน\n",
+          "• สวนสาธารณะ: ใช้สำหรับฟื้นฟูพลังงาน (Stamina)",
+        ),
+        const SizedBox(height: 16),
+        _buildSection(
+          "3. เงื่อนไข\n",
+          "ทุกการฝึกฝนต้องใช้ตั๋วฝึกฝนและจะเสียค่าพลังงานบางส่วน (ยกเว้นการฟื้นฟูในสวนสาธารณะ)",
+        ),
+      ],
+    );
+  }
+
+  Widget _buildClubDescription() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "ชมรมคือพื้นที่สำหรับทำกิจกรรมร่วมกับเพื่อนๆ โดยแบ่งบทบาทหน้าที่ ดังนี้:",
+          style: GoogleFonts.kanit(
+            fontSize: 16,
+            color: Colors.black87,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildSection(
+          "1. หัวหน้าชมรม\n",
+          "มีหน้าที่สร้างและมอบหมายภารกิจชมรมให้กับสมาชิก โดยจะได้รับของรางวัลเมื่อสมาชิกทำภารกิจสำเร็จมากกว่าครึ่งหนึ่งของสมาชิกทั้งหมด",
+        ),
+        const SizedBox(height: 16),
+        _buildSection(
+          "2. สมาชิกชมรม\n",
+          "มีหน้าที่ทำภารกิจที่ได้รับมอบหมายจากหัวหน้าชมรมให้สำเร็จ โดยจะได้รับของรางวัลทันทีที่ทำภารกิจสำเร็จ",
+        ),
+      ],
     );
   }
 

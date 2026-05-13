@@ -14,6 +14,7 @@ import 'package:flutter_application_1/widgets/ticket_box.dart';
 import 'package:flutter_application_1/screens/result_stat.dart';
 import 'package:flutter_application_1/screens/exam.dart';
 import 'package:flutter_application_1/screens/video_transition_screen.dart';
+import 'package:flutter_application_1/widgets/annotation.dart';
 
 class LocationUpgradeScreen extends StatefulWidget {
   final api.User? user;
@@ -454,6 +455,17 @@ class _LocationUpgradeScreenState extends State<LocationUpgradeScreen> {
                     color: Colors.white,
                   ),
                 ),
+              ),
+            ),
+            Positioned(
+              bottom: 8,
+              right: 15,
+              child: AnnotationButton(
+                title: widget.locationName == 'สนามสอบ' 
+                    ? "รายละเอียดการสอบ" 
+                    : "รายละเอียดการฝึกฝน",
+                isUpgrade: widget.locationName != 'สนามสอบ',
+                isExam: widget.locationName == 'สนามสอบ',
               ),
             ),
           ],
