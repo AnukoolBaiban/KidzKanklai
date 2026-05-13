@@ -67,18 +67,23 @@ class _AllQuestScreenState extends State<AllQuestScreen> {
     super.dispose();
   }
 
-  // 🌟 ฟังก์ชันเช็คว่าเคยแสดง Popup ยินดีต้อนรับแล้วหรือยัง
+  // 🌟 ฟังก์ชันเช็คว่าเคยแสดง Popup ยินดีต้อนรับแล้วหรือยัง (เช็คราย User ID)
   Future<void> _checkTutorialPopup() async {
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    if (currentUserId == null) return;
+
     final prefs = await SharedPreferences.getInstance();
-    final hasSeen = prefs.getBool('has_seen_quest_tutorial') ?? false;
+    // 🌟 เปลี่ยน Key ให้ผูกกับ User ID เพื่อให้ไอดีใหม่เห็น Tutorial แม้อยู่เครื่องเดิม
+    final String key = 'has_seen_quest_tutorial_$currentUserId';
+    final hasSeen = prefs.getBool(key) ?? false;
 
     if (!hasSeen && mounted) {
       showDialog(
         context: context,
         builder: (context) => const TutorialQuestPopup(),
       );
-      // ตั้งค่าว่าเป็นเคยเห็นแล้ว
-      await prefs.setBool('has_seen_quest_tutorial', true);
+      // ตั้งค่าว่าเป็นเคยเห็นแล้วสำหรับ ID นี้
+      await prefs.setBool(key, true);
     }
   }
 
