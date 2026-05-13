@@ -366,9 +366,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   controller: controller,
                   maxLength: maxLength,
                   style: const TextStyle(fontSize: 16),
+                  buildCounter: (context, {required currentLength, required isFocused, maxLength}) {
+                    return Text(
+                      '$currentLength/$maxLength',
+                      style: TextStyle(
+                        color: currentLength == maxLength ? Colors.red : Colors.black54,
+                        fontSize: 12,
+                      ),
+                    );
+                  },
                   decoration: InputDecoration(
                     hintText: "กรอก$titleใหม่",
-                    counterStyle: const TextStyle(color: Colors.black54),
                     filled: true,
                     fillColor: Colors.white,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
