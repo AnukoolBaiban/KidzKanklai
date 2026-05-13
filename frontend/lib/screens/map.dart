@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/api_service.dart';
+import 'package:flutter_application_1/api_service.dart' as api;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_application_1/widgets/bottom_navigation_bar.dart';
 import 'package:flutter_application_1/widgets/custom_top_bar.dart';
 import 'package:flutter_application_1/widgets/energy_bar.dart';
 import 'package:flutter_application_1/screens/location_upgrade.dart';
 
 class MapScreen extends StatefulWidget {
-  final User? user;
+  final api.User? user;
 
   const MapScreen({super.key, this.user});
 
@@ -16,7 +17,8 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   int _selectedIndex = 2;
-  User? _currentUser; // 🌟 1. เพิ่มตัวแปรสำหรับเก็บข้อมูลผู้ใช้
+  api.User? _currentUser; 
+  bool _isAllExamsPassed = false; // 🌟 เก็บสถานะว่าสอบผ่านทุกสนามหรือยัง
 
   // 🌟 2. เพิ่มตัวแปรนี้เพื่อเอาไว้บังคับรีโหลด EnergyBar
   Key _energyKey = UniqueKey();
@@ -29,11 +31,44 @@ class _MapScreenState extends State<MapScreen> {
     if (_currentUser == null) {
       _fetchUserProfile();
     }
+    _checkExamsStatus(); // 🌟 เช็คสถานะการสอบทันที
+  }
+
+  // 🌟 ฟังก์ชันเช็คว่าสอบผ่านครบทุกสนามหรือยัง
+  Future<void> _checkExamsStatus() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      final conductData = await Supabase.instance.client
+          .from('conduct')
+          .select('status')
+          .eq('user_id', user.id)
+          .limit(3);
+
+      if (conductData != null && (conductData as List).isNotEmpty) {
+        bool allCompleted = true;
+        for (var row in conductData) {
+          final status = row['status']?.toString().toLowerCase();
+          if (status != 'completed' && status != 'claimed') {
+            allCompleted = false;
+            break;
+          }
+        }
+        if (mounted) {
+          setState(() {
+            _isAllExamsPassed = allCompleted;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking exam status: $e');
+    }
   }
 
   // 🌟 3. ฟังก์ชันดึงข้อมูลโปรไฟล์ใหม่
   Future<void> _fetchUserProfile() async {
-    final updatedUser = await ApiService.getProfile(0);
+    final updatedUser = await api.ApiService.getProfile(0);
     if (mounted && updatedUser != null) {
       setState(() {
         _currentUser = updatedUser;
@@ -138,6 +173,7 @@ class _MapScreenState extends State<MapScreen> {
                 imagePath: 'assets/images/map/school.PNG',
                 label: 'สนามสอบ',
                 width: building * 1.3,
+                isCompleted: _isAllExamsPassed, // 🌟 ส่งสถานะสอบผ่านไป
               ),
             ),
 
@@ -257,11 +293,13 @@ class _MapScreenState extends State<MapScreen> {
     required String imagePath,
     required String label,
     required double width,
+    bool isCompleted = false,
   }) {
     return _MapLocationItem(
       imagePath: imagePath,
       label: label,
       width: width,
+      isCompleted: isCompleted,
       onTap: () async { // 🌟 1. เติม async ตรงนี้
         // 🌟 2. เติม await ให้มันหยุดรอจนกว่าผู้เล่นจะกดย้อนกลับมาจากหน้า LocationUpgradeScreen
         await Navigator.push(
@@ -284,6 +322,7 @@ class _MapScreenState extends State<MapScreen> {
           });
           // 🌟 5. รีเฟรชโปรไฟล์เพื่อให้ BottomNavigationBar อัปเดตเลเวลล่าสุด
           _fetchUserProfile();
+          _checkExamsStatus(); // 🌟 รีเฟรชสถานะสอบด้วย
         }
       },
     );
@@ -333,12 +372,14 @@ class _MapLocationItem extends StatefulWidget {
   final String imagePath;
   final String label;
   final double width;
+  final bool isCompleted;
   final VoidCallback onTap;
 
   const _MapLocationItem({
     required this.imagePath,
     required this.label,
     required this.width,
+    this.isCompleted = false,
     required this.onTap,
   });
 
@@ -381,7 +422,14 @@ class _MapLocationItemState extends State<_MapLocationItem> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: widget.isCompleted ? null : Colors.white,
+                  gradient: widget.isCompleted
+                      ? const LinearGradient(
+                          colors: [Color(0xFF85D755), Color(0xFF34C759)],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        )
+                      : null,
                   borderRadius: BorderRadius.circular(8),
                   boxShadow: [
                     BoxShadow(
@@ -391,12 +439,22 @@ class _MapLocationItemState extends State<_MapLocationItem> {
                     )
                   ],
                 ),
-                child: Text(
-                  widget.label,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (widget.isCompleted) ...[
+                      const Icon(Icons.check_circle, color: Colors.white, size: 16),
+                      const SizedBox(width: 4),
+                    ],
+                    Text(
+                      widget.label,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: widget.isCompleted ? Colors.white : const Color(0xFF313131),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
