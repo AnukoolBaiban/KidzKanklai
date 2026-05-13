@@ -962,7 +962,7 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
                   color: _isDeletePressed ? const Color(0xFFC72E2E) : const Color(0xFFEA4444),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text('ลบชมรม', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                child: const Text('ยุบชมรม', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
               ),
             ),
           ),

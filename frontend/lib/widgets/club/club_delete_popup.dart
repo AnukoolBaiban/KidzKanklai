@@ -130,7 +130,7 @@ class _ClubDeletePopupState extends State<ClubDeletePopup>
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: Text(
-                          'ยืนยันที่จะลบชมรมหรือไม่?',
+                          'ยืนยันที่จะยุบชมรมหรือไม่?',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white,
@@ -168,10 +168,10 @@ class _ClubDeletePopupState extends State<ClubDeletePopup>
                             onTap: widget.onCancel,
                             height: buttonHeight,
                             fontSize: buttonFontSize,
-                            colors: const [Color(0xFF556AEB), Color(0xFF59ABEC)],
+                            colors: [Colors.grey.shade600, Colors.grey.shade600],
                           ),
                           _buildButton(
-                            text: 'ลบชมรม',
+                            text: 'ยุบชมรม',
                             onTap: widget.onConfirm,
                             height: buttonHeight,
                             fontSize: buttonFontSize,

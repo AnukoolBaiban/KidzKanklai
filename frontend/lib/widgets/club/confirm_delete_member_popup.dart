@@ -164,7 +164,7 @@ class _ConfirmDeleteMemberPopupState extends State<ConfirmDeleteMemberPopup>
                       // Buttons
                       Row(
                         children: [
-                          // 🔴 ยกเลิก
+                          // ⚪ ยกเลิก
                           Expanded(
                             child: GestureDetector(
                               onTap: widget.onCancel,
@@ -172,11 +172,11 @@ class _ConfirmDeleteMemberPopupState extends State<ConfirmDeleteMemberPopup>
                                 height: buttonHeight,
                                 margin: const EdgeInsets.only(right: 5),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFEA4444),
+                                  color: Colors.grey.shade600,
                                   borderRadius: BorderRadius.circular(30),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFFEA4444).withOpacity(0.3),
+                                      color: Colors.black.withOpacity(0.1),
                                       blurRadius: 8,
                                       offset: const Offset(0, 4),
                                     ),
@@ -196,7 +196,7 @@ class _ConfirmDeleteMemberPopupState extends State<ConfirmDeleteMemberPopup>
                             ),
                           ),
 
-                          // 🔵 ยืนยัน
+                          // 🔴 ไล่ออก
                           Expanded(
                             child: GestureDetector(
                               onTap: widget.onConfirm,
@@ -204,18 +204,11 @@ class _ConfirmDeleteMemberPopupState extends State<ConfirmDeleteMemberPopup>
                                 height: buttonHeight,
                                 margin: const EdgeInsets.only(left: 5),
                                 decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      Color(0xFF556AEB),
-                                      Color(0xFF59ABEC),
-                                    ],
-                                  ),
+                                  color: const Color(0xFFEA4444),
                                   borderRadius: BorderRadius.circular(30),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFF59ABEC).withOpacity(0.3),
+                                      color: const Color(0xFFEA4444).withOpacity(0.3),
                                       blurRadius: 8,
                                       offset: const Offset(0, 4),
                                     ),
@@ -223,7 +216,7 @@ class _ConfirmDeleteMemberPopupState extends State<ConfirmDeleteMemberPopup>
                                 ),
                                 child: Center(
                                   child: Text(
-                                    'ยืนยัน',
+                                    'ไล่ออก',
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,

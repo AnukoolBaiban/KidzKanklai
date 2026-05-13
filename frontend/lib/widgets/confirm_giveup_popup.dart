@@ -148,7 +148,7 @@ class _ConfirmGiveUpPopupState extends State<ConfirmGiveUpPopup>
 
                       Row(
                         children: [
-                          // 🔴 ยกเลิก
+                          // ⚪ ยกเลิก
                           Expanded(
                             child: GestureDetector(
                               onTap: widget.onCancel,
@@ -156,7 +156,7 @@ class _ConfirmGiveUpPopupState extends State<ConfirmGiveUpPopup>
                                 height: buttonHeight,
                                 margin: EdgeInsets.only(right: 8),
                                 decoration: BoxDecoration(
-                                  color: Color(0xFFEA4444),
+                                  color: Colors.grey.shade600,
                                   borderRadius: BorderRadius.circular(30),
                                 ),
                                 child: Center(
@@ -173,7 +173,7 @@ class _ConfirmGiveUpPopupState extends State<ConfirmGiveUpPopup>
                             ),
                           ),
 
-                          // 🔵 ยืนยัน
+                          // 🔴 ยืนยัน
                           Expanded(
                             child: GestureDetector(
                               onTap: widget.onConfirm,
@@ -181,14 +181,7 @@ class _ConfirmGiveUpPopupState extends State<ConfirmGiveUpPopup>
                                 height: buttonHeight,
                                 margin: EdgeInsets.only(left: 8),
                                 decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      Color(0xFF556AEB),
-                                      Color(0xFF59ABEC),
-                                    ],
-                                  ),
+                                  color: const Color(0xFFEA4444),
                                   borderRadius: BorderRadius.circular(30),
                                 ),
                                 child: Center(

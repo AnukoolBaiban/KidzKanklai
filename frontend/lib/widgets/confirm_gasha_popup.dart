@@ -151,7 +151,7 @@ class _ConfirmGashaPopupState extends State<ConfirmGashaPopup>
 
                       Row(
                         children: [
-                          // 🔴 ยกเลิก
+                          // ⚪ ยกเลิก
                           Expanded(
                             child: GestureDetector(
                               onTap: widget.onCancel,
@@ -159,7 +159,7 @@ class _ConfirmGashaPopupState extends State<ConfirmGashaPopup>
                                 height: buttonHeight,
                                 margin: EdgeInsets.only(right: 8),
                                 decoration: BoxDecoration(
-                                  color: Color(0xFFEA4444),
+                                  color: Colors.grey.shade600,
                                   borderRadius: BorderRadius.circular(30),
                                 ),
                                 child: Center(

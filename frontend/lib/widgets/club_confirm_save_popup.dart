@@ -150,7 +150,7 @@ class _ClubConfirmSavePopupState extends State<ClubConfirmSavePopup>
 
                       Row(
                         children: [
-                          // 🔴 ยกเลิก
+                          // ยกเลิก
                           Expanded(
                             child: GestureDetector(
                               onTap: widget.onCancel,
@@ -158,7 +158,7 @@ class _ClubConfirmSavePopupState extends State<ClubConfirmSavePopup>
                                 height: buttonHeight,
                                 margin: EdgeInsets.only(right: 8),
                                 decoration: BoxDecoration(
-                                  color: Color(0xFFEA4444),
+                                  color: Colors.grey.shade600,
                                   borderRadius: BorderRadius.circular(30),
                                 ),
                                 child: Center(

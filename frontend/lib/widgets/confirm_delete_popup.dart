@@ -167,7 +167,7 @@ class _ConfirmDeletePopupState extends State<ConfirmDeletePopup>
                       // Buttons
                       Row(
                         children: [
-                          // 🔴 ยกเลิก
+                          // ⚪ ยกเลิก
                           Expanded(
                             child: GestureDetector(
                               onTap: widget.onCancel,
@@ -175,11 +175,11 @@ class _ConfirmDeletePopupState extends State<ConfirmDeletePopup>
                                 height: buttonHeight,
                                 margin: EdgeInsets.only(right: 5),
                                 decoration: BoxDecoration(
-                                  color: Color(0xFFEA4444),
+                                  color: Colors.grey.shade600,
                                   borderRadius: BorderRadius.circular(30),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Color(0xFFEA4444).withOpacity(0.3),
+                                      color: Colors.black.withOpacity(0.1),
                                       blurRadius: 8,
                                       offset: Offset(0, 4),
                                     ),
@@ -199,7 +199,7 @@ class _ConfirmDeletePopupState extends State<ConfirmDeletePopup>
                             ),
                           ),
 
-                          // 🔵 ยืนยัน
+                          // 🔴 ยืนยัน
                           Expanded(
                             child: GestureDetector(
                               onTap: widget.onConfirm,
@@ -207,18 +207,11 @@ class _ConfirmDeletePopupState extends State<ConfirmDeletePopup>
                                 height: buttonHeight,
                                 margin: EdgeInsets.only(left: 5),
                                 decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      Color(0xFF556AEB),
-                                      Color(0xFF59ABEC),
-                                    ],
-                                  ),
+                                  color: Color(0xFFEA4444),
                                   borderRadius: BorderRadius.circular(30),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Color(0xFF59ABEC).withOpacity(0.3),
+                                      color: Color(0xFFEA4444).withOpacity(0.3),
                                       blurRadius: 8,
                                       offset: Offset(0, 4),
                                     ),
