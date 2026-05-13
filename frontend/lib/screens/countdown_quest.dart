@@ -21,6 +21,7 @@ import 'package:flutter_application_1/services/audio_manager.dart';
 import 'package:flutter_application_1/config/rive_cache.dart';
 import 'package:flutter_application_1/screens/loading.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
+import 'package:flutter_application_1/widgets/confirm_start_quest_popup.dart';
 
 class CountdownQuestScreen extends StatefulWidget {
   final User? user;
@@ -953,7 +954,13 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
                   },
                 );
               } else {
-                _startQuest(); // 🌟 เปลี่ยนจาก _startTimer() เป็น _startQuest()
+                ConfirmStartQuestPopup.show(
+                  context,
+                  onConfirm: () {
+                    Navigator.pop(context); // ปิด popup
+                    _startQuest(); // 🌟 เปลี่ยนจาก _startTimer() เป็น _startQuest()
+                  },
+                );
               }
             }
           },

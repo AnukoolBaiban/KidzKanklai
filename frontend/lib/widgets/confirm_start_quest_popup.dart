@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/widgets/ticket_box.dart';
 
-class ConfirmSavePopup extends StatefulWidget {
+class ConfirmStartQuestPopup extends StatefulWidget {
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
 
-  const ConfirmSavePopup({
+  const ConfirmStartQuestPopup({
     Key? key,
     required this.onConfirm,
     required this.onCancel,
@@ -19,7 +19,7 @@ class ConfirmSavePopup extends StatefulWidget {
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.black.withOpacity(0.6),
-      builder: (context) => ConfirmSavePopup(
+      builder: (context) => ConfirmStartQuestPopup(
         onConfirm: onConfirm,
         onCancel: () => Navigator.pop(context),
       ),
@@ -27,10 +27,10 @@ class ConfirmSavePopup extends StatefulWidget {
   }
 
   @override
-  State<ConfirmSavePopup> createState() => _ConfirmSavePopupState();
+  State<ConfirmStartQuestPopup> createState() => _ConfirmStartQuestPopupState();
 }
 
-class _ConfirmSavePopupState extends State<ConfirmSavePopup>
+class _ConfirmStartQuestPopupState extends State<ConfirmStartQuestPopup>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
@@ -76,7 +76,6 @@ class _ConfirmSavePopupState extends State<ConfirmSavePopup>
     final subtitleFontSize = isSmallScreen ? 11.0 : 13.0;
     final buttonFontSize = isSmallScreen ? 14.0 : 16.0;
     final topPadding = isSmallScreen ? 15.0 : 20.0;
-    final badgeSize = isSmallScreen ? 12.0 : 14.0;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -98,7 +97,7 @@ class _ConfirmSavePopupState extends State<ConfirmSavePopup>
                   padding: EdgeInsets.fromLTRB(20, topPadding, 20, 20),
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
+                    gradient: const LinearGradient(
                       colors: [
                         Color.fromARGB(5, 0, 0, 0),
                         Color.fromARGB(80, 0, 0, 0),
@@ -121,7 +120,7 @@ class _ConfirmSavePopupState extends State<ConfirmSavePopup>
                       BoxShadow(
                         color: Colors.black.withOpacity(0.3),
                         blurRadius: 20,
-                        offset: Offset(0, 10),
+                        offset: const Offset(0, 10),
                       ),
                     ],
                   ),
@@ -129,7 +128,7 @@ class _ConfirmSavePopupState extends State<ConfirmSavePopup>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'ยืนยันการสร้างภารกิจ?',
+                        'ยืนยันที่จะเริ่มทำภารกิจทันที?',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white,
@@ -137,16 +136,16 @@ class _ConfirmSavePopupState extends State<ConfirmSavePopup>
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       Text(
-                        'ภารกิจของคุณจะถูกบันทึกแต่จะไม่สามารถลบหรือแก้ไขได้ในภายหลัง',
+                        'ภารกิจของคุณจะเริ่มนับเวลาถอยหลังทันที',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white70,
                           fontSize: subtitleFontSize,
                         ),
                       ),
-                      SizedBox(height: 20),
+                      const SizedBox(height: 20),
 
                       Row(
                         children: [
@@ -184,9 +183,9 @@ class _ConfirmSavePopupState extends State<ConfirmSavePopup>
                                 children: [
                                   Container(
                                     height: buttonHeight,
-                                    margin: EdgeInsets.only(left: 8),
+                                    margin: const EdgeInsets.only(left: 8),
                                     decoration: BoxDecoration(
-                                      gradient: LinearGradient(
+                                      gradient: const LinearGradient(
                                         begin: Alignment.topCenter,
                                         end: Alignment.bottomCenter,
                                         colors: [
@@ -229,7 +228,7 @@ class _ConfirmSavePopupState extends State<ConfirmSavePopup>
                                               height: 10,
                                             ),
                                             const SizedBox(width: 6),
-                                            Text(
+                                            const Text(
                                               "-1",
                                               style: TextStyle(
                                                 fontSize: 14,
