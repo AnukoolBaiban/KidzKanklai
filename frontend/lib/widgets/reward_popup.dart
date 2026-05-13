@@ -284,22 +284,36 @@ class _RewardPopupState extends State<RewardPopup> with SingleTickerProviderStat
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Image.asset(
-            imageToShow,
-            width: 35,
-            height: 35,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) {
-              return const Icon(Icons.stars, size: 35, color: Color(0xFFFFA726));
-            },
+          Transform.translate(
+            offset: reward.isFashion ? const Offset(1, 1) : Offset.zero,
+            child: Transform.scale(
+              scale: reward.isFashion ? 3.0 : 1.0,
+              child: Image.asset(
+                imageToShow,
+                width: 35,
+                height: 35,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Icon(Icons.stars, size: 35, color: Color(0xFFFFA726));
+                },
+              ),
+            ),
           ),
           const SizedBox(height: 4),
-          Text(
-            '+${reward.amount}',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                reward.isFashion 
+                    ? (reward.itemDescription ?? reward.itemName ?? "Item")
+                    : '+${reward.amount}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
             ),
           ),
         ],
@@ -367,19 +381,24 @@ class RewardData {
   final String type;
   final int amount;
   final String? itemName;
+  final String? itemDescription;
   final String? itemImage;
+  final bool isFashion;
 
   RewardData({
     required this.type,
     required this.amount,
     this.itemName,
+    this.itemDescription,
     this.itemImage,
+    this.isFashion = false,
   });
 
   factory RewardData.exp(int amount) => RewardData(type: 'EXP', amount: amount);
   factory RewardData.coin(int amount) => RewardData(type: 'COIN', amount: amount);
   factory RewardData.ticket(int amount) => RewardData(type: 'TICKET', amount: amount);
-  factory RewardData.item({required String name, required int amount, String? image}) {
-    return RewardData(type: 'ITEM', amount: amount, itemName: name, itemImage: image);
+  factory RewardData.item({required String name, required int amount, String? image, bool isFashion = false, String? description}) {
+    return RewardData(type: 'ITEM', amount: amount, itemName: name, itemImage: image, isFashion: isFashion, itemDescription: description);
   }
 }
+

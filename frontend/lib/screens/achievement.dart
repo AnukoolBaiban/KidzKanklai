@@ -511,10 +511,23 @@ class _AchievementScreenState extends State<AchievementScreen> {
 
                               if (rewardsList.isNotEmpty) {
                                 List<RewardData> popupRewards = rewardsList.map((r) {
+                                  // เช็คว่าเป็น Fashion หรือไม่จากข้อมูลใน achievement.reward
+                                  bool itemIsFashion = false;
+                                  if (achievement.reward != null && achievement.reward!.isFashion) {
+                                    // ตรวจสอบจากรูปภาพ (เพราะชื่อใน achievement.reward คือ description แต่ใน r['name'] คือ technical name)
+                                    // หรือถ้าใน rewardsList มีรายการเดียวและเป็นประเภทไอเทม
+                                    if (r['image'] == achievement.reward!.imagePath || 
+                                        (rewardsList.length == 1 && r['name'] != 'COIN' && r['name'] != 'EXP')) {
+                                      itemIsFashion = true;
+                                    }
+                                  }
+
                                   return RewardData.item(
                                     name: r['name'],
                                     amount: r['added'],
                                     image: r['image'] ?? 'assets/images/item/default_item.png',
+                                    isFashion: itemIsFashion,
+                                    description: itemIsFashion ? achievement.reward!.name : (r['description'] ?? r['name']),
                                   );
                                 }).toList();
                                 await RewardPopup.show(context, rewards: popupRewards);
