@@ -434,7 +434,14 @@ func KickMember(c *gin.Context) {
 		return
 	}
 
-	// 5. เตะออกจากชมรม (เคลียร์ค่า club_id, club_role, และ club_join_date เป็น NULL)
+	// 🌟 5. เตรียมส่งการแจ้งเตือนบอกผู้เล่นที่โดนเตะ (ทำก่อนจะลบออกจากชมรม)
+	var clubName string
+	err = tx.QueryRow(ctx, `SELECT name FROM public.clubs WHERE id = $1`, *ownerClubID).Scan(&clubName)
+	if err == nil {
+		CreateClubKickNotification(ctx, tx, targetUserID, clubName)
+	}
+
+	// 6. เตะออกจากชมรม (เคลียร์ค่า club_id, club_role, และ club_join_date เป็น NULL)
 	updateUserQuery := `
 		UPDATE public.user_profiles 
 		SET club_id = NULL, club_role = NULL, club_join_date = NULL 
@@ -444,13 +451,6 @@ func KickMember(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถไล่สมาชิกออกได้"})
 		return
-	}
-
-	// 🌟 6. สร้างการแจ้งเตือนบอกผู้เล่นที่โดนเตะ
-	var clubName string
-	err = tx.QueryRow(ctx, `SELECT name FROM public.clubs WHERE id = $1`, *ownerClubID).Scan(&clubName)
-	if err == nil {
-		CreateClubKickNotification(ctx, targetUserID, clubName)
 	}
 
 	// ยืนยัน Transaction

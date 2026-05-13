@@ -279,7 +279,7 @@ func CreateAchievementNotification(ctx context.Context, userID uuid.UUID, achiev
 }
 
 // CreateClubKickNotification — สร้าง Notification เมื่อถูกไล่ออกจากชมรม
-func CreateClubKickNotification(ctx context.Context, userID uuid.UUID, clubName string) {
+func CreateClubKickNotification(ctx context.Context, tx pgx.Tx, userID uuid.UUID, clubName string) {
 	now := time.Now()
 	// กำหนดวันหมดอายุเป็น 6 วันข้างหน้า เวลา 17:00
 	dueDate := time.Date(now.Year(), now.Month(), now.Day()+6, 17, 0, 0, 0, now.Location())
@@ -293,7 +293,7 @@ func CreateClubKickNotification(ctx context.Context, userID uuid.UUID, clubName 
 	title := "คุณพ้นสภาพสมาชิกชมรม 🛡️"
 	detail := fmt.Sprintf("คุณถูกหัวหน้าชมรมปลดออกจากชมรม \"%s\" แล้ว คุณสามารถเลือกเข้าร่วมชมรมอื่นๆ ได้ตามต้องการ", clubName)
 
-	err := configs.DB.QueryRow(ctx, insertNotifQuery, title, detail, dueDate).Scan(&notifID)
+	err := tx.QueryRow(ctx, insertNotifQuery, title, detail, dueDate).Scan(&notifID)
 	if err != nil {
 		fmt.Printf("❌ [CreateClubKickNotification] Failed to insert notification: %v\n", err)
 		return
@@ -304,7 +304,7 @@ func CreateClubKickNotification(ctx context.Context, userID uuid.UUID, clubName 
 		VALUES ($1, $2, 'unread', NULL, false)
 		ON CONFLICT (user_id, notification_id) DO NOTHING
 	`
-	_, err = configs.DB.Exec(ctx, linkQuery, userID, notifID)
+	_, err = tx.Exec(ctx, linkQuery, userID, notifID)
 	if err != nil {
 		fmt.Printf("❌ [CreateClubKickNotification] Failed to link user-notification: %v\n", err)
 		return
