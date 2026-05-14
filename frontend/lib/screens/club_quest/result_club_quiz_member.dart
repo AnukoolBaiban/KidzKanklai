@@ -383,12 +383,14 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
                                         ),
                                       ),
                                   // Bubble ข้อความให้กำลังใจ (ด้านซ้ายของตัวละคร)
-                                  if (_showEncouragement && _encouragementMessage != null)
-                                    Positioned(
-                                      left: -80, // เลยขอบซ้ายออกไปเยอะๆ จะได้ไม่โดนทับ
-                                      top: 60, // ระดับแก้มตัวละคร
+                                  Positioned(
+                                    left: -80, // เลยขอบซ้ายออกไปเยอะๆ จะได้ไม่โดนทับ
+                                    top: 60, // ระดับแก้มตัวละคร
+                                    child: IgnorePointer(
+                                      ignoring: !_showEncouragement || _encouragementMessage == null,
                                       child: _buildEncouragementBubble(),
                                     ),
+                                  ),
                                 ],
                               ),
                             ),

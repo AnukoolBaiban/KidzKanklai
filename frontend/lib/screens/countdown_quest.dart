@@ -304,12 +304,39 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
     }
   }
 
+  // 🌟 ฟังก์ชันแสดงข้อความแบบกำหนดเองและกำหนดเวลาได้
+  void _showCustomEncouragement(String message, {int seconds = 3}) {
+    if (mounted) {
+      setState(() {
+        _encouragementMessage = message;
+        _showEncouragement = true;
+      });
+      
+      _encouragementTimer?.cancel();
+      _encouragementTimer = Timer(Duration(seconds: seconds), () {
+        if (mounted) {
+          setState(() {
+            _showEncouragement = false;
+          });
+        }
+      });
+    }
+  }
+
   // 🌟 3. ฟังก์ชันจบเควส (ยิง API Complete)
   Future<void> _completeQuest() async {
     if (_currentQuestId == null) return;
 
     // 🎉 เล่นท่า Win ก่อนยิง API
     _characterKey.currentState?.triggerWin();
+
+    // 🌟 แสดงข้อความแสดงความยินดีสุ่มๆ ก่อน 3 วินาที
+    final winMessages = ["เก่งมากเลย!", "ยอดเยี่ยมไปเลย!", "ทำได้ดีมาก!", "พัฒนาขึ้นอีกแล้ว!"];
+    winMessages.shuffle();
+    _showCustomEncouragement(winMessages.first, seconds: 3);
+
+    // รอให้ข้อความแสดงจนจบ 3 วินาที (บวกเวลาจางนิดหน่อย)
+    await Future.delayed(const Duration(milliseconds: 3300));
 
     // 🌟 ดึง Profile ก่อนเรียก API เพื่อบันทึก Level เดิม
     final profileBefore = await ApiService.getProfile(0);
@@ -395,8 +422,6 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
         _elapsedTotalSeconds = 0;
         _totalDurationSeconds = 0;
         _triggeredThresholds.clear();
-        _showEncouragement = false;
-        _encouragementTimer?.cancel();
       }
     });
   }
@@ -421,6 +446,11 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
           // 💔 เล่นท่า Lose ก่อน API
           _characterKey.currentState?.triggerLose();
           
+          // 🌟 แสดงข้อความให้กำลังใจสุ่มๆ ก่อน 3 วินาที
+          final loseMessages = ["ไม่เป็นไรนะ!", "สู้ๆ เริ่มใหม่ได้!", "พยายามอีกนิด!", "อย่าเพิ่งท้อนะ!"];
+          loseMessages.shuffle();
+          _showCustomEncouragement(loseMessages.first, seconds: 3);
+
           if (_currentQuestId != null) {
             // ยิง API บอก Backend ว่าขอยอมแพ้
             await ApiService.cancelQuest(_currentQuestId!); 
@@ -429,13 +459,18 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
           String finalTime = _formattedElapsedTime;
           _stopTimer(reset: true);
           
-          MissionFailPopup.show(
-            context,
-            elapsedTime: finalTime,
-            onTapContinue: () {
-               Navigator.pop(context); // กลับหน้าเดิม
-            },
-          );
+          // รอให้ข้อความแสดงจนครบ 3 วินาที (บวกเวลาจางนิดหน่อย)
+          await Future.delayed(const Duration(milliseconds: 3300));
+
+          if (mounted) {
+            MissionFailPopup.show(
+              context,
+              elapsedTime: finalTime,
+              onTapContinue: () {
+                Navigator.pop(context); // กลับหน้าเดิม
+              },
+            );
+          }
         },
       );
     }
@@ -560,12 +595,14 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
             ),
 
             // ── Bubble ข้อความให้กำลังใจ (ด้านซ้ายของตัวละคร) ──
-            if (_showEncouragement && _encouragementMessage != null)
-              Positioned(
-                bottom: bottomPadding + 360.0, // ยกให้สูงขึ้นระดับแก้มของตัวละคร
-                left: size.width * 0.04, // ชิดซ้าย
+            Positioned(
+              bottom: bottomPadding + 360.0, // ยกให้สูงขึ้นระดับแก้มของตัวละคร
+              left: size.width * 0.04, // ชิดซ้าย
+              child: IgnorePointer(
+                ignoring: !_showEncouragement || _encouragementMessage == null,
                 child: _buildEncouragementBubble(size, isSmallScreen),
               ),
+            ),
 
             // ── Overlay โซนกดตัวละครเพื่อให้เล่นท่า Cheerup (ดัก Tap ไว้หน้าสุด) ──
             Positioned(
