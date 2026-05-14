@@ -5,6 +5,7 @@ import 'package:rive/rive.dart' hide LinearGradient, Image;
 import 'package:flutter_application_1/config/rive_cache.dart';
 import 'package:flutter_application_1/screens/result_stat.dart' show AnimatedUpwardArrow;
 import 'package:flutter_application_1/widgets/reward_popup.dart';
+import 'package:flutter_application_1/screens/loading.dart';
 
 class ResultExamScreen extends StatefulWidget {
   final User? user;
@@ -36,24 +37,39 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
   SMINumber? _clothInput;
   StateMachineController? _controller;
   bool _isRiveLoaded = false;
+  bool _isPageReady = false;
   User? _currentUser;
 
   @override
   void initState() {
     super.initState();
     _currentUser = widget.user;
-    if (_currentUser == null) {
-      _fetchUser();
-    }
+    _initializePage();
   }
 
-  Future<void> _fetchUser() async {
-    final user = await ApiService.getProfile(0);
-    if (mounted) {
-      setState(() {
-        _currentUser = user;
-      });
-      _syncRiveToEquipped(); // ซิงค์ข้อมูลหลังจากโหลด User เสร็จ
+  Future<void> _initializePage() async {
+    try {
+      // 1. Fetch user if not provided
+      if (_currentUser == null) {
+        _currentUser = await ApiService.getProfile(0);
+      }
+
+      // 2. Pre-load Rive assets
+      await RiveCache().loadAssets([
+        'assets/animation/kid.riv',
+        'assets/animation/teen.riv',
+        'assets/animation/adult.riv',
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _isPageReady = true;
+        });
+        _syncRiveToEquipped();
+      }
+    } catch (e) {
+      debugPrint("Error initializing ResultExamScreen: $e");
+      if (mounted) setState(() => _isPageReady = true);
     }
   }
 
@@ -172,6 +188,15 @@ class _ResultExamScreenState extends State<ResultExamScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 600),
+      child: !_isPageReady 
+        ? const LoadingScreen(isStandalone: false)
+        : _buildActualPage(context),
+    );
+  }
+
+  Widget _buildActualPage(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
     final topBarHeight = 60.0 + topPadding;
     final screenWidth = MediaQuery.of(context).size.width;
