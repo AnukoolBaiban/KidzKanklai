@@ -829,7 +829,9 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
           ),
           Center(
             child: Text(
-              'จำนวนสมาชิกที่สำเร็จภารกิจนี้ $countText',
+              totalReq == 0
+                  ? 'ขณะนี้ไม่มีสมาชิกในชมรม'
+                  : 'จำนวนสมาชิกที่สำเร็จภารกิจนี้ $countText',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,

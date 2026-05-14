@@ -424,10 +424,18 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
                                           width: double.infinity,
                                           padding: const EdgeInsets.all(12),
                                           decoration: BoxDecoration(
-                                            color: isCompleted ? const Color(0xFFE6F9EE) : const Color(0xFFE8F4F8),
+                                            color: isCompleted
+                                                ? const Color(0xFFE6F9EE)
+                                                : (_totalMembers == 0
+                                                    ? const Color(0xFFFFF5F5)
+                                                    : const Color(0xFFE8F4F8)),
                                             borderRadius: BorderRadius.circular(8),
                                             border: Border.all(
-                                              color: isCompleted ? const Color(0xFF34C759) : const Color(0xFF9DD0E7),
+                                              color: isCompleted
+                                                  ? const Color(0xFF34C759)
+                                                  : (_totalMembers == 0
+                                                      ? const Color(0xFFEA4444)
+                                                      : const Color(0xFF9DD0E7)),
                                             ),
                                           ),
                                           child: isCompleted
@@ -442,26 +450,37 @@ class _ClubQuestDetailLeaderScreenState extends State<ClubQuestDetailLeaderScree
                                                     ),
                                                   ],
                                                 )
-                                              : Row(
-                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                  children: [
-                                                    const Text(
-                                                      'ความคืบหน้าภารกิจของสมาชิก',
-                                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF002A50)),
-                                                    ),
-                                                    Text(
-                                                      '$_completedMembers / $_totalMembers คน',
-                                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2374B5)),
-                                                    ),
-                                                  ],
-                                                ),
+                                              : (_totalMembers == 0
+                                                  ? const Center(
+                                                      child: Text(
+                                                        'ไม่มีสมาชิกในชมรม คุณจะไม่ได้รับของรางวัล',
+                                                        style: TextStyle(
+                                                          fontSize: 14,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: Color(0xFFEA4444),
+                                                        ),
+                                                      ),
+                                                    )
+                                                  : Row(
+                                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                      children: [
+                                                        const Text(
+                                                          'ความคืบหน้าภารกิจของสมาชิก',
+                                                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF002A50)),
+                                                        ),
+                                                        Text(
+                                                          '$_completedMembers / $_totalMembers คน',
+                                                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2374B5)),
+                                                        ),
+                                                      ],
+                                                    )),
                                         );
                                       }),
 
                                       const SizedBox(height: 12),
 
-                                      // 🌟 2. ปุ่มดูรายชื่อคนที่ยังไม่เสร็จ (ซ่อนเมื่อทุกคนทำเสร็จแล้ว)
-                                      if (_totalMembers == 0 || _completedMembers < _totalMembers)
+                                      // 🌟 2. ปุ่มดูรายชื่อคนที่ยังไม่เสร็จ (ซ่อนเมื่อทุกคนทำเสร็จแล้ว หรือไม่มีสมาชิกเลย)
+                                      if (_totalMembers > 0 && _completedMembers < _totalMembers)
                                       SizedBox(
                                         width: double.infinity,
                                         child: ElevatedButton.icon(
