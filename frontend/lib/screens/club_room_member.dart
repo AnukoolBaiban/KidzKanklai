@@ -334,27 +334,28 @@ class _ClubRoomMemberScreenState extends State<ClubRoomMemberScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // 🌟 เพิ่มข้อความบอกจำนวนภารกิจที่อยู่ตรงกลาง
-                  SizedBox(
-                    height: 30,
-                    child: Center(
-                      child: Text(
-                        "ภารกิจที่ยังไม่สำเร็จ ${_quests.length - _completedQuestIds.length}/${_quests.length}",
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black54,
+                  // 🌟 เพิ่มข้อความบอกจำนวนภารกิจที่อยู่ตรงกลาง (ซ่อนถ้าไม่มีภารกิจเลย)
+                  if (_quests.isNotEmpty)
+                    SizedBox(
+                      height: 30,
+                      child: Center(
+                        child: Text(
+                          "ภารกิจที่ยังไม่สำเร็จ ${_quests.length - _completedQuestIds.length}/${_quests.length}",
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black54,
+                          ),
                         ),
                       ),
                     ),
-                  ),
                   // Mission List แบบ scroll ได้ (แสดงเฉพาะตอนขยาย)
                   if (!_isCollapsed)
                     Expanded(
                       child: _quests.isEmpty
                           ? const Center(
                               child: Text(
-                                "ยังไม่มีภารกิจในขณะนี้",
+                                "ยังไม่มีภารกิจชมรมในขณะนี้",
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
