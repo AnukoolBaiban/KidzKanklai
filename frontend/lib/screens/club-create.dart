@@ -105,7 +105,7 @@ class _ClubCreateScreenState extends State<ClubCreateScreen> {
     const headerHeight = 80.0;
 
     return Scaffold(
-      resizeToAvoidBottomInset: true,
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           _buildBackground(),
