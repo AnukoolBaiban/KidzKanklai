@@ -1,6 +1,7 @@
 import 'dart:io'; // 🌟 1. เพิ่มสำหรับจัดการไฟล์
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:characters/characters.dart';
 import 'package:image_picker/image_picker.dart'; // 🌟 2. เพิ่ม ImagePicker
 import 'package:flutter_application_1/api_service.dart';
 import 'package:flutter_application_1/screens/lobby.dart';
@@ -494,9 +495,9 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '${controller.text.length}/15',
+                      '${controller.text.characters.length}/15',
                       style: TextStyle(
-                        color: controller.text.length >= 15
+                        color: controller.text.characters.length >= 15
                             ? Colors.red
                             : Colors.grey.shade400,
                         fontSize: 12,
@@ -617,9 +618,9 @@ class _CreateNormalQuestScreenState extends State<CreateNormalQuestScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '${_detailController.text.length}/300',
+                      '${_detailController.text.characters.length}/300',
                       style: TextStyle(
-                        color: _detailController.text.length >= 300
+                        color: _detailController.text.characters.length >= 300
                             ? Colors.red
                             : Colors.grey.shade500,
                         fontSize: 12,

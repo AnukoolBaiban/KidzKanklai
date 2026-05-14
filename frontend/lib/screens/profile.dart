@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:characters/characters.dart';
 import 'package:flutter_application_1/screens/lobby.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http; // เพิ่ม import นี้
@@ -368,9 +369,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: const TextStyle(fontSize: 16),
                   buildCounter: (context, {required currentLength, required isFocused, maxLength}) {
                     return Text(
-                      '$currentLength/$maxLength',
+                      '${controller.text.characters.length}/$maxLength',
                       style: TextStyle(
-                        color: currentLength == maxLength ? Colors.red : Colors.black54,
+                        color: controller.text.characters.length == maxLength ? Colors.red : Colors.black54,
                         fontSize: 12,
                       ),
                     );

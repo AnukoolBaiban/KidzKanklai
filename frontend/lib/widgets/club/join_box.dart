@@ -111,6 +111,7 @@ class _JoinCodeBoxState extends State<JoinCodeBox> {
                             padding: const EdgeInsets.symmetric(horizontal: 18),
                             child: TextField(
                               controller: widget.codeController,
+                              maxLength: 6,
                               style: const TextStyle(
                                 fontSize: 15,
                                 color: Color(0xFF444444),
@@ -122,6 +123,7 @@ class _JoinCodeBoxState extends State<JoinCodeBox> {
                               },
                               decoration: const InputDecoration(
                                 hintText: 'กรอกรหัส',
+                                counterText: '',
                                 hintStyle: TextStyle(
                                   color: Color(0xFFBBBBBB),
                                   fontSize: 15,

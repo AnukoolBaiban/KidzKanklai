@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:characters/characters.dart';
 
 // ── 1. กล่องตั้งชื่อชมรม ─────────────────────────────────────
 class ClubNameField extends StatefulWidget {
@@ -88,9 +89,9 @@ class _ClubNameFieldState extends State<ClubNameField> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '${widget.controller.text.length}/20',
+                      '${widget.controller.text.characters.length}/20',
                       style: TextStyle(
-                        color: widget.controller.text.length >= 20
+                        color: widget.controller.text.characters.length >= 20
                             ? Colors.red
                             : Colors.grey.shade400,
                         fontSize: 12,
@@ -184,9 +185,9 @@ class _ClubDescFieldState extends State<ClubDescField> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '${widget.controller.text.length}/300',
+                      '${widget.controller.text.characters.length}/300',
                       style: TextStyle(
-                        color: widget.controller.text.length >= 300
+                        color: widget.controller.text.characters.length >= 300
                             ? Colors.red
                             : Colors.grey.shade500,
                         fontSize: 12,

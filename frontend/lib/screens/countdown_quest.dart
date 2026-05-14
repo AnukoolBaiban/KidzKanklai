@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:characters/characters.dart';
 import 'package:flutter_application_1/api_service.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_application_1/widgets/music_select_popup.dart';
@@ -866,7 +867,7 @@ class _CountdownQuestScreenState extends State<CountdownQuestScreen>
         controller: _detailController,
         textAlign: TextAlign.center,
         maxLength: _maxChars,
-        onChanged: (val) => setState(() => _charCount = val.length),
+        onChanged: (val) => setState(() => _charCount = val.characters.length),
         style: GoogleFonts.kanit(fontSize: fontSize, color: Colors.black87),
         decoration: InputDecoration(
           hintText: "ตั้งชื่อกิจกรรม",
