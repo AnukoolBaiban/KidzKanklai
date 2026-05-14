@@ -1023,10 +1023,13 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
                         const SizedBox(width: 40),
                         Expanded(
                           child: Center(
-                            child: Text(
-                              _clubName,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                _clubName,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+                              ),
                             ),
                           ),
                         ),

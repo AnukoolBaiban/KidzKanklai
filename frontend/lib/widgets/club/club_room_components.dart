@@ -114,15 +114,18 @@ class _ClubBlueHeaderState extends State<ClubBlueHeader> {
               child: Center(
                 child: Padding(
                   padding: EdgeInsets.symmetric(
-                    horizontal: widget.onBackPressed != null ? 60 : 30,
+                    horizontal: (widget.onBackPressed != null || widget.isClubAnnotation || widget.annotationTitle != null || widget.annotationDescription != null) ? 70 : 30,
                   ),
-                  child: Text(
-                    widget.title,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      widget.title,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),

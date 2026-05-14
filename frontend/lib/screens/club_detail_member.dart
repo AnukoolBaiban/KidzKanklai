@@ -767,10 +767,13 @@ class _ClubDetailMemberScreenState extends State<ClubDetailMemberScreen> {
                       boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 2, offset: const Offset(0, 1))],
                     ),
                     alignment: Alignment.center,
-                    child: Text(
-                      _clubName,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        _clubName,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+                      ),
                     ),
                   ),
                 ),
