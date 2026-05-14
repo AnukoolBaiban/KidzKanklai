@@ -292,7 +292,7 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
         _buildCircularIconButton(
           imagePath: "assets/images/button/bt-create.png",
           isPressed: _isCreatePressed,
-          isDisabled: false, // 🌟 ไม่มีการจำกัดสิทธิ์การกดสร้างแล้ว
+          isDisabled: _totalMembersCount == 0 || _isLoading, // 🌟 ปิดปุ่มถ้าไม่มีสมาชิก
           onTap: () {
             Navigator.pushNamed(context, '/createclubquest');
           },
@@ -364,10 +364,10 @@ class _ClubRoomHeadScreenState extends State<ClubRoomHeadScreen> {
     bool isDisabled = false,
   }) {
     return GestureDetector(
-      onTapDown: (_) => onPressedChanged(true),
-      onTapUp: (_) => onPressedChanged(false),
-      onTapCancel: () => onPressedChanged(false),
-      onTap: onTap,
+      onTapDown: isDisabled ? null : (_) => onPressedChanged(true),
+      onTapUp: isDisabled ? null : (_) => onPressedChanged(false),
+      onTapCancel: isDisabled ? null : () => onPressedChanged(false),
+      onTap: isDisabled ? null : onTap,
       child: Container(
         width: 50,
         height: 50,
