@@ -267,20 +267,9 @@ class _ClubDetailHeadScreenState extends State<ClubDetailHeadScreen> {
         if (ClubDetailHeadPreloader.cachedData != null && ClubDetailHeadPreloader.cachedData!['club'] != null) {
           ClubDetailHeadPreloader.cachedData!['club']['is_joinable'] = value;
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? (value ? 'เปิดรับสมาชิกแล้ว' : 'ปิดรับสมาชิกแล้ว')),
-            backgroundColor: value ? Colors.green : Colors.orange,
-            duration: const Duration(seconds: 1),
-          ),
-        );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result?['error'] ?? 'เกิดข้อผิดพลาด'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        // กรณีเฟล ให้ดีดสวิตช์กลับ
+        setState(() => _isJoinable = !value);
       }
     }
   }
